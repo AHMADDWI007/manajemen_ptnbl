@@ -16,7 +16,7 @@
   <div class="content-wrapper">
     <div class="content-header">
       <div class="container-fluid">
-        <h3 class="m-0 text-success">Data Produksi</h3>
+        <h3 class="m-0 text-success">Bahan Dalam Proses</h3>
       </div>
     </div>
 

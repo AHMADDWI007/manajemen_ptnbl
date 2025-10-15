@@ -6,81 +6,93 @@
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
 
-  <!-- Navbar -->
-  @include('template.navbar')
+    @include('template.navbar')
 
-  <!-- Sidebar -->
-  @include('template.sidebar')
+    @include('template.sidebar')
 
-  <!-- Content Wrapper -->
-  <div class="content-wrapper">
-    <div class="content-header">
-      <div class="container-fluid">
-        <h3 class="mb-4 text-success fw-bold">Hasil Uji Lab Bokar</h3>
-      </div>
-    </div>
-
-    <div class="content">
-      <div class="container-fluid">
-
-        {{-- Notifikasi sukses --}}
-        @if(session('success'))
-          <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-
-        {{-- Tabel Data --}}
-        <div class="card shadow-sm">
-          <div class="card-header bg-success text-white">
-            <strong>Daftar Hasil Uji Lab Bokar</strong>
-          </div>
-          <div class="card-body table-responsive">
-            <table class="table table-bordered table-striped align-middle">
-              <thead class="text-center bg-light">
-                <tr>
-                  <th>No</th>
-                  <th>Tanggal</th>
-                  <th>No Kamar</th>
-                  <th>Hasil Uji</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse ($data_lab as $index => $lab)
-                  <tr>
-                    <td class="text-center">{{ $index + 1 }}</td>
-                    <td>{{ $lab->tanggal }}</td>
-                    <td>{{ $lab->no_kamar }}</td>
-                    <td>{{ $lab->hasil_uji ?? '-' }}</td>
-                    <td class="text-center">
-                      @if($lab->status == 'Menunggu Hasil')
-                        <span class="badge bg-warning text-dark">{{ $lab->status }}</span>
-                      @elseif($lab->status == 'Selesai')
-                        <span class="badge bg-success">{{ $lab->status }}</span>
-                      @else
-                        <span class="badge bg-secondary">{{ $lab->status }}</span>
-                      @endif
-                    </td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="5" class="text-center text-muted">Belum ada data hasil uji lab.</td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
-          </div>
+    <div class="content-wrapper">
+        <div class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1 class="m-0 text-success fw-bold">Hasil Uji Lab Bokar</h1>
+                    </div>
+                    <div class="col-sm-6">
+                        <ol class="breadcrumb float-sm-right">
+                            <li class="breadcrumb-item"><a href="#">Home</a></li>
+                            <li class="breadcrumb-item active">Hasil Uji Lab Bokar</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
         </div>
 
-      </div>
-    </div>
-  </div>
+        <div class="content">
+            <div class="container-fluid">
 
-  <!-- Footer -->
-  <footer class="main-footer">
-    @include('template.footer')
-  </footer>
+                {{-- Tabel Data --}}
+                <div class="card shadow-sm">
+                    {{-- PERUBAHAN 1: Tombol "Tambah Data" dihapus dari header --}}
+                    <div class="card-header bg-success text-white">
+                        <strong>Daftar Hasil Uji Lab Bokar</strong>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-bordered table-striped align-middle" id="dataTable">
+                            <thead class="text-center bg-light">
+                                <tr>
+                                    <th>No</th>
+                                    <th>Tanggal</th>
+                                    <th>Supplier</th>
+                                    <th>No Sampel</th>
+                                    <th>K3 (%)</th>
+                                    <th>Dirt (%)</th>
+                                    <th>Ask (%)</th>
+                                    {{-- PERUBAHAN 2: Kolom "Aksi" dihapus --}}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($data_lab as $item)
+                                    <tr>
+                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') }}</td>
+                                        <td>{{ $item->suplier }}</td>
+                                        <td>{{ $item->no_sampel }}</td>
+                                        <td class="text-center">{{ $item->k3 ?? '-' }}</td>
+                                        <td class="text-center">{{ $item->dirt ?? '-' }}</td>
+                                        <td class="text-center">{{ $item->ask ?? '-' }}</td>
+                                        {{-- PERUBAHAN 3: Kolom yang berisi tombol Edit dan Hapus dihapus --}}
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        {{-- PERUBAHAN 4: Colspan disesuaikan menjadi 7 karena kolom Aksi hilang --}}
+                                        <td colspan="7" class="text-center text-muted">Belum ada data hasil uji lab.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- PERUBAHAN 5: Seluruh bagian Modal Form dihapus karena tidak lagi diperlukan --}}
+
+    <footer class="main-footer">
+        @include('template.footer')
+    </footer>
 
 </div>
 
 @include('template.script')
+
+{{-- PERUBAHAN 6: JavaScript disederhanakan, hanya menyisakan inisialisasi DataTable --}}
+<script>
+    // Inisialisasi DataTable untuk fitur pencarian, paginasi, dll.
+    $(document).ready(function() {
+        $('#dataTable').DataTable();
+    });
+</script>
+
 </body>
 </html>

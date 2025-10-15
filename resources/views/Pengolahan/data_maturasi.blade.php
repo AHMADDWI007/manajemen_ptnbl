@@ -16,7 +16,7 @@
     <div class="content-wrapper">
         <div class="content-header">
             <div class="container-fluid">
-                <h3 class="mb-4 text-success fw-bold">Data Maturasi</h3>
+                <h3 class="mb-4 text-success fw-bold">Pengolahan Maturasi</h3>
             </div>
         </div>
 

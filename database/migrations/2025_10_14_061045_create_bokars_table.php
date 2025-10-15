@@ -9,16 +9,20 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+        public function up(): void
     {
-       Schema::create('bokar', function (Blueprint $table) {
-    $table->id();
-    $table->float('berat_penuh');
-    $table->float('berat_truk');
-    $table->float('berat_muatan');
-    $table->timestamps();
-});
-
+        Schema::create('bokar', function (Blueprint $table) {
+            $table->id();
+            $table->string('uraian');
+            $table->decimal('stock_awal', 10, 2)->nullable();
+            $table->decimal('penerimaan_harian', 10, 2)->nullable();
+            $table->decimal('penerimaan_sd_hari_ini', 10, 2)->nullable();
+            $table->decimal('jumlah_stock_bokar', 10, 2)->nullable();
+            $table->decimal('bokar_diproses_harian', 10, 2)->nullable();
+            $table->decimal('bokar_diproses_sd_hari_ini', 10, 2)->nullable();
+            $table->decimal('sisa_stock', 10, 2)->nullable();
+            $table->timestamps();
+        });
     }
 
     /**
@@ -26,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('bokars');
+        Schema::dropIfExists('bokar');
     }
 };

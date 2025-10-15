@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Bokar extends Model
+class HasilUjiTroli extends Model
 {
     use HasFactory;
 
@@ -14,7 +14,7 @@ class Bokar extends Model
      *
      * @var string
      */
-    protected $table = 'bokar';
+    protected $table = 'hasil_uji_troli';
 
     /**
      * Atribut yang dapat diisi secara massal (mass assignable).
@@ -23,13 +23,19 @@ class Bokar extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-    'uraian',
-    'stock_awal',
-    'penerimaan_harian',
-    'penerimaan_sd_hari_ini',
-    'jumlah_stock_bokar',
-    'bokar_diproses_harian',
-    'bokar_diproses_sd_hari_ini',
-    'sisa_stock', // Sisa Stock di foto sepertinya sama dengan Jumlah Stock Bokar
+        'tanggal',
+        'no_trolly',
+        'k3',
+        'po',
+        'pa',
+        'pri',
+        'jam_sample',
+        'lama_pengeringan',
     ];
+
+    /**
+     * Kita akan menggunakan timestamps (created_at dan updated_at)
+     * jadi baris 'public $timestamps = false;' dihapus.
+     * Timestamps sangat berguna untuk melacak kapan data dibuat atau diubah.
+     */
 }

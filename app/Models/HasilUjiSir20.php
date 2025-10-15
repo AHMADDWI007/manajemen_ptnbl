@@ -5,29 +5,28 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class HasilUjiMaturasi extends Model
+class HasilUjiSir20 extends Model
 {
     use HasFactory;
 
     /**
      * Nama tabel yang terhubung dengan model ini.
-     *
-     * @var string
      */
-    protected $table = 'hasil_uji_maturasi';
+    protected $table = 'hasil_uji_sir_20';
 
     /**
      * Atribut yang dapat diisi secara massal (mass assignable).
-     * Kolom-kolom ini yang akan diisi oleh aplikasi mobile Anda melalui API.
-     *
-     * @var array<int, string>
+     * Sesuai dengan kolom baru yang diminta.
      */
     protected $fillable = [
-        'tanggal',
-        'no_kamar',
-        'k3',
+        'no_palet', // 'no.palet' diubah menjadi snake_case
         'po',
         'pa',
         'pri',
+        'dirt',
+        'ask', // 'ask' akan kita asumsikan sebagai 'ash' (kadar abu)
+        'vm',  // 'vm' akan kita asumsikan sebagai 'volatile_matter'
+        'money',
+        'nitrogen',
     ];
 }

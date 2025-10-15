@@ -13,58 +13,53 @@
     <div class="content-wrapper">
         <div class="content-header">
             <div class="container-fluid">
-                <h3 class="mb-4 text-success fw-bold">Hasil Uji Maturasi</h3>
+                <h3 class="mb-4 text-success fw-bold">Hasil Uji SIR 20</h3>
             </div>
         </div>
 
         <div class="content">
             <div class="container-fluid">
 
-                {{-- Notifikasi (jika diperlukan dari proses lain) --}}
-                @if(session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        {{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                @endif
-
-                {{-- Tabel Data --}}
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white">
-                        <strong>Daftar Hasil Uji Maturasi</strong>
+                        <strong>Daftar Hasil Uji SIR 20</strong>
                     </div>
                     <div class="card-body table-responsive">
-                        {{-- Tambahkan ID "dataTable" untuk inisialisasi JavaScript --}}
                         <table class="table table-bordered table-striped align-middle" id="dataTable">
                             <thead class="text-center bg-light">
-                                {{-- PERUBAHAN 1: Menyesuaikan header tabel --}}
+                                {{-- HEADER TABEL DISESUAIKAN --}}
                                 <tr>
                                     <th>No</th>
-                                    <th>Tanggal</th>
-                                    <th>No. Kamar</th>
-                                    <th>K3</th>
+                                    <th>No. Palet</th>
                                     <th>Po</th>
                                     <th>Pa</th>
                                     <th>PRI</th>
+                                    <th>Dirt (%)</th>
+                                    <th>Ash (%)</th>
+                                    <th>VM (%)</th>
+                                    <th>Money</th>
+                                    <th>Nitrogen</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {{-- Pastikan controller mengirim variabel bernama $data_maturasi --}}
-                                @forelse ($data_maturasi as $item)
+                                @forelse ($data_sir_20 as $item)
                                     <tr>
-                                        {{-- PERUBAHAN 2: Menyesuaikan isi data tabel --}}
+                                        {{-- ISI TABEL DISESUAIKAN --}}
                                         <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') }}</td>
-                                        <td>{{ $item->no_kamar }}</td>
-                                        <td class="text-center">{{ $item->k3 ?? '-' }}</td>
+                                        <td>{{ $item->no_palet }}</td>
                                         <td class="text-center">{{ $item->po ?? '-' }}</td>
                                         <td class="text-center">{{ $item->pa ?? '-' }}</td>
                                         <td class="text-center">{{ $item->pri ?? '-' }}</td>
+                                        <td class="text-center">{{ $item->dirt ?? '-' }}</td>
+                                        <td class="text-center">{{ $item->ask ?? '-' }}</td>
+                                        <td class="text-center">{{ $item->vm ?? '-' }}</td>
+                                        <td class="text-center">{{ isset($item->money) ? number_format($item->money, 2, ',', '.') : '-' }}</td>
+                                        <td class="text-center">{{ $item->nitrogen ?? '-' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        {{-- PERUBAHAN 3: Menyesuaikan colspan --}}
-                                        <td colspan="7" class="text-center text-muted">Belum ada data hasil uji maturasi.</td>
+                                        {{-- Colspan disesuaikan menjadi 10 --}}
+                                        <td colspan="10" class="text-center text-muted">Belum ada data hasil uji SIR 20.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -84,7 +79,6 @@
 
 @include('template.script')
 
-{{-- Script untuk DataTable (pencarian, paginasi) --}}
 <script>
     $(document).ready(function() {
         $('#dataTable').DataTable();
