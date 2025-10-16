@@ -9,27 +9,23 @@ class Bokar extends Model
 {
     use HasFactory;
 
-    /**
-     * Nama tabel yang terhubung dengan model ini.
-     *
-     * @var string
-     */
     protected $table = 'bokar';
 
     /**
      * Atribut yang dapat diisi secara massal (mass assignable).
-     * Kolom-kolom ini akan diisi oleh aplikasi mobile Anda melalui API.
-     *
-     * @var array<int, string>
+     * Kolom baru ditambahkan di sini.
      */
     protected $fillable = [
-    'uraian',
-    'stock_awal',
-    'penerimaan_harian',
-    'penerimaan_sd_hari_ini',
-    'jumlah_stock_bokar',
-    'bokar_diproses_harian',
-    'bokar_diproses_sd_hari_ini',
-    'sisa_stock', // Sisa Stock di foto sepertinya sama dengan Jumlah Stock Bokar
+        'tanggal',
+        'no_kamar',
+        'berat_awal',
+        'berat_truck',
+        'berat_basah',
+        'k3_lab',
+        'berat_kering',
+        'total_ds',       // Ditambahkan
+        'total_pt',       // Ditambahkan
+        'jumlah',         // Ditambahkan
     ];
 }
+

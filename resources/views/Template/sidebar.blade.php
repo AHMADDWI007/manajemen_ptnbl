@@ -129,13 +129,13 @@
                     </a>
                      <ul class="nav nav-treeview">
                         <li class="nav-item">
-                            <a href="{{ url('/data-produksi/sir-20') }}" class="nav-link {{ request()->is('data-produksi/sir-20*') ? 'active' : '' }}">
+                            <a href="{{ url('/produksi_sir20') }}" class="nav-link {{ request()->is('produksi_sir20*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Produksi SIR 20</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url('/data-produksi/penjualan-sir-20') }}" class="nav-link {{ request()->is('data-produksi/penjualan-sir-20*') ? 'active' : '' }}">
+                            <a href="{{ url('/penjualan_sir20') }}" class="nav-link {{ request()->is('penjualan_sir20*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Penjualan SIR 20</p>
                             </a>
@@ -178,6 +178,12 @@
                             </a>
                         </li>
                     </ul>
+                     <li class="nav-item">
+                    <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-book"></i>
+                        <p>Laporan Harian</p>
+                    </a>
+                </li>
                 </li>
                  {{-- ### AKHIR DARI KODE YANG DITAMBAHKAN KEMBALI ### --}}
 

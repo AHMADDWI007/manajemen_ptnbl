@@ -6,28 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-        public function up(): void
+    public function up(): void
     {
         Schema::create('bokar', function (Blueprint $table) {
             $table->id();
-            $table->string('uraian');
-            $table->decimal('stock_awal', 10, 2)->nullable();
-            $table->decimal('penerimaan_harian', 10, 2)->nullable();
-            $table->decimal('penerimaan_sd_hari_ini', 10, 2)->nullable();
-            $table->decimal('jumlah_stock_bokar', 10, 2)->nullable();
-            $table->decimal('bokar_diproses_harian', 10, 2)->nullable();
-            $table->decimal('bokar_diproses_sd_hari_ini', 10, 2)->nullable();
-            $table->decimal('sisa_stock', 10, 2)->nullable();
+            $table->date('tanggal');
+            $table->string('no_kamar');
+            $table->decimal('berat_awal', 10, 2)->nullable();
+            $table->decimal('berat_truck', 10, 2)->nullable();
+            $table->decimal('berat_basah', 10, 2)->nullable();
+            $table->decimal('k3_lab', 8, 2)->nullable();
+            $table->decimal('berat_kering', 10, 2)->nullable();
+            // Kolom baru ditambahkan di sini
+            $table->decimal('total_ds', 10, 2)->nullable();
+            $table->decimal('total_pt', 10, 2)->nullable();
+            $table->decimal('jumlah', 10, 2)->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('bokar');
