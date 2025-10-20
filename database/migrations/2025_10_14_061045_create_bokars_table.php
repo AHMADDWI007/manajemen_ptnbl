@@ -11,12 +11,13 @@ return new class extends Migration
         Schema::create('bokar', function (Blueprint $table) {
             $table->id();
             $table->date('tanggal');
-            $table->string('no_kamar');
-            $table->decimal('berat_awal', 10, 2)->nullable();
+            $table->string('bak_maturasi');
+            $table->string('jenis')->nullable();
             $table->decimal('berat_truck', 10, 2)->nullable();
-            $table->decimal('berat_basah', 10, 2)->nullable();
-            $table->decimal('k3_lab', 8, 2)->nullable();
-            $table->decimal('berat_kering', 10, 2)->nullable();
+            $table->decimal('berat_timbang', 10, 2)->nullable();
+            $table->decimal('netto_basah', 8, 2)->nullable();
+             $table->float('k3',)->default(0);
+            $table->decimal('netto_kering', 10, 2)->nullable();
             // Kolom baru ditambahkan di sini
             $table->decimal('total_ds', 10, 2)->nullable();
             $table->decimal('total_pt', 10, 2)->nullable();

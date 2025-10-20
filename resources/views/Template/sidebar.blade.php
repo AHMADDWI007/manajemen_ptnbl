@@ -1,6 +1,6 @@
 <aside class="main-sidebar elevation-4" style="background-color: #355E3B;">
     <a href="#" class="brand-link d-flex align-items-center" style="background-color: #2E8B57; color: #fff;">
-        <img src="{{ asset('gambar/logo.png') }}" alt="Logo" class="brand-image img-circle elevation-3"
+        <img src="{{ asset('gambar/nb_icon.png') }}" alt="Logo" class="brand-image img-circle elevation-3"
             style="opacity:.9; background-color:#fff; padding:3px;">
         <span class="brand-text fw-bolder text-white ms-2" style="font-size: 15px; letter-spacing: 0.5px;">
             PT. NUSANTARA BATULICIN
@@ -146,7 +146,7 @@
                 {{-- ### KODE YANG DITAMBAHKAN KEMBALI ### --}}
                 {{-- Data Pengguna --}}
                 <li class="nav-item">
-                    <a href="{{ url('/data-pengguna') }}" class="nav-link {{ request()->is('data-pengguna*') ? 'active' : '' }}">
+                    <a href="{{ url('/data_pengguna') }}" class="nav-link {{ request()->is('data_pengguna*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-users"></i>
                         <p>Data Pengguna</p>
                     </a>
@@ -184,6 +184,23 @@
                         <p>Laporan Harian</p>
                     </a>
                 </li>
+                 <li class="nav-item">
+                    <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
+                       <i class="nav-icon fas fa-clipboard-list"></i>
+                        <p>Persetujuan</p>
+                    </a>
+                </li>
+                <!-- Tombol Logout -->
+                <div class="mt-auto mb-3 px-3">
+                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin ingin logout?');">
+                        @csrf
+                        <button type="submit" class="btn w-100 d-flex align-items-center justify-content-center"
+                            style="background-color: #8B0000; color: #fff; font-weight: bold; border: none; border-radius: 8px; padding: 10px;">
+                            <i class="fas fa-sign-out-alt me-2"></i> Logout
+                        </button>
+                    </form>
+                </div>
+
                 </li>
                  {{-- ### AKHIR DARI KODE YANG DITAMBAHKAN KEMBALI ### --}}
 
@@ -200,6 +217,16 @@
         .nav-sidebar .nav-treeview>.nav-item>.nav-link { color: #f8f9fa !important; }
         .nav-sidebar .nav-treeview>.nav-item>.nav-link.active { background-color: #2E8B57 !important; color: white !important; }
         .nav-sidebar .nav-header { font-size: 0.9rem; }
+        .sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar nav {
+    flex-grow: 1;
+}
+
     </style>
 </aside>
 

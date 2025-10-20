@@ -10,32 +10,37 @@ class Maturasi extends Model
     use HasFactory;
 
     /**
-     * Nama tabel yang terhubung dengan model ini.
-     * Nama 'maturasis' (plural) digunakan untuk mengikuti konvensi Laravel.
+     * The table associated with the model.
+     *
      * @var string
      */
     protected $table = 'maturasis';
 
     /**
-     * Atribut yang dapat diisi secara massal (mass assignable).
-     * Kolom-kolom ini cocok dengan yang ada di file view Anda.
+     * The attributes that are mass assignable.
+     *
      * @var array<int, string>
      */
     protected $fillable = [
-        'uraian_proses',
-        'kg_kk',
-        'tgl',
+        'uraian',
+        'stok_awal',
+        'tgl_masuk',
         'umur',
         'diolah',
         'mutasi',
         'masuk_hi',
-        'k3',
-        'po',
-        'pa',
-        'pri',
-        'stock_akhir',
+        'stok_akhir',
         'asal_bokar',
         'keterangan',
+    ];
+
+    /**
+     * The attributes that should be cast to native types.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'tgl_masuk' => 'date',
     ];
 }
 

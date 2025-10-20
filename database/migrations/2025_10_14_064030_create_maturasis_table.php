@@ -11,34 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Membuat tabel 'maturasis' (plural) sesuai konvensi Laravel
         Schema::create('maturasis', function (Blueprint $table) {
-            $table->id();
-            $table->string('uraian_proses')->unique(); // Kunci utama untuk mencocokkan data
-            
-            // Kolom Stock Awal
-            $table->decimal('kg_kk', 10, 2)->nullable();
-            $table->date('tgl')->nullable();
+            $table->id(); // Ini akan menjadi kolom "NO"
+            $table->string('uraian');
+            $table->decimal('stok_awal', 15, 2)->nullable()->default(0);
+            $table->date('tgl_masuk')->nullable();
             $table->string('umur')->nullable();
-
-            // Kolom Diproses HI
-            $table->decimal('diolah', 10, 2)->nullable();
-            $table->decimal('mutasi', 10, 2)->nullable();
-
-            // Kolom Masuk
-            $table->decimal('masuk_hi', 10, 2)->nullable();
-            
-            // Kolom Quality
-            $table->decimal('k3', 8, 2)->nullable();
-            $table->decimal('po', 8, 2)->nullable();
-            $table->decimal('pa', 8, 2)->nullable();
-            $table->decimal('pri', 8, 2)->nullable();
-
-            // Kolom sisa
-            $table->decimal('stock_akhir', 10, 2)->nullable();
+            $table->decimal('diolah', 15, 2)->nullable()->default(0);
+            $table->decimal('mutasi', 15, 2)->nullable()->default(0);
+            $table->decimal('masuk_hi', 15, 2)->nullable()->default(0);
+            $table->decimal('stok_akhir', 15, 2)->nullable()->default(0);
             $table->string('asal_bokar')->nullable();
-            $table->string('keterangan')->nullable();
-            
+            $table->text('keterangan')->nullable();
             $table->timestamps();
         });
     }
@@ -51,4 +35,3 @@ return new class extends Migration
         Schema::dropIfExists('maturasis');
     }
 };
-

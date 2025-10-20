@@ -5,17 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class BahanDalamProses extends Model
+class BahanProses extends Model
 {
     use HasFactory;
 
     /**
-     * Nama tabel di database (plural).
+     * Nama tabel database.
      */
-    protected $table = 'bahan_dalam_proses';
+    protected $table = 'bahan_proses';
 
     /**
-     * Kolom yang boleh diisi melalui API dari aplikasi mobile.
+     * Daftar kolom yang boleh diisi secara massal (mass assignable).
      */
     protected $fillable = [
         'uraian',

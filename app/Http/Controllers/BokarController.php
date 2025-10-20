@@ -4,78 +4,97 @@ namespace App\Http\Controllers;
 
 use App\Models\Bokar;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class BokarController extends Controller
 {
     /**
-     * Menampilkan daftar data pengolahan basah (bokar).
+     * Menampilkan semua data pengolahan bokar.
      */
     public function index()
     {
-        // Variabel diubah menjadi $data_basah agar sesuai dengan view yang telah kita buat
-        $data_basah = Bokar::latest()->get();
+        $data_basah = Bokar::all();
 
-        // Mengarahkan ke view yang benar dengan data yang sesuai
-        return view('pengolahan.data_bokar', compact('data_basah'));
+        $total_ds = Bokar::where('jenis', 'DS')->sum('netto_kering');
+    $total_pt = Bokar::where('jenis', 'PT')->sum('netto_kering');
+    $jumlah_total = $total_ds + $total_pt;
+        return view('pengolahan.data_bokar', compact(
+            'data_basah',
+            'total_ds',
+            'total_pt',
+            'jumlah_total'
+        ));
     }
 
     /**
-     * Menyimpan data baru (biasanya untuk API).
+     * Menyimpan data baru (dengan logika otomatis hitung netto).
      */
     public function store(Request $request)
     {
-        // Validasi disesuaikan dengan kolom baru di model
         $validated = $request->validate([
-            'tanggal'      => 'required|date',
-            'supplier'     => 'required|string|max:255',
-            'berat_basah'  => 'required|numeric|min:0',
-            'k3'           => 'required|numeric|min:0',
-            'berat_kering' => 'required|numeric|min:0',
-            'total'        => 'required|numeric|min:0',
+            'tanggal'        => 'required|date',
+            'bak_maturasi'   => 'required|string|max:255',
+            'jenis'          => 'required|string|max:255',
+            'berat_truck'    => 'required|numeric|min:0',
+            'berat_timbang'  => 'required|numeric|min:0',
+            'k3'             => 'required|numeric|min:0',
         ]);
+
+        // 💡 Hitung otomatis:
+        $validated['netto_basah']  = $validated['berat_timbang'] - $validated['berat_truck'];
+        $validated['netto_kering'] = $validated['netto_basah'] * ($validated['k3'] / 100);
 
         Bokar::create($validated);
 
-        // Untuk web, kembali ke halaman index. Untuk API, biasanya mengembalikan JSON.
-        return redirect()->route('bokar.index')->with('success', 'Data pengolahan basah berhasil ditambahkan.');
+        return redirect()->route('bokar.index')->with('success', '✅ Data berhasil ditambahkan!');
     }
 
     /**
-     * Menampilkan satu data spesifik (opsional, untuk detail view atau API).
+     * Mengambil data untuk modal edit (AJAX).
      */
-    public function show(Bokar $bokar)
+    public function edit($id)
     {
-        // Untuk API, Anda bisa mengembalikan data sebagai JSON
+        $bokar = Bokar::findOrFail($id);
         return response()->json($bokar);
     }
 
     /**
-     * Memperbarui data yang ada (biasanya untuk API).
+     * Mengupdate data (dengan perhitungan otomatis juga).
      */
-    public function update(Request $request, Bokar $bokar)
+    public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'tanggal'      => 'required|date',
-            'supplier'     => 'required|string|max:255',
-            'berat_basah'  => 'required|numeric|min:0',
-            'k3'           => 'required|numeric|min:0',
-            'berat_kering' => 'required|numeric|min:0',
-            'total'        => 'required|numeric|min:0',
+            'tanggal'        => 'required|date',
+            'bak_maturasi'   => 'required|string|max:255',
+            'jenis'          => 'required|string|max:255',
+            'berat_truck'    => 'required|numeric|min:0',
+            'berat_timbang'  => 'required|numeric|min:0',
+            'k3'             => 'required|numeric|min:0',
         ]);
 
-        $bokar->update($validated);
+        // 💡 Hitung ulang otomatis
+        $validated['netto_basah']  = $validated['berat_timbang'] - $validated['berat_truck'];
+        $validated['netto_kering'] = $validated['netto_basah'] * ($validated['k3'] / 100);
 
-        return redirect()->route('bokar.index')->with('success', 'Data pengolahan basah berhasil diperbarui.');
+        Bokar::findOrFail($id)->update($validated);
+
+        return redirect()->route('bokar.index')->with('success', '✅ Data berhasil diperbarui!');
     }
 
     /**
-     * Menghapus data (biasanya untuk API atau admin).
+     * Menghapus data.
      */
-    public function destroy(Bokar $bokar)
+    public function destroy($id)
     {
-        $bokar->delete();
+        Bokar::findOrFail($id)->delete();
+        return redirect()->route('bokar.index')->with('success', '🗑️ Data berhasil dihapus!');
+    }
 
-        return redirect()->route('bokar.index')->with('success', 'Data pengolahan basah berhasil dihapus.');
+    /**
+     * Menampilkan detail data (AJAX).
+     */
+    public function show($id)
+    {
+        $bokar = Bokar::findOrFail($id);
+        return response()->json($bokar);
     }
 }

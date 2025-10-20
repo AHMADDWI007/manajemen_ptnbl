@@ -11,21 +11,17 @@ class Bokar extends Model
 
     protected $table = 'bokar';
 
-    /**
-     * Atribut yang dapat diisi secara massal (mass assignable).
-     * Kolom baru ditambahkan di sini.
-     */
     protected $fillable = [
         'tanggal',
-        'no_kamar',
-        'berat_awal',
+        'bak_maturasi',
+        'jenis',
         'berat_truck',
-        'berat_basah',
-        'k3_lab',
-        'berat_kering',
-        'total_ds',       // Ditambahkan
-        'total_pt',       // Ditambahkan
-        'jumlah',         // Ditambahkan
+        'berat_timbang',
+        'netto_basah',
+        'k3',
+        'netto_kering',
+        'total_ds',
+        'total_pt',
+        'jumlah',
     ];
 }
-
