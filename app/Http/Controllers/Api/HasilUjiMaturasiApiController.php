@@ -4,41 +4,35 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\HasilUjiLabBokar; // 1. Import Model yang sudah Anda buat
+use App\Models\HasilUjiMaturasi;
 
-class HasilUjiLabBokarApiController extends Controller
+class HasilUjiMaturasiApiController extends Controller
 {
-    /**
-     * Method ini akan dijalankan ketika aplikasi mobile mengirim data.
-     */
     public function store(Request $request)
     {
-        // 2. Validasi data yang masuk dari aplikasi mobile
+        // ✅ Validasi data dari aplikasi mobile
         $validatedData = $request->validate([
             'tanggal'   => 'required|date',
-            'suplier'   => 'required|string|max:255',
-            'no_sampel' => 'required|string|max:100|unique:hasil_uji_lab_bokar,no_sampel',
+            'no_kamar'  => 'required|string|max:50',
             'k3'        => 'required|numeric',
-            'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'po'        => 'required|numeric',
+            'pa'        => 'required|numeric',
+            'pri'       => 'required|numeric',
         ]);
 
-        // 3. Simpan data yang sudah divalidasi ke database
         try {
-            HasilUjiLabBokar::create($validatedData);
+            // ✅ Simpan ke database
+            HasilUjiMaturasi::create($validatedData);
 
-            // 4. Kirim respons "sukses" kembali ke aplikasi mobile dalam format JSON
             return response()->json([
                 'success' => true,
-                'message' => 'Data Uji Bokar berhasil disimpan.'
-            ], 201); // Kode 201 berarti "Created"
-
+                'message' => 'Data Uji Maturasi berhasil disimpan.'
+            ], 201);
         } catch (\Exception $e) {
-            // Jika terjadi error saat menyimpan, kirim respons "gagal"
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menyimpan data: ' . $e->getMessage()
-            ], 500); // Kode 500 berarti "Internal Server Error"
+            ], 500);
         }
     }
 
@@ -46,14 +40,14 @@ class HasilUjiLabBokarApiController extends Controller
     {
         try {
             // Ambil semua data dari model, urutkan dari yang terbaru
-            $data = HasilUjiLabBokar::latest()->get();
+            $data = HasilUjiMaturasi::latest()->get();
 
             // Jika data ditemukan, kirim sebagai respons JSON
             return response()->json([
                 'success' => true,
-                'message' => 'Data berhasil diambil.',
+                'message' => 'Data Uji Maturasi berhasil diambil.',
                 'data'    => $data
-            ], 200); // Kode 200 berarti "OK"
+            ], 200); // 200 = OK
 
         } catch (\Exception $e) {
             // Jika terjadi error, kirim respons gagal
@@ -67,7 +61,7 @@ class HasilUjiLabBokarApiController extends Controller
     public function show($id)
     {
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiMaturasi::findOrFail($id);
             return response()->json([
                 'success' => true,
                 'data'    => $data
@@ -81,21 +75,23 @@ class HasilUjiLabBokarApiController extends Controller
         }
     }
 
+    /**
+     * Method untuk menyimpan perubahan data. (UPDATE)
+     */
     public function update(Request $request, $id)
     {
-        // Validasi, mirip seperti store tapi ada pengecualian untuk 'unique'
+        // Validasi, mirip seperti store. Jika no_kamar harus unik, tambahkan rule 'unique'
         $validatedData = $request->validate([
-            'tanggal'   => 'required|date',
-            'suplier'   => 'required|string|max:255',
-            // Aturan 'unique' diubah agar mengabaikan data dengan ID saat ini
-            'no_sampel' => 'required|string|max:100|unique:hasil_uji_lab_bokar,no_sampel,' . $id,
-            'k3'        => 'required|numeric',
-            'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'tanggal'  => 'required|date',
+            'no_kamar' => 'required|string|max:50', // Contoh: 'unique:hasil_uji_maturasi,no_kamar,' . $id
+            'k3'       => 'required|numeric',
+            'po'       => 'required|numeric',
+            'pa'       => 'required|numeric',
+            'pri'      => 'required|numeric',
         ]);
 
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiMaturasi::findOrFail($id);
             $data->update($validatedData);
 
             return response()->json([
@@ -111,10 +107,13 @@ class HasilUjiLabBokarApiController extends Controller
         }
     }
 
+    /**
+     * Method untuk menghapus data. (DELETE)
+     */
     public function destroy($id)
     {
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiMaturasi::findOrFail($id);
             $data->delete();
 
             return response()->json([

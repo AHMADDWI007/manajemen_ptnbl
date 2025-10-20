@@ -4,62 +4,56 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\HasilUjiLabBokar; // 1. Import Model yang sudah Anda buat
+use App\Models\HasilUjiSir20;
 
-class HasilUjiLabBokarApiController extends Controller
+class HasilUjiSir20ApiController extends Controller
 {
-    /**
-     * Method ini akan dijalankan ketika aplikasi mobile mengirim data.
-     */
     public function store(Request $request)
     {
-        // 2. Validasi data yang masuk dari aplikasi mobile
+        // ✅ Validasi data dari aplikasi mobile
         $validatedData = $request->validate([
-            'tanggal'   => 'required|date',
-            'suplier'   => 'required|string|max:255',
-            'no_sampel' => 'required|string|max:100|unique:hasil_uji_lab_bokar,no_sampel',
-            'k3'        => 'required|numeric',
+            'no_palet'  => 'required|string|max:100',
+            'po'        => 'required|numeric',
+            'pa'        => 'required|numeric',
+            'pri'       => 'required|numeric',
             'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'ask'       => 'required|numeric', // kadar abu
+            'vm'        => 'required|numeric', // zat menguap
+            'money'     => 'required|numeric', // viskositas mooney
+            'nitrogen'  => 'required|numeric',
         ]);
 
-        // 3. Simpan data yang sudah divalidasi ke database
         try {
-            HasilUjiLabBokar::create($validatedData);
+            // ✅ Simpan ke database
+            HasilUjiSir20::create($validatedData);
 
-            // 4. Kirim respons "sukses" kembali ke aplikasi mobile dalam format JSON
             return response()->json([
                 'success' => true,
-                'message' => 'Data Uji Bokar berhasil disimpan.'
-            ], 201); // Kode 201 berarti "Created"
-
+                'message' => 'Data Uji SIR 20 berhasil disimpan.'
+            ], 201);
         } catch (\Exception $e) {
-            // Jika terjadi error saat menyimpan, kirim respons "gagal"
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menyimpan data: ' . $e->getMessage()
-            ], 500); // Kode 500 berarti "Internal Server Error"
+            ], 500);
         }
     }
 
-    public function index()
+     public function index()
     {
         try {
-            // Ambil semua data dari model, urutkan dari yang terbaru
-            $data = HasilUjiLabBokar::latest()->get();
+            $data = HasilUjiSir20::all();
 
-            // Jika data ditemukan, kirim sebagai respons JSON
             return response()->json([
                 'success' => true,
-                'message' => 'Data berhasil diambil.',
-                'data'    => $data
-            ], 200); // Kode 200 berarti "OK"
-
+                'message' => 'Data hasil uji SIR 20 berhasil diambil.',
+                'data' => $data
+            ], 200);
         } catch (\Exception $e) {
-            // Jika terjadi error, kirim respons gagal
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengambil data: ' . $e->getMessage()
+                'message' => 'Gagal mengambil data: ' . $e->getMessage(),
+                'data' => []
             ], 500);
         }
     }
@@ -67,12 +61,11 @@ class HasilUjiLabBokarApiController extends Controller
     public function show($id)
     {
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiSir20::findOrFail($id);
             return response()->json([
                 'success' => true,
                 'data'    => $data
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -81,28 +74,30 @@ class HasilUjiLabBokarApiController extends Controller
         }
     }
 
+    /**
+     * (UPDATE) Menyimpan perubahan data.
+     */
     public function update(Request $request, $id)
     {
-        // Validasi, mirip seperti store tapi ada pengecualian untuk 'unique'
         $validatedData = $request->validate([
-            'tanggal'   => 'required|date',
-            'suplier'   => 'required|string|max:255',
-            // Aturan 'unique' diubah agar mengabaikan data dengan ID saat ini
-            'no_sampel' => 'required|string|max:100|unique:hasil_uji_lab_bokar,no_sampel,' . $id,
-            'k3'        => 'required|numeric',
+            'no_palet'  => 'required|string|max:100|unique:hasil_uji_sir_20,no_palet,' . $id,
+            'po'        => 'required|numeric',
+            'pa'        => 'required|numeric',
+            'pri'       => 'required|numeric',
             'dirt'      => 'required|numeric',
             'ask'       => 'required|numeric',
+            'vm'        => 'required|numeric',
+            'money'     => 'required|numeric',
+            'nitrogen'  => 'required|numeric',
         ]);
 
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiSir20::findOrFail($id);
             $data->update($validatedData);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Data berhasil diperbarui.'
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -111,17 +106,18 @@ class HasilUjiLabBokarApiController extends Controller
         }
     }
 
+    /**
+     * (DELETE) Menghapus data.
+     */
     public function destroy($id)
     {
         try {
-            $data = HasilUjiLabBokar::findOrFail($id);
+            $data = HasilUjiSir20::findOrFail($id);
             $data->delete();
-
             return response()->json([
                 'success' => true,
                 'message' => 'Data berhasil dihapus.'
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
