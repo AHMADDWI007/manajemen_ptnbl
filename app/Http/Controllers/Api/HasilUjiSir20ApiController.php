@@ -17,7 +17,7 @@ class HasilUjiSir20ApiController extends Controller
             'pa'        => 'required|numeric',
             'pri'       => 'required|numeric',
             'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric', // kadar abu
+            'ash'       => 'required|numeric', // kadar abu
             'vm'        => 'required|numeric', // zat menguap
             'money'     => 'required|numeric', // viskositas mooney
             'nitrogen'  => 'required|numeric',
@@ -80,12 +80,12 @@ class HasilUjiSir20ApiController extends Controller
     public function update(Request $request, $id)
     {
         $validatedData = $request->validate([
-            'no_palet'  => 'required|string|max:100|unique:hasil_uji_sir_20,no_palet,' . $id,
+            'no_palet'  => 'required|string|max:100|unique:hasil_uji_sir_20s,no_palet,' . $id,
             'po'        => 'required|numeric',
             'pa'        => 'required|numeric',
             'pri'       => 'required|numeric',
             'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'ash'       => 'required|numeric',
             'vm'        => 'required|numeric',
             'money'     => 'required|numeric',
             'nitrogen'  => 'required|numeric',
