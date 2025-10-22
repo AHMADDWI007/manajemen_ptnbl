@@ -6,7 +6,11 @@ use App\Http\Controllers\Api\HasilUjiLabBokarApiController;
 use App\Http\Controllers\Api\HasilUjiMaturasiApiController;
 use App\Http\Controllers\Api\HasilUjiTroliApiController;
 use App\Http\Controllers\Api\HasilUjiSir20ApiController;
+use App\Http\Controllers\Api\AuthController; // Import controller
 
+
+// Tambahkan rute ini untuk login
+Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
