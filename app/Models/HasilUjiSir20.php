@@ -5,13 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class HasilUjiSir20 extends Model
+class HasilUjiSIR20 extends Model
 {
     use HasFactory;
 
+    // Nama tabel sesuai database
     protected $table = 'hasil_uji_sir_20s';
 
+    // Kolom yang bisa diisi massal
     protected $fillable = [
+        'tanggal',
         'no_palet',
         'po',
         'pa',
@@ -20,6 +23,13 @@ class HasilUjiSir20 extends Model
         'ash',
         'vm',
         'money',
-        'nitrogen',
+        'nitrogen'
+    ];
+
+    // Jika menggunakan tanggal secara otomatis
+    protected $dates = [
+        'tanggal',
+        'created_at',
+        'updated_at'
     ];
 }

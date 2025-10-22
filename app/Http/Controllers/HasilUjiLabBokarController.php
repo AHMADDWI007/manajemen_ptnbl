@@ -5,18 +5,20 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\HasilUjiLabBokar;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
 
 class HasilUjiLabBokarController extends Controller
 {
     /**
-     * Menampilkan daftar semua data hasil uji lab bokar.
+     * Menampilkan SEMUA daftar data hasil uji lab bokar.
+     * Filter akan dilakukan oleh DataTables di sisi klien.
      */
     public function index()
     {
-        // PERUBAHAN DI SINI: Nama variabel diubah menjadi $data_lab
-        $data_lab = HasilUjiLabBokar::latest()->get();
-        
-        // Sekarang compact('data_lab') akan berfungsi dengan benar karena variabelnya ada
+        // Ambil SEMUA data, diurutkan berdasarkan tanggal terbaru
+        $data_lab = HasilUjiLabBokar::orderBy('tanggal', 'desc')->get();
+
+        // Kirim semua data ke view
         return view('Pengolahan.hasil_uji_lab_bokar', compact('data_lab'));
     }
 
@@ -60,8 +62,21 @@ class HasilUjiLabBokarController extends Controller
 
         $hasilUjiLabBokar->update($validated);
 
-        // PERUBAHAN DI SINI: Mengarahkan kembali ke halaman index setelah update
-        return redirect()->route('hasil-uji-lab-bokar.index')->with('success', 'Data hasil uji lab berhasil diperbarui.');
+        return redirect()
+            ->route('hasil_uji_lab_bokar.index') // Pastikan 'hasil_uji_lab_bokar.index' adalah nama route Anda
+            ->with('success', 'Data hasil uji lab berhasil diperbarui.');
+    }
+
+    public function show($id)
+    {
+        $data = HasilUjiLabBokar::findOrFail($id);
+        return response()->json($data);
+    }
+
+    public function edit($id)
+    {
+        $data = HasilUjiLabBokar::findOrFail($id);
+        return response()->json($data);
     }
 
     /**
@@ -71,6 +86,8 @@ class HasilUjiLabBokarController extends Controller
     {
         $hasilUjiLabBokar->delete();
 
-        return redirect()->back()->with('success', 'Data hasil uji lab berhasil dihapus.');
+        return redirect()
+            ->back()
+            ->with('success', 'Data hasil uji lab berhasil dihapus.');
     }
 }

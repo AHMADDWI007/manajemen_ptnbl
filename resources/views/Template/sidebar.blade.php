@@ -143,7 +143,6 @@
                     </ul>
                 </li>
 
-                {{-- ### KODE YANG DITAMBAHKAN KEMBALI ### --}}
                 {{-- Data Pengguna --}}
                 <li class="nav-item">
                     <a href="{{ url('/data_pengguna') }}" class="nav-link {{ request()->is('data_pengguna*') ? 'active' : '' }}">
@@ -178,7 +177,9 @@
                             </a>
                         </li>
                     </ul>
-                     <li class="nav-item">
+                 </li> {{-- Penutup li Data Lainnya --}}
+
+                 <li class="nav-item">
                     <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-book"></i>
                         <p>Laporan Harian</p>
@@ -186,27 +187,23 @@
                 </li>
                  <li class="nav-item">
                     <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
-                       <i class="nav-icon fas fa-clipboard-list"></i>
-                        <p>Persetujuan</p>
+                         <i class="nav-icon fas fa-clipboard-list"></i>
+                         <p>Persetujuan</p>
                     </a>
                 </li>
-                <!-- Tombol Logout -->
-                <div class="mt-auto mb-3 px-3">
-                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin ingin logout?');">
-                        @csrf
-                        <button type="submit" class="btn w-100 d-flex align-items-center justify-content-center"
-                            style="background-color: #8B0000; color: #fff; font-weight: bold; border: none; border-radius: 8px; padding: 10px;">
-                            <i class="fas fa-sign-out-alt me-2"></i> Logout
-                        </button>
-                    </form>
-                </div>
-
-                </li>
-                 {{-- ### AKHIR DARI KODE YANG DITAMBAHKAN KEMBALI ### --}}
-
             </ul>
         </nav>
     </div>
+
+    <div class="mt-auto mb-3 px-3">
+         <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin ingin logout?');">
+             @csrf
+             <button type="submit" class="btn w-100 d-flex align-items-center justify-content-center"
+                 style="background-color: #8B0000; color: #fff; font-weight: bold; border: none; border-radius: 8px; padding: 10px;">
+                 <i class="fas fa-sign-out-alt me-2"></i> Logout
+             </button>
+         </form>
+     </div>
 
     <style>
         .nav-sidebar .nav-link { color: white !important; }
@@ -217,16 +214,33 @@
         .nav-sidebar .nav-treeview>.nav-item>.nav-link { color: #f8f9fa !important; }
         .nav-sidebar .nav-treeview>.nav-item>.nav-link.active { background-color: #2E8B57 !important; color: white !important; }
         .nav-sidebar .nav-header { font-size: 0.9rem; }
-        .sidebar {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
 
-.sidebar nav {
-    flex-grow: 1;
-}
+        /* ========================================================== */
+        /* CSS TAMBAHAN UNTUK SIDEBAR PENUH TINGGI */
+        /* ========================================================== */
+        .main-sidebar {
+           height: 100vh !important; /* Tinggi 100% viewport */
+           position: fixed !important; /* Tetap di posisi saat scroll */
+           top: 0;
+           left: 0;
+           display: flex; /* Aktifkan flexbox */
+           flex-direction: column; /* Susun item secara vertikal */
+           overflow-y: auto; /* Scroll jika perlu */
+        }
+        .sidebar {
+            flex-grow: 1; /* Biarkan area menu tumbuh mengisi sisa ruang */
+            overflow-y: auto; /* Scroll jika menu panjang */
+        }
+        .main-sidebar .mt-auto {
+            margin-top: auto !important; /* Dorong logout ke bawah */
+        }
+
+        /* Beri margin kiri ke konten utama agar tidak tertutup sidebar */
+        /* Sesuaikan 250px jika lebar sidebar Anda berbeda */
+        .content-wrapper {
+             margin-left: 250px !important; 
+        }
+        /* ========================================================== */
 
     </style>
 </aside>
-

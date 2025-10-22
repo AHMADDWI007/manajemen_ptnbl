@@ -86,13 +86,15 @@
                                         <td>{{ $item->uraian ?? '-' }}</td>
                                         <td>{{ number_format($item->stok_awal ?? 0, 2, ',', '.') }}</td>
                                         <td>
-                                            @if($item->stok_awal > 0 && $item->tgl_masuk)
+                                            {{-- Logika Tgl Masuk Stok --}}
+                                            @if($item->tgl_masuk)
                                                 {{ $item->tgl_masuk->format('d-m-Y') }}
                                             @else
                                                 KOSONG
                                             @endif
                                         </td>
-                                        <td>{{ $item->tgl_masuk ? $item->created_at->startOfDay()->diffInDays($item->tgl_masuk->startOfDay()) . ' hari' : '0 hari' }}</td>
+                                        {{-- PERBAIKAN: Menampilkan kolom 'umur' langsung dari database --}}
+                                        <td>{{ $item->umur ?? 0 }} hari</td>
                                         <td>{{ number_format($item->diolah ?? 0, 2, ',', '.') }}</td>
                                         <td>{{ number_format($item->mutasi ?? 0, 2, ',', '.') }}</td>
                                         <td>{{ number_format($item->masuk_hi ?? 0, 2, ',', '.') }}</td>
@@ -125,7 +127,7 @@
                             </table>
                         </div>
                      </div>
-                 </div>
+                   </div>
             </div>
         </div>
     </div>
@@ -143,11 +145,18 @@
             <form action="{{ route('maturasi.store') }}" method="POST" id="formTambah">
                 @csrf
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title fw-bold">Input Data Maturasi - {{ \Carbon\Carbon::today()->isoFormat('D MMMM Y') }}</h5>
+                    <h5 class="modal-title fw-bold">Input Data Maturasi</h5>
                     <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
+
+                        {{-- PERBAIKAN: Tambah Input Tanggal Harian --}}
+                        <div class="col-md-6 mb-3">
+                            <label>Tanggal Input Harian</label>
+                            <input type="date" name="tanggal_input" id="tanggal_input_tambah" class="form-control form-control-sm" required>
+                        </div>
+                        
                         <div class="col-md-6 mb-3">
                             <label>Uraian</label>
                             <select name="uraian" id="uraian" class="form-control form-control-sm" required>
@@ -157,19 +166,20 @@
                                 @endfor
                             </select>
                         </div>
+
                         <div class="col-md-6 mb-3">
                             <label>Stok Awal (Kg)</label>
                             <input type="number" name="stok_awal" id="stok_awal" class="form-control form-control-sm" readonly required step="0.01">
                         </div>
+
+                        {{-- PERBAIKAN: Ganti 'umur_display' menjadi input 'umur' --}}
                         <div class="col-md-6 mb-3">
-                            <label>Tanggal Masuk Awal</label>
-                            <input type="text" id="tgl_masuk_display" class="form-control form-control-sm" readonly>
-                            <input type="hidden" name="tgl_masuk_hidden" id="tgl_masuk_hidden">
+                            <label>Umur (Hari)</label>
+                            <input type="number" name="umur" id="umur" class="form-control form-control-sm" readonly required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Umur (hari ini)</label>
-                            <input type="text" id="umur_display" class="form-control form-control-sm" readonly>
-                        </div>
+
+                        {{-- PERBAIKAN: Hapus field tgl_masuk_display dan tgl_masuk_hidden --}}
+
                         <div class="col-md-6 mb-3">
                             <label>Diolah (Kg)</label>
                             <input type="number" name="diolah" id="diolah" class="form-control form-control-sm" value="0" step="0.01" min="0">
@@ -191,9 +201,11 @@
                             <label>Perkiraan Stok Akhir (Kg)</label>
                             <input type="text" id="stok_akhir_display" class="form-control form-control-sm" readonly>
                         </div>
+                        
+                        {{-- PERBAIKAN: Ganti 'keterangan_display' menjadi input 'keterangan' --}}
                         <div class="col-md-6 mb-3">
-                            <label>Perkiraan Keterangan</label>
-                            <input type="text" id="keterangan_display" class="form-control form-control-sm" readonly>
+                            <label>Keterangan</label>
+                            <input type="text" name="keterangan" id="keterangan" class="form-control form-control-sm" readonly>
                         </div>
                     </div>
                 </div>
@@ -244,16 +256,31 @@
                 </div>
                 <div class="modal-body">
                     <div class="row">
+                        
+                        {{-- PERBAIKAN: Tambah Input Tanggal Harian untuk Edit --}}
+                        <div class="col-md-6 mb-3">
+                            <label>Tanggal Input Harian</label>
+                            <input type="date" name="tanggal_input" id="editTanggalInput" class="form-control form-control-sm" required>
+                        </div>
+                        
                         <div class="col-md-6 mb-3">
                             <label>Uraian</label>
                             <input type="text" name="uraian" id="editUraian" class="form-control form-control-sm" readonly>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Stok Awal (Kg)</label>
-                            <input type="number" name="stok_awal" id="editStokAwal" class="form-control form-control-sm" step="0.01">
+                            <input type="number" name="stok_awal" id="editStokAwal" class="form-control form-control-sm" step="0.01" required>
                         </div>
+                         
+                         {{-- PERBAIKAN: Tambahkan input Umur --}}
+                        <div class="col-md-6 mb-3">
+                            <label>Umur (Hari)</label>
+                            <input type="number" name="umur" id="editUmur" class="form-control form-control-sm" step="1" required>
+                        </div>
+                         
                          <div class="col-md-6 mb-3">
-                            <label>Tanggal Masuk</label>
+                            <label>Tanggal Masuk Bokar</label>
+                            {{-- tgl_masuk bisa null, jadi tidak 'required' --}}
                             <input type="date" name="tgl_masuk" id="editTglMasuk" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-6 mb-3">
@@ -274,7 +301,7 @@
                         </div>
                          <div class="col-md-6 mb-3">
                             <label>Keterangan</label>
-                            <input type="text" name="keterangan" id="editKeterangan" class="form-control form-control-sm">
+                            <input type="text" name="keterangan" id="editKeterangan" class="form-control form-control-sm" readonly> {{-- Keterangan di-set readonly karena di-update oleh tanggal_input --}}
                         </div>
                     </div>
                 </div>
@@ -307,76 +334,118 @@ $(document).ready(function() {
         return Number(num).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function calculateAndUpdate() {
+    // --- LOGIKA MODAL TAMBAH ---
+
+    // PERBAIKAN: Fungsi hitung stok akhir display (dihapus logika keterangan)
+    function calculateStokAkhirDisplay() {
         let stok_awal = parseFloat($('#stok_awal').val()) || 0;
         let diolah = parseFloat($('#diolah').val()) || 0;
         let mutasi = parseFloat($('#mutasi').val()) || 0;
         let masuk_hi = parseFloat($('#masuk_hi').val()) || 0;
         let stok_akhir = stok_awal - diolah - mutasi + masuk_hi;
         $('#stok_akhir_display').val(formatNumber(stok_akhir));
-        let keterangan = "KOSONG";
-        let tglMasukLamaStr = $('#tgl_masuk_hidden').val();
-        if (stok_akhir > 0) {
-            if (masuk_hi > 0) {
-                keterangan = "{{ \Carbon\Carbon::today()->isoFormat('D MMMM') }}";
-            } else if (tglMasukLamaStr) {
-                let tgl = new Date(tglMasukLamaStr + 'T00:00:00Z');
-                keterangan = tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long' });
+    }
+    
+    // PERBAIKAN: Fungsi baru untuk update keterangan berdasarkan tanggal
+    function updateKeterangan() {
+        let tanggalInput = $('#tanggal_input_tambah').val();
+        if (tanggalInput) {
+            try {
+                let dateObj = new Date(tanggalInput + 'T00:00:00');
+                let options = { day: 'numeric', month: 'long' };
+                $('#keterangan').val(dateObj.toLocaleDateString('id-ID', options));
+            } catch (e) {
+                $('#keterangan').val('Tanggal Invalid');
             }
+        } else {
+            $('#keterangan').val('');
         }
-        $('#keterangan_display').val(keterangan);
     }
 
-    $('#uraian').on('change', function() {
-        const selectedUraian = $(this).val();
-        if (selectedUraian) {
+    // PERBAIKAN: Fungsi baru untuk fetch data (menggantikan logika lama)
+    function fetchPreviousData() {
+        const selectedUraian = $('#uraian').val();
+        const selectedDate = $('#tanggal_input_tambah').val();
+
+        // Hanya jalankan jika KEDUA field terisi
+        if (selectedUraian && selectedDate) {
             $.ajax({
-                url: "{{ route('maturasi.get-latest-data') }}",
+                // PERBAIKAN: Gunakan route name yang benar
+                url: "{{ route('maturasi.getPreviousData') }}", 
                 type: 'GET',
-                data: { uraian: selectedUraian },
+                // PERBAIKAN: Kirim 'uraian' dan 'tanggal_input'
+                data: { 
+                    uraian: selectedUraian,
+                    tanggal_input: selectedDate 
+                },
                 dataType: 'json',
                 success: function(data) {
                     if (data) {
-                        const stokAkhir = parseFloat(data.stok_akhir).toFixed(2);
-                        $('#stok_awal').val(stokAkhir);
-                        if (data.tgl_masuk) {
-                            let tglMasukYmd = data.tgl_masuk.split('T')[0];
-                            $('#tgl_masuk_hidden').val(tglMasukYmd);
-                            let tglMasukDate = new Date(data.tgl_masuk + 'T00:00:00Z');
-                            $('#tgl_masuk_display').val(tglMasukDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }));
-                            $('#umur_display').val(data.umur_hari_ini + " hari");
-                        } else {
-                            $('#tgl_masuk_display').val('KOSONG');
-                            $('#tgl_masuk_hidden').val('');
-                            $('#umur_display').val('0 hari');
-                        }
+                        $('#stok_awal').val(parseFloat(data.stok_awal).toFixed(2));
+                        $('#umur').val(data.umur); // Isi input 'umur'
                     } else {
                         $('#stok_awal').val('0.00');
-                        $('#tgl_masuk_display').val('KOSONG');
-                        $('#tgl_masuk_hidden').val('');
-                        $('#umur_display').val('0 hari');
+                        $('#umur').val(0);
                     }
-                    calculateAndUpdate();
+                    calculateStokAkhirDisplay(); // Hitung ulang display stok akhir
                 },
                 error: function() {
-                    alert('Gagal mengambil data terakhir. Mengatur ke nilai default.');
+                    alert('Gagal mengambil data sebelumnya. Mengatur ke nilai default.');
                     $('#stok_awal').val('0.00');
-                    $('#tgl_masuk_display').val('KOSONG');
-                    $('#tgl_masuk_hidden').val('');
-                    $('#umur_display').val('0 hari');
-                    calculateAndUpdate();
+                    $('#umur').val(0);
+                    calculateStokAkhirDisplay();
                 }
             });
+        } else {
+            // Reset jika salah satu field kosong
+            $('#stok_awal').val('0.00');
+            $('#umur').val(0);
+            calculateStokAkhirDisplay();
+        }
+    }
+
+    // PERBAIKAN: Hapus blok $('#uraian').on('change', ...) yang lama
+
+    // PERBAIKAN: Tambahkan listener baru untuk 'uraian' dan 'tanggal_input'
+    $('#uraian').on('change', fetchPreviousData);
+    $('#tanggal_input_tambah').on('change', function() {
+        fetchPreviousData();    // Ambil data stok & umur
+        updateKeterangan();     // Update field keterangan
+    });
+
+    // PERBAIKAN: Listener untuk input di modal tambah
+    $('#diolah, #mutasi, #masuk_hi, #stok_awal').on('input', calculateStokAkhirDisplay);
+    
+    // Reset form tambah saat modal dibuka
+    $('#modalTambah').on('show.bs.modal', function () {
+         $('#formTambah')[0].reset();
+         // Set default value
+         $('#asal_bokar').val('Petani');
+         $('#diolah, #mutasi, #masuk_hi').val('0');
+         $('#stok_awal, #umur, #stok_akhir_display, #keterangan').val('');
+         // Set tanggal input hari ini
+         let today = new Date().toISOString().split('T')[0];
+         $('#tanggal_input_tambah').val(today).trigger('change'); // Set dan trigger change
+    });
+    
+    // PERBAIKAN: Listener untuk tanggal di modal edit
+    $('#editTanggalInput').on('change', function() {
+         let tanggalInput = $(this).val();
+         if (tanggalInput) {
+            try {
+                let dateObj = new Date(tanggalInput + 'T00:00:00');
+                let options = { day: 'numeric', month: 'long' };
+                $('#editKeterangan').val(dateObj.toLocaleDateString('id-ID', options));
+            } catch (e) {
+                $('#editKeterangan').val('Tanggal Invalid');
+            }
+        } else {
+            $('#editKeterangan').val('');
         }
     });
 
-    $('#diolah, #mutasi, #masuk_hi').on('input', calculateAndUpdate);
-    
-    $('#modalTambah').on('show.bs.modal', function () {
-         $('#formTambah')[0].reset();
-         $('#stok_awal, #tgl_masuk_display, #tgl_masuk_hidden, #umur_display, #stok_akhir_display, #keterangan_display').val('');
-         $('#asal_bokar').val('Petani');
-    });
+
+    // --- LOGIKA DETAIL & EDIT ---
 
     // === DETAIL ===
     $(document).on('click', '.btn-detail', function () {
@@ -384,7 +453,7 @@ $(document).ready(function() {
         $.get('/maturasi/' + id, function (data) {
             $('#detailUraian').text(data.uraian || '-');
             $('#detailStokAwal').text(formatNumber(data.stok_awal));
-            $('#detailTglMasuk').text(data.tgl_masuk ? new Date(data.tgl_masuk + 'T00:00:00Z').toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'}) : 'KOSONG');
+            $('#detailTglMasuk').text(data.tgl_masuk ? new Date(data.tgl_masuk).toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'}) : 'KOSONG');
             $('#detailDiolah').text(formatNumber(data.diolah));
             $('#detailMutasi').text(formatNumber(data.mutasi));
             $('#detailMasukHi').text(formatNumber(data.masuk_hi));
@@ -399,14 +468,19 @@ $(document).ready(function() {
     $(document).on('click', '.btn-edit', function () {
         var id = $(this).data('id');
         $.get('/maturasi/' + id + '/edit', function (data) {
+            
+            // PERBAIKAN: Isi input tanggal harian (dari created_at)
+            $('#editTanggalInput').val(data.tanggal_input_edit).trigger('change'); // Isi dan trigger change untuk update keterangan
+
             $('#editUraian').val(data.uraian);
             $('#editStokAwal').val(data.stok_awal);
+            $('#editUmur').val(data.umur); // Isi input umur
             $('#editTglMasuk').val(data.tgl_masuk ? data.tgl_masuk.split('T')[0] : '');
             $('#editDiolah').val(data.diolah);
             $('#editMutasi').val(data.mutasi);
             $('#editMasukHi').val(data.masuk_hi);
             $('#editAsalBokar').val(data.asal_bokar);
-            $('#editKeterangan').val(data.keterangan);
+            $('#editKeterangan').val(data.keterangan); // Keterangan akan di-override oleh trigger change di atas
             $('#formEdit').attr('action', '/maturasi/' + id);
             $('#modalEdit').modal('show');
         });
@@ -426,15 +500,21 @@ $(document).ready(function() {
         function( settings, data, dataIndex ) {
             var minStr = $('#min-date').val();
             var maxStr = $('#max-date').val();
-            var dateStr = data[1] || '';
+            var dateStr = data[1] || ''; // Ambil data dari kolom Tanggal Input (indeks 1)
 
             if ( ( minStr === '' && maxStr === '' ) ) { return true; }
+            
+            // Konversi tanggal dari format dd-mm-yyyy ke yyyy-mm-dd
             var parts = dateStr.split('-');
             if (parts.length !== 3) return false;
             var tableDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            
             var min = minStr ? new Date(minStr) : null;
             var max = maxStr ? new Date(maxStr) : null;
+            
+            if (min) min.setHours(0,0,0,0);
             if (max) max.setHours(23, 59, 59, 999);
+
             return ( min === null && tableDate <= max ) || ( min <= tableDate && max === null ) || ( min <= tableDate && tableDate <= max );
         }
     );
@@ -449,4 +529,3 @@ $(document).ready(function() {
 </script>
 </body>
 </html>
-
