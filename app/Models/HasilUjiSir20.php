@@ -10,11 +10,12 @@ class HasilUjiSIR20 extends Model
     use HasFactory;
 
     // Nama tabel sesuai database
-    protected $table = 'hasil_uji_sir_20s';
+    protected $table = 'hasil_uji_sir_20';
 
     // Kolom yang bisa diisi massal
     protected $fillable = [
         'tanggal',
+        'jenis_kemasan',
         'no_palet',
         'po',
         'pa',

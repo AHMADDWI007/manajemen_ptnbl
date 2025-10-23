@@ -1,138 +1,199 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Sistem PT NBL</title>
     @include('template.head')
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Login | PT Nusantara Batulicin</title>
 
     <style>
         html, body {
-            height: 100%;
             margin: 0;
             padding: 0;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f1f3f6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh; /* pastikan tetap di tengah */
-        }
-
-        .login-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
             height: 100%;
+            font-family: 'Poppins', sans-serif;
+            background: url('{{ asset('gambar/karet.jpg') }}') no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
 
-        .login-card {
-            background-color: #fff;
+        /* ANIMASI MASUK HALUS UNTUK FRAME */
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ANIMASI GRADIENT BERGERAK */
+        @keyframes gradientMove {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .login-container {
+            display: flex;
+            width: 850px;
+            height: 440px;
             border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            width: 100%;
-            max-width: 400px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            background-color: #fff;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        /* Bagian kiri (welcome) */
+        .login-left {
+            flex: 1;
+            background: linear-gradient(-45deg, #00d4a1, #6fe3bb, #00b488, #9df7d7);
+            background-size: 300% 300%;
+            animation: gradientMove 6s ease infinite;
+            color: white;
             padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
         }
 
-        .logo-wrapper {
-            width: 110px;
-            height: 110px;
-            margin: 0 auto 20px;
-            border: 2px solid #4CAF50;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .login-left img {
+            width: 85px;
+            margin-bottom: 20px;
+            animation: floatLogo 3s ease-in-out infinite;
         }
 
-        .logo-wrapper img {
-            width: 70px;
-            height: 70px;
-            object-fit: contain;
+        /* Logo mengambang */
+        @keyframes floatLogo {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
         }
 
-        h2 {
-            font-size: 1.4rem;
+        .login-left h1 {
+            font-size: 25px;
             font-weight: 700;
-            color: #000;
-            margin-bottom: 5px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            text-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
         }
 
-        p.subtitle {
-            color: #777;
-            margin-bottom: 25px;
-            font-size: 0.9rem;
+        .login-left p {
+            font-size: 14px;
+            color: #e8fff5;
+            line-height: 1.6;
+        }
+
+        /* Bagian kanan (form login) */
+        .login-right {
+            flex: 1;
+            background-color: #fff;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            animation: fadeInUp 1.2s ease forwards;
+        }
+
+        .login-right h2 {
+            color: #00b488;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 22px;
         }
 
         .form-control {
             width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ccc;
-            border-radius: 12px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #b2f2d4;
             margin-bottom: 15px;
             font-size: 0.95rem;
-            transition: all 0.2s ease-in-out;
+            outline: none;
+            transition: all 0.3s ease;
         }
 
         .form-control:focus {
-            outline: none;
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 2px rgba(76,175,80,0.15);
+            border-color: #00b488;
+            box-shadow: 0 0 10px rgba(0, 180, 136, 0.3);
+            transform: scale(1.02);
         }
 
         .btn-login {
             width: 100%;
-            padding: 12px;
-            background-color: #4CAF50;
+            padding: 10px;
             border: none;
-            border-radius: 12px;
+            border-radius: 20px;
+            background: linear-gradient(to right, #00b488, #34e2b5);
             color: #fff;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 180, 136, 0.3);
         }
 
         .btn-login:hover {
-            background-color: #43a047;
+            background: linear-gradient(to right, #02a97d, #2cd4a3);
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(0, 180, 136, 0.4);
         }
 
         .extra-links {
             margin-top: 15px;
-            font-size: 0.9rem;
-            color: #555;
+            text-align: center;
+            font-size: 13px;
         }
 
         .extra-links a {
-            color: #4CAF50;
+            color: #00b488;
             text-decoration: none;
             font-weight: 500;
+            transition: color 0.3s ease;
         }
 
         .extra-links a:hover {
             text-decoration: underline;
+            color: #008b6f;
         }
 
         .alert {
             text-align: left;
             font-size: 0.85rem;
+            margin-bottom: 15px;
+            width: 100%;
         }
     </style>
 </head>
-<body>
-    <div class="login-wrapper">
-        <div class="login-card">
-            <div class="logo-wrapper">
-                <img src="{{ asset('gambar/nb_icon.png') }}" alt="Logo">
-            </div>
 
-            <h2>Selamat Datang Kembali</h2>
-            <p class="subtitle">Silakan masuk untuk melanjutkan</p>
+<body>
+    <div class="login-container">
+        <!-- Bagian kiri -->
+        <div class="login-left">
+            <img src="{{ asset('gambar/nb_icon.png') }}" alt="Logo">
+            <h1>SELAMAT DATANG<br>DI SISTEM MANAJEMEN<br>PT NUSANTARA BATULICIN</h1>
+            <p>Silakan login untuk mengakses Sistem.</p>
+        </div>
+
+        <!-- Bagian kanan -->
+        <div class="login-right">
+            <h2>Login Akun</h2>
 
             @if($errors->any())
                 <div class="alert alert-danger py-2 small">
@@ -153,7 +214,7 @@
 
             <div class="extra-links">
                 <a href="#">Lupa Password?</a><br>
-                <span>Tidak bisa masuk? <a href="#">Hubungi Admin</a></span>
+                Tidak bisa masuk? <a href="#">Hubungi Admin</a>
             </div>
         </div>
     </div>

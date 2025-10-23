@@ -43,7 +43,8 @@
 
                 {{-- Data Laboratorium --}}
                 @php
-                    $isLabOpen = request()->is('hasil_uji_lab_bokar*', 'hasil_uji_maturasi*', 'hasil_uji_troli*', 'hasil_uji_sir_20*');
+                    // Tambahkan URL baru ke pengecekan $isLabOpen
+                    $isLabOpen = request()->is('hasil_uji_lab_bokar*', 'uji-bokar-diolah*', 'hasil_uji_maturasi*', 'hasil_uji_troli*', 'hasil_uji_sir_20*');
                 @endphp
                 <li id="menu-laboratorium" class="nav-item has-treeview {{ $isLabOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isLabOpen ? 'active' : '' }}">
@@ -57,9 +58,20 @@
                         <li class="nav-item">
                             <a href="{{ url('/hasil_uji_lab_bokar') }}" class="nav-link {{ request()->is('hasil_uji_lab_bokar*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
-                                <p>Uji Bokar</p>
+                                <p>Uji Bokar Diterima</p>
                             </a>
                         </li>
+                        {{-- =================================== --}}
+                        {{-- MENU BARU DITAMBAHKAN DI SINI --}}
+                        {{-- =================================== --}}
+                        <li class="nav-item">
+                            {{-- Ganti URL '/uji-bokar-diolah' sesuai route Anda nanti --}}
+                            <a href="{{ url('/uji-bokar-diolah') }}" class="nav-link {{ request()->is('uji-bokar-diolah*') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Uji Bokar Diolah</p>
+                            </a>
+                        </li>
+                        {{-- =================================== --}}
                         <li class="nav-item">
                             <a href="{{ url('/hasil_uji_maturasi') }}" class="nav-link {{ request()->is('hasil_uji_maturasi*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
@@ -117,7 +129,8 @@
 
                 {{-- Data Produksi --}}
                 @php
-                    $isProduksiOpen = request()->is('data-produksi*');
+                    // Perbaiki pengecekan request is untuk Data Produksi
+                    $isProduksiOpen = request()->is('produksi_sir20*', 'penjualan_sir20*'); 
                 @endphp
                 <li id="menu-produksi" class="nav-item has-treeview {{ $isProduksiOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isProduksiOpen ? 'active' : '' }}">
@@ -177,16 +190,18 @@
                             </a>
                         </li>
                     </ul>
-                 </li> {{-- Penutup li Data Lainnya --}}
+                 </li> 
 
                  <li class="nav-item">
-                    <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
+                    {{-- Ganti URL jika route name berbeda --}}
+                    <a href="{{ route('laporan.harian') }}" class="nav-link {{ request()->routeIs('laporan.harian*') ? 'active' : '' }}"> 
                         <i class="nav-icon fas fa-book"></i>
                         <p>Laporan Harian</p>
                     </a>
                 </li>
                  <li class="nav-item">
-                    <a href="{{ url('/laporan-Harian') }}" class="nav-link {{ request()->is('laporan-Harian*') ? 'active' : '' }}">
+                    {{-- Ganti URL/Route jika berbeda --}}
+                    <a href="{{ url('/persetujuan') }}" class="nav-link {{ request()->is('persetujuan*') ? 'active' : '' }}"> 
                          <i class="nav-icon fas fa-clipboard-list"></i>
                          <p>Persetujuan</p>
                     </a>
@@ -215,32 +230,26 @@
         .nav-sidebar .nav-treeview>.nav-item>.nav-link.active { background-color: #2E8B57 !important; color: white !important; }
         .nav-sidebar .nav-header { font-size: 0.9rem; }
 
-        /* ========================================================== */
-        /* CSS TAMBAHAN UNTUK SIDEBAR PENUH TINGGI */
-        /* ========================================================== */
         .main-sidebar {
-           height: 100vh !important; /* Tinggi 100% viewport */
-           position: fixed !important; /* Tetap di posisi saat scroll */
+           height: 100vh !important; 
+           position: fixed !important; 
            top: 0;
            left: 0;
-           display: flex; /* Aktifkan flexbox */
-           flex-direction: column; /* Susun item secara vertikal */
-           overflow-y: auto; /* Scroll jika perlu */
+           display: flex; 
+           flex-direction: column; 
+           overflow-y: auto; 
         }
         .sidebar {
-            flex-grow: 1; /* Biarkan area menu tumbuh mengisi sisa ruang */
-            overflow-y: auto; /* Scroll jika menu panjang */
+            flex-grow: 1; 
+            overflow-y: auto; 
         }
         .main-sidebar .mt-auto {
-            margin-top: auto !important; /* Dorong logout ke bawah */
+            margin-top: auto !important; 
         }
 
-        /* Beri margin kiri ke konten utama agar tidak tertutup sidebar */
-        /* Sesuaikan 250px jika lebar sidebar Anda berbeda */
         .content-wrapper {
              margin-left: 250px !important; 
         }
-        /* ========================================================== */
 
     </style>
 </aside>

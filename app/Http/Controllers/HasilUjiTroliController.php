@@ -42,7 +42,7 @@ class HasilUjiTroliController extends Controller
         HasilUjiTroli::create($validator->validated());
 
         // PERBAIKAN: Redirect ke nama route yang benar
-        return redirect()->route('hasil-uji-troli.index')
+        return redirect()->route('hasil_uji_troli.index')
                          ->with('success', 'Data hasil uji troli berhasil ditambahkan!');
     }
 
