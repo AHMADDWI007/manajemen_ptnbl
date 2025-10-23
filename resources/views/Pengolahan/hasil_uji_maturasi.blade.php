@@ -85,7 +85,7 @@
                                 <input type="text" id="max-date" class="form-control form-control-sm" placeholder="Pilih tanggal...">
                             </div>
                             <div class="col-md-3 d-flex align-items-end gap-2"> 
-                                 <button id="filter-btn" class="btn btn-primary btn-sm">Filter</button>
+                                 <button id="filter-btn" class="btn btn-primary btn-sm">Filter</button>&nbsp;
                                  <button id="reset-filter" class="btn btn-secondary btn-sm">Reset</button>
                             </div>
                         </div>

@@ -23,10 +23,29 @@ class HasilUjiLabBokar extends Model
      */
     protected $fillable = [
         'tanggal',
-        'suplier',
-        'no_sampel', // Diubah dari 'no sampel' menjadi snake_case
+        'suplier',      // Pastikan ejaan ini ('suplier') sama persis dengan nama kolom di database Anda
+        'no_sampel',    // Pastikan ini ('no_sampel') sama persis dengan nama kolom di database Anda
         'k3',
         'dirt',
-        'ask',
+        'ask',          // Pastikan ejaan ini ('ask') sama persis dengan nama kolom di database Anda (atau ganti ke 'ash' jika perlu)
+        'po',
+        'pa',
+        'pri',
+    ];
+
+    /**
+     * Casts tipe data atribut.
+     * Direkomendasikan untuk tanggal dan desimal.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'tanggal' => 'date',      // Otomatis konversi ke objek Carbon saat diambil
+        'k3'      => 'decimal:2', // Tentukan jumlah desimal
+        'dirt'    => 'decimal:2',
+        'ask'     => 'decimal:2', // Atau 'ash' => 'decimal:2'
+        'po'      => 'decimal:2',
+        'pa'      => 'decimal:2',
+        'pri'     => 'decimal:2',
     ];
 }

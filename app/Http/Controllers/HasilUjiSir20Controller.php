@@ -18,6 +18,7 @@ class HasilUjiSIR20Controller extends Controller
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
+            'jenis_kemasan' => 'nullable|string|max:255',
             'no_palet' => 'required|string|max:255',
             'po' => 'nullable|numeric',
             'pa' => 'nullable|numeric',
@@ -54,6 +55,7 @@ class HasilUjiSIR20Controller extends Controller
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
+            'jenis_kemasan' => 'nullable|string|max:255',
             'no_palet' => 'required|string|max:255',
             'po' => 'nullable|numeric',
             'pa' => 'nullable|numeric',

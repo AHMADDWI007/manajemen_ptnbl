@@ -19,15 +19,12 @@
             text-align: center; /* Aturan dasar rata tengah */
         }
 
-        /* ============================================= */
-        /* TAMBAHAN: Aturan Lebih Spesifik untuk Rata Tengah */
-        /* ============================================= */
+        /* Aturan Spesifik Rata Tengah */
         #dataTable th, 
         #dataTable td {
-             text-align: center !important; /* Paksa rata tengah horizontal */
-             vertical-align: middle !important; /* Paksa rata tengah vertikal */
+             text-align: center !important; 
+             vertical-align: middle !important; 
         }
-        /* ============================================= */
 
         .action-buttons {
             display: flex;
@@ -92,7 +89,7 @@
                                 <label for="max-date">Sampai Tanggal:</label>
                                 <input type="text" id="max-date" class="form-control form-control-sm" placeholder="Pilih tanggal...">
                             </div>
-                            <div class="col-md-3 d-flex align-items-end"> {{-- Pakai gap-2 --}}
+                            <div class="col-md-3 d-flex align-items-end gap-2"> 
                                 <button id="filter-btn" class="btn btn-primary btn-sm">Filter</button>&nbsp;
                                 <button id="reset-filter" class="btn btn-secondary btn-sm">Reset</button>
                             </div>
@@ -100,7 +97,6 @@
                         <hr>
 
                         <table class="table table-bordered table-striped align-middle" id="dataTable">
-                            {{-- thead sudah center karena class dan CSS --}}
                             <thead class="text-center bg-light"> 
                                 <tr>
                                     <th>No</th>
@@ -111,23 +107,22 @@
                                     <th>Pa</th>
                                     <th>PRI</th>
                                     <th>Jam Sample</th>
-                                    <th>Lama Pengeringan (jam)</th>
+                                    {{-- <th>Lama Pengeringan</th> --}} {{-- KOLOM DIHAPUS --}}
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($data_troli as $item)
                                     <tr>
-                                        {{-- Semua td akan center karena CSS --}}
                                         <td>{{ $loop->iteration }}</td>
                                         <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') }}</td>
                                         <td>{{ $item->no_trolly }}</td>
-                                        <td>{{ is_numeric($item->k3) ? (floor($item->k3) == $item->k3 ? (int)$item->k3 : $item->k3) : '-' }}</td>
-                                        <td>{{ is_numeric($item->po) ? (floor($item->po) == $item->po ? (int)$item->po : $item->po) : '-' }}</td>
-                                        <td>{{ is_numeric($item->pa) ? (floor($item->pa) == $item->pa ? (int)$item->pa : $item->pa) : '-' }}</td>
-                                        <td>{{ is_numeric($item->pri) ? (floor($item->pri) == $item->pri ? (int)$item->pri : $item->pri) : '-' }}</td>
+                                        <td>{{ is_numeric($item->k3) ? (fmod($item->k3, 1) == 0 ? (int)$item->k3 : $item->k3) : '-' }}</td>
+                                        <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td>
+                                        <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
+                                        <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
                                         <td>{{ $item->jam_sample ? \Carbon\Carbon::parse($item->jam_sample)->format('H:i') : '-' }}</td>
-                                        <td>{{ is_numeric($item->lama_pengeringan) ? (floor($item->lama_pengeringan) == $item->lama_pengeringan ? (int)$item->lama_pengeringan : $item->lama_pengeringan) : '-' }}</td>
+                                        {{-- <td>{{ is_numeric($item->lama_pengeringan) ? (fmod($item->lama_pengeringan, 1) == 0 ? (int)$item->lama_pengeringan : $item->lama_pengeringan) : '-' }}</td> --}} {{-- DATA DIHAPUS --}}
                                         <td>
                                             <div class="action-buttons">
                                                 <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"><i class="fas fa-eye"></i></button>
@@ -142,7 +137,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="10" class="text-center text-muted">Belum ada data hasil uji troli.</td>
+                                        <td colspan="9" class="text-center text-muted">Belum ada data hasil uji troli.</td> {{-- COLSPAN DIUBAH MENJADI 9 --}}
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -154,6 +149,7 @@
         </div>
     </div>
 
+    {{-- MODAL TAMBAH --}}
     <div class="modal fade" id="modalTambahTroli" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -171,9 +167,9 @@
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" class="form-control"></div>
-                        <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" class="form-control" step="0.1"></div>
+                        {{-- <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" class="form-control" step="0.1"></div> --}} {{-- INPUT DIHAPUS --}}
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer"> {{-- Pastikan div ini ada --}}
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-success">Simpan</button>
                     </div>
@@ -182,6 +178,7 @@
         </div>
     </div>
 
+    {{-- MODAL DETAIL --}}
     <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -198,13 +195,14 @@
                         <dt class="col-sm-5">Pa</dt><dd class="col-sm-7" id="detailPa">-</dd>
                         <dt class="col-sm-5">PRI</dt><dd class="col-sm-7" id="detailPri">-</dd>
                         <dt class="col-sm-5">Jam Sample</dt><dd class="col-sm-7" id="detailJamSample">-</dd>
-                        <dt class="col-sm-5">Lama Pengeringan</dt><dd class="col-sm-7" id="detailLamaPengeringan">-</dd>
+                        {{-- <dt class="col-sm-5">Lama Pengeringan</dt><dd class="col-sm-7" id="detailLamaPengeringan">-</dd> --}} {{-- DETAIL DIHAPUS --}}
                     </dl>
                 </div>
             </div>
         </div>
     </div>
 
+    {{-- MODAL EDIT --}}
     <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -223,7 +221,7 @@
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" id="editJamSample" class="form-control"></div>
-                        <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" id="editLamaPengeringan" class="form-control" step="0.1"></div>
+                        {{-- <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" id="editLamaPengeringan" class="form-control" step="0.1"></div> --}} {{-- INPUT DIHAPUS --}}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -285,10 +283,14 @@ $(document).ready(function() {
         var id = $(this).data('id'); var url = "{{ url('hasil_uji_troli') }}/" + id;
         $.get(url, function (data) {
             $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
-            $('#detailNoTrolly').text(data.no_trolly || '-'); $('#detailK3').text(data.k3 || '-'); $('#detailPo').text(data.po || '-');
-            $('#detailPa').text(data.pa || '-'); $('#detailPri').text(data.pri || '-');
+            $('#detailNoTrolly').text(data.no_trolly || '-'); 
+            $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) : '-');
+            $('#detailPo').text(data.po ? (Math.floor(data.po) == data.po ? parseInt(data.po) : data.po) : '-');
+            $('#detailPa').text(data.pa ? (Math.floor(data.pa) == data.pa ? parseInt(data.pa) : data.pa) : '-');
+            $('#detailPri').text(data.pri ? (Math.floor(data.pri) == data.pri ? parseInt(data.pri) : data.pri) : '-');
             var jam = data.jam_sample ? data.jam_sample.substring(0, 5) : '-';
-            $('#detailJamSample').text(jam); $('#detailLamaPengeringan').text(data.lama_pengeringan || '-');
+            $('#detailJamSample').text(jam); 
+            // $('#detailLamaPengeringan').text(data.lama_pengeringan || '-'); // BARIS DIHAPUS
             $('#modalDetail').modal('show');
         }).fail(function() { alert('Gagal mengambil data detail. Cek URL atau route.'); });
     });
@@ -299,10 +301,12 @@ $(document).ready(function() {
         var urlGet = "{{ url('hasil_uji_troli') }}/" + id + "/edit";
         var urlPost = "{{ url('hasil_uji_troli') }}/" + id;
         $.get(urlGet, function (data) {
-            $('#editTanggal').val(data.tanggal); $('#editNoTrolly').val(data.no_trolly); $('#editK3').val(data.k3);
-            $('#editPo').val(data.po); $('#editPa').val(data.pa); $('#editPri').val(data.pri);
+            $('#editTanggal').val(data.tanggal); $('#editNoTrolly').val(data.no_trolly); 
+            $('#editK3').val(data.k3); $('#editPo').val(data.po); $('#editPa').val(data.pa); 
+            $('#editPri').val(data.pri);
             $('#editJamSample').val(data.jam_sample ? data.jam_sample.substring(0, 5) : ''); 
-            $('#editLamaPengeringan').val(data.lama_pengeringan); $('#formEdit').attr('action', urlPost);
+            // $('#editLamaPengeringan').val(data.lama_pengeringan); // BARIS DIHAPUS
+            $('#formEdit').attr('action', urlPost);
             $('#modalEdit').modal('show');
         }).fail(function() { alert('Gagal mengambil data edit. Cek URL atau route.'); });
     });

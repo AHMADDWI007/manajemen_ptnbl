@@ -82,7 +82,7 @@
                                 <label for="max-date">Sampai Tanggal:</label>
                                 <input type="text" id="max-date" class="form-control form-control-sm" placeholder="Pilih tanggal...">
                             </div>
-                            <div class="col-md-3 d-flex align-items-end">
+                            <div class="col-md-3 d-flex align-items-end gap-2">
                                 <button id="filter-btn" class="btn btn-primary btn-sm">Filter</button>&nbsp;
                                 <button id="reset-filter" class="btn btn-secondary btn-sm">Reset</button>
                             </div>
@@ -94,6 +94,7 @@
                                 <tr>
                                     <th>No</th>
                                     <th>Tanggal</th>
+                                    <th>Jenis Kemasan</th> {{-- TAMBAHAN --}}
                                     <th>No. Palet</th>
                                     <th>Po</th>
                                     <th>Pa</th>
@@ -111,25 +112,22 @@
                                     <tr>
                                         <td>{{ $loop->iteration }}</td>
                                         <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') }}</td>
+                                        <td>{{ $item->jenis_kemasan ?? '-' }}</td> {{-- TAMBAHAN --}}
                                         <td>{{ $item->no_palet }}</td>
-                                        {{-- ============================================= --}}
-                                        {{-- PERBAIKAN FORMAT ANGKA DI BAWAH INI --}}
-                                        {{-- ============================================= --}}
-                                        <td>{{ is_numeric($item->po) ? (floor($item->po) == $item->po ? (int)$item->po : $item->po) : '-' }}</td>
-                                        <td>{{ is_numeric($item->pa) ? (floor($item->pa) == $item->pa ? (int)$item->pa : $item->pa) : '-' }}</td>
-                                        <td>{{ is_numeric($item->pri) ? (floor($item->pri) == $item->pri ? (int)$item->pri : $item->pri) : '-' }}</td>
-                                        <td>{{ is_numeric($item->dirt) ? (floor($item->dirt) == $item->dirt ? (int)$item->dirt : number_format($item->dirt, 4, ',', '.')) : '-' }}</td> {{-- Dirt mungkin perlu 4 desimal --}}
-                                        <td>{{ is_numeric($item->ash) ? (floor($item->ash) == $item->ash ? (int)$item->ash : $item->ash) : '-' }}</td>
-                                        <td>{{ is_numeric($item->vm) ? (floor($item->vm) == $item->vm ? (int)$item->vm : $item->vm) : '-' }}</td>
-                                        <td>{{ is_numeric($item->money) ? (floor($item->money) == $item->money ? (int)$item->money : $item->money) : '-' }}</td>
-                                        <td>{{ is_numeric($item->nitrogen) ? (floor($item->nitrogen) == $item->nitrogen ? (int)$item->nitrogen : $item->nitrogen) : '-' }}</td>
-                                        {{-- ============================================= --}}
-                                        {{-- AKHIR PERBAIKAN FORMAT ANGKA --}}
-                                        {{-- ============================================= --}}
+                                        {{-- Format Angka Diperbaiki --}}
+                                        <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td>
+                                        <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
+                                        <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
+                                        <td>{{ is_numeric($item->dirt) ? (fmod($item->dirt, 1) == 0 ? (int)$item->dirt : $item->dirt) : '-' }}</td> 
+                                        <td>{{ is_numeric($item->ash) ? (fmod($item->ash, 1) == 0 ? (int)$item->ash : $item->ash) : '-' }}</td>
+                                        <td>{{ is_numeric($item->vm) ? (fmod($item->vm, 1) == 0 ? (int)$item->vm : $item->vm) : '-' }}</td>
+                                        <td>{{ is_numeric($item->money) ? (fmod($item->money, 1) == 0 ? (int)$item->money : $item->money) : '-' }}</td>
+                                        <td>{{ is_numeric($item->nitrogen) ? (fmod($item->nitrogen, 1) == 0 ? (int)$item->nitrogen : $item->nitrogen) : '-' }}</td>
                                         <td>
                                             <div class="action-buttons">
                                                 <button class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"><i class="fas fa-eye"></i></button>
                                                 <button class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id }}" title="Edit"><i class="fas fa-edit"></i></button>
+                                                {{-- Route Diperbaiki --}}
                                                 <form action="{{ route('hasil-uji-sir20.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block;"> 
                                                     @csrf
                                                     @method('DELETE')
@@ -140,7 +138,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="12" class="text-center text-muted">Belum ada data.</td>
+                                        <td colspan="13" class="text-center text-muted">Belum ada data.</td> {{-- Colspan jadi 13 --}}
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -152,10 +150,10 @@
     </div>
 
     <div class="modal fade" id="modalTambahSir" tabindex="-1" role="dialog" aria-hidden="true">
-        {{-- Konten Modal Tambah --}}
          <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <form action="{{ route('hasil-uji-sir20.store') }}" method="POST">
+                {{-- Route Diperbaiki --}}
+                <form action="{{ route('hasil_uji_sir_20.store') }}" method="POST">
                     @csrf
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title fw-bold">Tambah Hasil Uji SIR 20</h5>
@@ -163,6 +161,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" class="form-control" required></div>
+                        <div class="form-group"><label>Jenis Kemasan</label><input type="text" name="jenis_kemasan" class="form-control" placeholder="Contoh: Plastik, Kayu..."></div> {{-- TAMBAHAN --}}
                         <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" class="form-control" required></div>
                         <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
@@ -183,16 +182,16 @@
     </div>
 
     <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
-        {{-- Konten Modal Detail --}}
          <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <div class="modal-header bg-success text-white"> 
+                 <div class="modal-header bg-success text-white"> 
                     <h5 class="modal-title">Detail Hasil Uji SIR 20</h5>
                     <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <dl class="row mb-0">
                         <dt class="col-sm-4">Tanggal</dt><dd class="col-sm-8" id="detailTanggal">-</dd>
+                        <dt class="col-sm-4">Jenis Kemasan</dt><dd class="col-sm-8" id="detailJenisKemasan">-</dd> {{-- TAMBAHAN --}}
                         <dt class="col-sm-4">No. Palet</dt><dd class="col-sm-8" id="detailNoPalet">-</dd>
                         <dt class="col-sm-4">Po</dt><dd class="col-sm-8" id="detailPo">-</dd>
                         <dt class="col-sm-4">Pa</dt><dd class="col-sm-8" id="detailPa">-</dd>
@@ -209,7 +208,6 @@
     </div>
 
     <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
-        {{-- Konten Modal Edit --}}
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <form id="formEdit" method="POST">
@@ -221,6 +219,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" id="editTanggal" class="form-control" required></div>
+                        <div class="form-group"><label>Jenis Kemasan</label><input type="text" name="jenis_kemasan" id="editJenisKemasan" class="form-control" placeholder="Contoh: Plastik, Kayu..."></div> {{-- TAMBAHAN --}}
                         <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" id="editNoPalet" class="form-control" required></div>
                         <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
@@ -285,12 +284,27 @@ $(document).ready(function(){
     // DETAIL
     $(document).on('click', '.btn-detail', function(){
         var id = $(this).data('id');
-        var url = "{{ url('hasil-uji-sir20') }}/" + id; 
+        var url = "{{ url('hasil_uji_sir_20') }}/" + id; // URL Diperbaiki
         $.get(url, function(data){
             $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
-            $('#detailNoPalet').text(data.no_palet || '-'); $('#detailPo').text(data.po || '-'); $('#detailPa').text(data.pa || '-');
-            $('#detailPri').text(data.pri || '-'); $('#detailDirt').text(data.dirt || '-'); $('#detailAsh').text(data.ash || '-');
-            $('#detailVm').text(data.vm || '-'); $('#detailMoney').text(data.money || '-'); $('#detailNitrogen').text(data.nitrogen || '-');
+            $('#detailJenisKemasan').text(data.jenis_kemasan || '-'); // TAMBAHAN
+            $('#detailNoPalet').text(data.no_palet || '-');
+            
+            function formatNumber(num) {
+                if (!$.isNumeric(num)) return '-';
+                // Gunakan fmod versi JS (operato %)
+                return (num % 1 === 0) ? parseInt(num) : parseFloat(num);
+            }
+
+            $('#detailPo').text(formatNumber(data.po));
+            $('#detailPa').text(formatNumber(data.pa));
+            $('#detailPri').text(formatNumber(data.pri));
+            $('#detailDirt').text(formatNumber(data.dirt));
+            $('#detailAsh').text(formatNumber(data.ash));
+            $('#detailVm').text(formatNumber(data.vm));
+            $('#detailMoney').text(formatNumber(data.money));
+            $('#detailNitrogen').text(formatNumber(data.nitrogen));
+
             $('#modalDetail').modal('show'); 
         }).fail(function(){ alert('Gagal memuat detail.'); });
     });
@@ -298,13 +312,21 @@ $(document).ready(function(){
     // EDIT
     $(document).on('click', '.btn-edit', function(){
         var id = $(this).data('id');
-        var urlGet = "{{ url('hasil-uji-sir20') }}/" + id + "/edit"; 
-        var urlPost = "{{ url('hasil-uji-sir20') }}/" + id; 
+        var urlGet = "{{ url('hasil_uji_sir_20') }}/" + id + "/edit"; // URL Diperbaiki
+        var urlPost = "{{ url('hasil_uji_sir_20') }}/" + id; // URL Diperbaiki
         $.get(urlGet, function(data){
-            $('#editTanggal').val(data.tanggal); $('#editNoPalet').val(data.no_palet); $('#editPo').val(data.po);
-            $('#editPa').val(data.pa); $('#editPri').val(data.pri); $('#editDirt').val(data.dirt);
-            $('#editAsh').val(data.ash); $('#editVm').val(data.vm); $('#editMoney').val(data.money);
-            $('#editNitrogen').val(data.nitrogen); $('#formEdit').attr('action', urlPost); 
+            $('#editTanggal').val(data.tanggal); 
+            $('#editJenisKemasan').val(data.jenis_kemasan); // TAMBAHAN
+            $('#editNoPalet').val(data.no_palet); 
+            $('#editPo').val(data.po);
+            $('#editPa').val(data.pa); 
+            $('#editPri').val(data.pri); 
+            $('#editDirt').val(data.dirt);
+            $('#editAsh').val(data.ash); 
+            $('#editVm').val(data.vm); 
+            $('#editMoney').val(data.money);
+            $('#editNitrogen').val(data.nitrogen); 
+            $('#formEdit').attr('action', urlPost); 
             $('#modalEdit').modal('show'); 
         }).fail(function(){ alert('Gagal memuat data edit.'); });
     });
