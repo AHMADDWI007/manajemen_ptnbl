@@ -13,7 +13,8 @@ class HasilUjiSir20ApiController extends Controller
         // ✅ Validasi data dari aplikasi mobile
         $validatedData = $request->validate([
             // ✅ PERBAIKAN: Tambahkan validasi untuk 'tanggal'
-            'tanggal'   => 'required|date',
+            'tanggal'   => 'required|date_format:Y-m-d',
+            'jenis_kemasan' => 'required|string|max:255',
             'no_palet'  => 'required|string|max:100',
             'po'        => 'required|numeric',
             'pa'        => 'required|numeric',
@@ -83,8 +84,10 @@ class HasilUjiSir20ApiController extends Controller
     {
         $validatedData = $request->validate([
             // ✅ PERBAIKAN: Tambahkan validasi untuk 'tanggal'
-            'tanggal'   => 'required|date',
-            'no_palet'  => 'required|string|max:100|unique:hasil_uji_sir_20s,no_palet,' . $id,
+            'tanggal'   => 'required|date_format:Y-m-d',
+             // ✅ PERBAIKAN: Tambahkan validasi untuk jenis_kemasan
+            'jenis_kemasan' => 'required|string|max:255',
+            'no_palet'  => 'required|string|max:100|unique:hasil_uji_sir_20,no_palet,' . $id,
             'po'        => 'required|numeric',
             'pa'        => 'required|numeric',
             'pri'       => 'required|numeric',

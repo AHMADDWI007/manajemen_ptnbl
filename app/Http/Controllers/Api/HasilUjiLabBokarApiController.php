@@ -21,6 +21,11 @@ class HasilUjiLabBokarApiController extends Controller
             'k3'        => 'required|numeric',
             'dirt'      => 'required|numeric',
             'ask'       => 'required|numeric',
+            // ✅ PERBAIKAN: Tambahkan validasi untuk PO, PA, PRI
+            'po'        => 'required|numeric',
+            'pa'        => 'required|numeric',
+            'pri'       => 'required|numeric',
+            // ✅ AKHIR PERBAIKAN
         ]);
 
         // 3. Simpan data yang sudah divalidasi ke database
@@ -92,6 +97,11 @@ class HasilUjiLabBokarApiController extends Controller
             'k3'        => 'required|numeric',
             'dirt'      => 'required|numeric',
             'ask'       => 'required|numeric',
+            // ✅ PERBAIKAN: Tambahkan validasi untuk PO, PA, PRI
+            'po'        => 'required|numeric',
+            'pa'        => 'required|numeric',
+            'pri'       => 'required|numeric',
+            // ✅ AKHIR PERBAIKAN
         ]);
 
         try {
