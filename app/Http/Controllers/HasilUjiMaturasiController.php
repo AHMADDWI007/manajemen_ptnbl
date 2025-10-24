@@ -5,25 +5,27 @@ namespace App\Http\Controllers;
 use App\Models\HasilUjiMaturasi; // Pastikan Model diimpor
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+// Gunakan Route Model Binding untuk konsistensi (opsional tapi disarankan)
+// use Illuminate\Validation\Rule;
 
 class HasilUjiMaturasiController extends Controller
 {
     public function index()
     {
         $data_maturasi = HasilUjiMaturasi::orderBy('tanggal', 'desc')->get();
-        // Pastikan nama view ini cocok dengan nama file Anda
-        return view('Pengolahan.Hasil_Uji_Maturasi', compact('data_maturasi'));
+        // Pastikan nama view ini cocok: Pengolahan/hasil_uji_maturasi.blade.php
+        return view('Pengolahan.hasil_uji_maturasi', compact('data_maturasi'));
     }
 
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
-            'no_kamar' => 'required|string|max:255',
-            'k3' => 'nullable|numeric',
-            'po' => 'nullable|numeric',
-            'pa' => 'nullable|numeric',
-            'pri' => 'nullable|numeric',
+            'no_kamar' => 'required|string|max:255', // Mungkin perlu unique?
+            'k3' => 'nullable|numeric|min:0',
+            'po' => 'nullable|numeric|min:0',
+            'pa' => 'nullable|numeric|min:0',
+            'pri' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -32,47 +34,57 @@ class HasilUjiMaturasiController extends Controller
 
         HasilUjiMaturasi::create($validator->validated());
 
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data hasil uji maturasi berhasil ditambahkan!');
+        // PERBAIKAN: Gunakan underscore '_' sesuai nama route dari resource
+        return redirect()->route('hasil_uji_maturasi.index')
+                         ->with('success', 'Data hasil uji maturasi berhasil ditambahkan!');
     }
 
-    public function show($id)
+    // Gunakan Route Model Binding agar lebih ringkas & aman
+    public function show(HasilUjiMaturasi $hasilUjiMaturasi) // Nama variabel $hasilUjiMaturasi
     {
-        $data = HasilUjiMaturasi::findOrFail($id);
-        return response()->json($data);
+        // findOrFail tidak perlu lagi
+        return response()->json($hasilUjiMaturasi);
     }
 
-    public function edit($id)
+    // Gunakan Route Model Binding
+    public function edit(HasilUjiMaturasi $hasilUjiMaturasi) // Nama variabel $hasilUjiMaturasi
     {
-        $data = HasilUjiMaturasi::findOrFail($id);
-        return response()->json($data);
+        // findOrFail tidak perlu lagi
+        return response()->json($hasilUjiMaturasi);
     }
 
-    public function update(Request $request, $id)
+    // Gunakan Route Model Binding
+    public function update(Request $request, HasilUjiMaturasi $hasilUjiMaturasi) // Nama variabel $hasilUjiMaturasi
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
-            'no_kamar' => 'required|string|max:255',
-            'k3' => 'nullable|numeric',
-            'po' => 'nullable|numeric',
-            'pa' => 'nullable|numeric',
-            'pri' => 'nullable|numeric',
+            'no_kamar' => 'required|string|max:255', // Jika perlu unique on update, gunakan Rule::unique
+            'k3' => 'nullable|numeric|min:0',
+            'po' => 'nullable|numeric|min:0',
+            'pa' => 'nullable|numeric|min:0',
+            'pri' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $hasilUji = HasilUjiMaturasi::findOrFail($id);
-        $hasilUji->update($validator->validated());
+        // findOrFail tidak perlu lagi
+        $hasilUjiMaturasi->update($validator->validated());
 
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil diperbarui!');
+        // PERBAIKAN: Gunakan underscore '_' sesuai nama route dari resource
+        return redirect()->route('hasil_uji_maturasi.index')
+                         ->with('success', 'Data berhasil diperbarui!');
     }
 
-    public function destroy($id)
+    // Gunakan Route Model Binding
+    public function destroy(HasilUjiMaturasi $hasilUjiMaturasi) // Nama variabel $hasilUjiMaturasi
     {
-        $hasilUji = HasilUjiMaturasi::findOrFail($id);
-        $hasilUji->delete();
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil dihapus!');
+        // findOrFail tidak perlu lagi
+        $hasilUjiMaturasi->delete();
+
+        // PERBAIKAN: Gunakan underscore '_' sesuai nama route dari resource
+        return redirect()->route('hasil_uji_maturasi.index')
+                         ->with('success', 'Data berhasil dihapus!');
     }
 }
-
