@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\{
     LoginController, UserController, BokarController, MaturasiController,
-    BahanProsesController, HasilUjiBokarController, HasilUjiMaturasiController,
+    BahanProsesController, HasilUjiBokarController, HasilUjiBokarOlahController, HasilUjiMaturasiController,
     HasilUjiSir20Controller, HasilUjiTroliController, ProduksiSir20Controller,
     PenjualanSir20Controller, LaporanHarianController
 };
@@ -72,6 +72,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('hasil_uji_sir_20', HasilUjiSir20Controller::class);
     // Alternatif jika mau konsisten pakai resource:
     // Route::resource('hasil_uji_sir_20', HasilUjiSir20Controller::class);
+    // Hasil Uji Bokar Olah (Fitur Baru)
+    Route::resource('hasil_uji_bokar_olah', HasilUjiBokarOlahController::class); // <--- TAMBAHKAN ROUTE INI
 
     // HAPUS RESOURCE DUPLIKAT DENGAN NAMA BERBEDA INI:
     // Route::resource('hasil-uji-lab', HasilUjiLabBokarController::class);

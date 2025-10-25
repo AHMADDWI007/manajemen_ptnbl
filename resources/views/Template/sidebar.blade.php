@@ -66,7 +66,7 @@
                         {{-- =================================== --}}
                         <li class="nav-item">
                             {{-- Ganti URL '/uji-bokar-diolah' sesuai route Anda nanti --}}
-                            <a href="{{ url('/uji-bokar-diolah') }}" class="nav-link {{ request()->is('uji-bokar-diolah*') ? 'active' : '' }}">
+                            <a href="{{ route('hasil_uji_bokar_olah.index') }}" class="nav-link {{ request()->is('uji-bokar-diolah*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Uji Bokar Diolah</p>
                             </a>
