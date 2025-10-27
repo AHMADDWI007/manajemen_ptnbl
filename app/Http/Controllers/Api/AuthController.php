@@ -30,9 +30,13 @@ class AuthController extends Controller
         }
 
         // 3. Otentikasi berhasil, dapatkan data user
+        //   Auth::attempt() secara otomatis me-loginkan user jika berhasil,
+        //   jadi $request->user() akan mengembalikan data user yang login.
         $user = $request->user();
 
-        // 4. PERIKSA ROLE (Sesuai permintaan Anda)
+        // ✅ PERBAIKAN: Hapus blok IF yang memeriksa role 'admin'
+        /*
+        // 4. PERIKSA ROLE (BAGIAN INI DIHAPUS/DIKOMENTARI)
         if ($user->role !== 'admin') {
             // Jika role bukan admin, tolak login
              Auth::logout(); // Logout user yang baru saja login
@@ -41,18 +45,20 @@ class AuthController extends Controller
                 'message' => 'Login gagal. Anda tidak memiliki hak akses Admin.',
             ], 403); // 403 Forbidden
         }
+        */
+        // ✅ AKHIR PERBAIKAN
 
-        // 5. Jika dia admin, buat token (Gunakan Sanctum)
+        // 5. Buat token untuk user yang berhasil login (apapun rolenya)
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 6. Kirim respons sukses
+        // 6. Kirim respons sukses (berisi token dan data user termasuk rolenya)
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil!',
             'data'    => [
                 'token' => $token,
-                'user'  => $user
+                'user'  => $user // Data user lengkap (termasuk role) dikirim ke mobile
             ]
-        ], 200);
+        ], 200); // 200 OK
     }
 }

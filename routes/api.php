@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\HasilUjiLabBokarApiController;
 use App\Http\Controllers\Api\HasilUjiMaturasiApiController;
 use App\Http\Controllers\Api\HasilUjiTroliApiController;
 use App\Http\Controllers\Api\HasilUjiSir20ApiController;
+use App\Http\Controllers\Api\HasilUjiBokarOlahApiController;
 use App\Http\Controllers\Api\AuthController; // Import controller
 
 
@@ -64,3 +65,14 @@ Route::get('/uji-sir20/{id}', [HasilUjiSir20ApiController::class, 'show']);     
 Route::put('/uji-sir20/{id}', [HasilUjiSir20ApiController::class, 'update']);           // Update
 Route::delete('/uji-sir20/{id}', [HasilUjiSir20ApiController::class, 'destroy']);       // Delete
 
+// ✅ Rute API untuk aplikasi mobile (uji-bokar-olah) - Menyimpan data baru
+Route::post('/uji-bokar-olah', [HasilUjiBokarOlahApiController::class, 'store'])
+    ->name('api.uji-bokar-olah.store'); // Create
+
+// ✅ Rute API untuk MENGAMBIL semua data dari server (uji-bokar-olah)
+Route::get('/hasil-uji-bokar-olah', [HasilUjiBokarOlahApiController::class, 'index']);
+
+// ✅ Rute API lainnya untuk Uji Bokar Olah (CRUD)
+Route::get('/uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'show']);       // Read (One)
+Route::put('/uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'update']);     // Update
+Route::delete('/uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'destroy']); // Delete

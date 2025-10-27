@@ -19,6 +19,7 @@ class UserController extends Controller
         // Mengambil semua data pengguna dari database
         $users = User::all();
         // Mengirim data pengguna ke view 'Datapengguana'
+        // ✅ PERBAIKAN: Pastikan nama view benar (Pengguna.data_pengguna)
         return view('Pengguna.data_pengguna', compact('users'));
     }
 
@@ -29,14 +30,20 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        // Validasi input dari form
+        // ✅ PERBAIKAN: Perbarui aturan validasi 'role'
         $request->validate([
             'fullname' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users', // username harus unik
             'jabatan' => 'required|string|max:255',
-            'role' => 'required|string|in:admin,user', // role harus 'admin' atau 'user'
+            // ✅ PERBAIKAN: Tambahkan role baru ke aturan 'in'
+            'role' => [
+                'required', 'string',
+                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'user'])
+            ],
+            // ✅ AKHIR PERBAIKAN
             'password' => 'required|string|min:8', // password minimal 8 karakter
         ]);
+        // ✅ AKHIR PERBAIKAN VALIDASI
 
         // Membuat user baru menggunakan data yang sudah divalidasi
         User::create([
@@ -58,15 +65,21 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        // Validasi input
+        // ✅ PERBAIKAN: Perbarui aturan validasi 'role'
         $request->validate([
             'fullname' => 'required|string|max:255',
             // Username harus unik, tapi abaikan untuk user yang sedang diedit
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'jabatan' => 'required|string|max:255',
-            'role' => 'required|string|in:admin,user',
+            // ✅ PERBAIKAN: Tambahkan role baru ke aturan 'in'
+            'role' => [
+                'required', 'string',
+                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'user'])
+            ],
+            // ✅ AKHIR PERBAIKAN
             'password' => 'nullable|string|min:8', // Password boleh kosong (tidak diubah)
         ]);
+        // ✅ AKHIR PERBAIKAN VALIDASI
 
         // Menyiapkan data untuk diupdate
         $dataToUpdate = $request->except('password');
@@ -97,4 +110,3 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'Pengguna berhasil dihapus.');
     }
 }
-
