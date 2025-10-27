@@ -258,12 +258,21 @@
 {{-- ================================================================= --}}
 {{--                       BAGIAN SCRIPT JavaScript                     --}}
 {{-- ================================================================= --}}
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{{-- PERBAIKAN: Aktifkan @include('template.script') --}}
+{{-- Ini seharusnya sudah berisi jQuery, Bootstrap, dan adminlte.min.js --}}
+@include('template.script')
+
+{{-- HAPUS PANGGILAN MANUAL JQUERY & BOOTSTRAP JIKA SUDAH ADA DI template.script --}}
+{{-- <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script> --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script> --}}
+
+{{-- Panggil library spesifik halaman ini (SETELAH template.script) --}}
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
+{{-- Script kustom untuk halaman ini --}}
 <script>
 $(document).ready(function() { // Jalankan setelah DOM siap
 

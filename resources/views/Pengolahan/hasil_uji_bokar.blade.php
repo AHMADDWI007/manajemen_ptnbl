@@ -280,12 +280,20 @@
 {{-- ================================================================= --}}
 {{--                       BAGIAN SCRIPT JavaScript                     --}}
 {{-- ================================================================= --}}
-{{-- Memanggil library JS eksternal --}}
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script> {{-- jQuery --}}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script> {{-- Bootstrap JS --}}
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> {{-- DataTables --}}
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script> {{-- DataTables Bootstrap 5 Styling --}}
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script> {{-- Flatpickr Date Picker --}}
+
+{{-- PERBAIKAN: Panggil script template utama --}}
+{{-- Ini seharusnya sudah berisi jQuery, Bootstrap, dan adminlte.min.js --}}
+@include('template.script')
+
+{{-- Memanggil library JS eksternal (HANYA JIKA BELUM ADA di template.script) --}}
+{{-- Jika template.script sudah memuat jQuery & Bootstrap, Anda bisa hapus 2 baris di bawah --}}
+{{-- <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script> --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script> --}}
+
+{{-- Panggil library spesifik halaman ini (SETELAH template.script) --}}
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 {{-- Script kustom untuk halaman ini --}}
 <script>
