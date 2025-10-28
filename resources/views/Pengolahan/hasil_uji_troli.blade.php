@@ -4,7 +4,8 @@
     @include('template.head')
     
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    {{-- CSS DataTables untuk Bootstrap 4 (sesuai template AdminLTE) --}}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -107,7 +108,6 @@
                                     <th>Pa</th>
                                     <th>PRI</th>
                                     <th>Jam Sample</th>
-                                    {{-- <th>Lama Pengeringan</th> --}} {{-- KOLOM DIHAPUS --}}
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -122,7 +122,6 @@
                                         <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
                                         <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
                                         <td>{{ $item->jam_sample ? \Carbon\Carbon::parse($item->jam_sample)->format('H:i') : '-' }}</td>
-                                        {{-- <td>{{ is_numeric($item->lama_pengeringan) ? (fmod($item->lama_pengeringan, 1) == 0 ? (int)$item->lama_pengeringan : $item->lama_pengeringan) : '-' }}</td> --}} {{-- DATA DIHAPUS --}}
                                         <td>
                                             <div class="action-buttons">
                                                 <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"><i class="fas fa-eye"></i></button>
@@ -137,7 +136,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted">Belum ada data hasil uji troli.</td> {{-- COLSPAN DIUBAH MENJADI 9 --}}
+                                        <td colspan="9" class="text-center text-muted">Belum ada data hasil uji troli.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -149,7 +148,6 @@
         </div>
     </div>
 
-    {{-- MODAL TAMBAH --}}
     <div class="modal fade" id="modalTambahTroli" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -167,9 +165,8 @@
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" class="form-control"></div>
-                        {{-- <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" class="form-control" step="0.1"></div> --}} {{-- INPUT DIHAPUS --}}
                     </div>
-                    <div class="modal-footer"> {{-- Pastikan div ini ada --}}
+                    <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-success">Simpan</button>
                     </div>
@@ -178,31 +175,55 @@
         </div>
     </div>
 
-    {{-- MODAL DETAIL --}}
-    <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white"> 
-                    <h5 class="modal-title">Detail Hasil Uji Troli</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Tanggal</dt><dd class="col-sm-7" id="detailTanggal">-</dd>
-                        <dt class="col-sm-5">No. Trolly</dt><dd class="col-sm-7" id="detailNoTrolly">-</dd>
-                        <dt class="col-sm-5">K3</dt><dd class="col-sm-7" id="detailK3">-</dd>
-                        <dt class="col-sm-5">Po</dt><dd class="col-sm-7" id="detailPo">-</dd>
-                        <dt class="col-sm-5">Pa</dt><dd class="col-sm-7" id="detailPa">-</dd>
-                        <dt class="col-sm-5">PRI</dt><dd class="col-sm-7" id="detailPri">-</dd>
-                        <dt class="col-sm-5">Jam Sample</dt><dd class="col-sm-7" id="detailJamSample">-</dd>
-                        {{-- <dt class="col-sm-5">Lama Pengeringan</dt><dd class="col-sm-7" id="detailLamaPengeringan">-</dd> --}} {{-- DETAIL DIHAPUS --}}
-                    </dl>
-                </div>
+   <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white"> 
+                <h5 class="modal-title">Detail Hasil Uji Troli</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>Tanggal</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailTanggal">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>No. Trolly</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailNoTrolly">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>K3</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailK3">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>Po</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailPo">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>Pa</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailPa">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>PRI</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailPri">-</dd>
+
+                    <dt class="col-sm-5 d-flex justify-content-between">
+                        <span>Jam Sample</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-7" id="detailJamSample">-</dd>
+                </dl>
             </div>
         </div>
     </div>
+</div>
 
-    {{-- MODAL EDIT --}}
     <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -221,7 +242,6 @@
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" id="editJamSample" class="form-control"></div>
-                        {{-- <div class="form-group"><label>Lama Pengeringan (Jam)</label><input type="number" name="lama_pengeringan" id="editLamaPengeringan" class="form-control" step="0.1"></div> --}} {{-- INPUT DIHAPUS --}}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -232,18 +252,27 @@
         </div>
     </div>
 
-
     <footer class="main-footer">@include('template.footer')</footer>
 </div>
 
-{{-- @include('template.script') --}}
+{{-- ========================================================== --}}
+{{-- PERBAIKAN URUTAN SCRIPT DI BAWAH INI --}}
+{{-- ========================================================== --}}
 
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+{{-- 1. PANGGIL SCRIPT INTI TEMPLATE (HARUS SUDAH ADA JQUERY, BOOTSTRAP 4, ADMINLTE.JS) --}}
+@include('template.script') 
+
+{{-- 2. PANGGIL PLUGIN TAMBAHAN (DataTables, Flatpickr) --}}
+{{-- HAPUS JQUERY & BOOTSTRAP MANUAL DARI SINI --}}
+{{-- <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script> --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script> --}}
+
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+{{-- GANTI DARI dataTables.bootstrap5.min.js MENJADI dataTables.bootstrap4.min.js --}}
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
+{{-- 3. JALANKAN SCRIPT KUSTOM HALAMAN (TIDAK ADA FUNGSI YANG DIHAPUS) --}}
 <script>
 $(document).ready(function() {
     
@@ -284,13 +313,18 @@ $(document).ready(function() {
         $.get(url, function (data) {
             $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
             $('#detailNoTrolly').text(data.no_trolly || '-'); 
-            $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) : '-');
-            $('#detailPo').text(data.po ? (Math.floor(data.po) == data.po ? parseInt(data.po) : data.po) : '-');
-            $('#detailPa').text(data.pa ? (Math.floor(data.pa) == data.pa ? parseInt(data.pa) : data.pa) : '-');
-            $('#detailPri').text(data.pri ? (Math.floor(data.pri) == data.pri ? parseInt(data.pri) : data.pri) : '-');
+            
+            function formatNumber(num) {
+                if (!$.isNumeric(num)) return '-';
+                return (num % 1 === 0) ? parseInt(num) : parseFloat(num);
+            }
+            
+           $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) + ' %' : '-');
+            $('#detailPo').text(formatNumber(data.po));
+            $('#detailPa').text(formatNumber(data.pa));
+            $('#detailPri').text(formatNumber(data.pri));
             var jam = data.jam_sample ? data.jam_sample.substring(0, 5) : '-';
             $('#detailJamSample').text(jam); 
-            // $('#detailLamaPengeringan').text(data.lama_pengeringan || '-'); // BARIS DIHAPUS
             $('#modalDetail').modal('show');
         }).fail(function() { alert('Gagal mengambil data detail. Cek URL atau route.'); });
     });
@@ -305,7 +339,6 @@ $(document).ready(function() {
             $('#editK3').val(data.k3); $('#editPo').val(data.po); $('#editPa').val(data.pa); 
             $('#editPri').val(data.pri);
             $('#editJamSample').val(data.jam_sample ? data.jam_sample.substring(0, 5) : ''); 
-            // $('#editLamaPengeringan').val(data.lama_pengeringan); // BARIS DIHAPUS
             $('#formEdit').attr('action', urlPost);
             $('#modalEdit').modal('show');
         }).fail(function() { alert('Gagal mengambil data edit. Cek URL atau route.'); });

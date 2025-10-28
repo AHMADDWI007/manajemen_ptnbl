@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\HasilUjiSIR20; // Model baru untuk SIR 20
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule; // (Baik untuk ditambahkan, meskipun 'in' bisa tanpa ini)
 
 class HasilUjiSIR20Controller extends Controller
 {
@@ -18,7 +19,9 @@ class HasilUjiSIR20Controller extends Controller
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
-            'jenis_kemasan' => 'nullable|string|max:255',
+            // --- PERUBAHAN DI SINI ---
+            'jenis_kemasan' => 'nullable|string|in:MB5,SW', // Hanya izinkan MB5 atau SW
+            // -------------------------
             'no_palet' => 'required|string|max:255',
             'po' => 'nullable|numeric',
             'pa' => 'nullable|numeric',
@@ -55,7 +58,9 @@ class HasilUjiSIR20Controller extends Controller
     {
         $validator = Validator::make($request->all(), [
             'tanggal' => 'required|date',
-            'jenis_kemasan' => 'nullable|string|max:255',
+            // --- PERUBAHAN DI SINI ---
+            'jenis_kemasan' => 'nullable|string|in:MB5,SW', // Hanya izinkan MB5 atau SW
+            // -------------------------
             'no_palet' => 'required|string|max:255',
             'po' => 'nullable|numeric',
             'pa' => 'nullable|numeric',

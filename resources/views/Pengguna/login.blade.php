@@ -11,7 +11,7 @@
             padding: 0;
             height: 100%;
             font-family: 'Poppins', sans-serif;
-            background: url('{{ asset('gambar/karet.jpg') }}') no-repeat center center fixed;
+            background: url('{{ asset('gambar/PT.jpg') }}') no-repeat center center fixed;
             background-size: cover;
             display: flex;
             justify-content: center;
@@ -113,7 +113,7 @@
         }
 
         .login-right h2 {
-            color: #00b488;
+            color: #028161;
             margin-bottom: 20px;
             font-weight: 600;
             font-size: 22px;
@@ -170,13 +170,13 @@
 
         .extra-links a:hover {
             text-decoration: underline;
-            color: #008b6f;
+            color:  #008b6f;
         }
 
         .alert {
             text-align: left;
             font-size: 0.85rem;
-            margin-bottom: 15px;
+            margin-bottom: 15px;   
             width: 100%;
         }
     </style>
@@ -187,7 +187,7 @@
         <!-- Bagian kiri -->
         <div class="login-left">
             <img src="{{ asset('gambar/nb_icon.png') }}" alt="Logo">
-            <h1>SELAMAT DATANG<br>DI SISTEM MANAJEMEN<br>PT NUSANTARA BATULICIN</h1>
+            <h1>SELAMAT DATANG<br>DI SISTEM INFORMASI PRODUKSI<br>PT NUSANTARA BATULICIN</h1>
             <p>Silakan login untuk mengakses Sistem.</p>
         </div>
 

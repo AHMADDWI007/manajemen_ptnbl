@@ -123,7 +123,7 @@
                                             <div class="action-buttons">
                                                 <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"> <i class="fas fa-eye"></i> </button>
                                                 <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id }}" title="Edit"> <i class="fas fa-edit"></i> </button>
-                                                <form action="{{ route('hasil-uji-maturasi.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?')" style="display:inline-block; margin:0;">
+                                                <form action="{{ route('hasil_uji_maturasi.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?')" style="display:inline-block; margin:0;">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
@@ -149,7 +149,7 @@
     <div class="modal fade" id="modalTambah" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <form action="{{ route('hasil-uji-maturasi.store') }}" method="POST">
+                <form action="{{ route('hasil_uji_maturasi.store') }}" method="POST">
                     @csrf
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title fw-bold">Tambah Hasil Uji Maturasi</h5>
@@ -172,27 +172,50 @@
         </div>
     </div>
 
-    {{-- MODAL DETAIL --}}
-    <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                 <div class="modal-header bg-success text-white"> 
-                    <h5 class="modal-title">Detail Hasil Uji</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4">Tanggal</dt><dd class="col-sm-8" id="detailTanggal">-</dd>
-                        <dt class="col-sm-4">No. Kamar</dt><dd class="col-sm-8" id="detailNoKamar">-</dd>
-                        <dt class="col-sm-4">K3 (%)</dt><dd class="col-sm-8" id="detailK3">-</dd>
-                        <dt class="col-sm-4">Po</dt><dd class="col-sm-8" id="detailPo">-</dd>
-                        <dt class="col-sm-4">Pa</dt><dd class="col-sm-8" id="detailPa">-</dd>
-                        <dt class="col-sm-4">PRI</dt><dd class="col-sm-8" id="detailPri">-</dd>
-                    </dl>
-                </div>
+{{-- MODAL DETAIL --}}
+<div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white"> 
+                <h5 class="modal-title">Detail Hasil Uji</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Tanggal</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailTanggal">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>No. Kamar</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailNoKamar">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>K3 (%)</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailK3">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Po</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPo">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Pa</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPa">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>PRI</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPri">-</dd>
+                </dl>
             </div>
         </div>
     </div>
+</div>
 
     {{-- MODAL EDIT --}}
     <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
@@ -227,7 +250,7 @@
     </footer>
 </div>
 
-{{-- @include('template.script') --}}
+@include('template.script')
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -271,12 +294,12 @@ $(document).ready(function() {
 
     // DETAIL
     $(document).on('click', '.btn-detail', function () {
-        var id = $(this).data('id'); var url = "{{ url('hasil-uji-maturasi') }}/" + id; 
+        var id = $(this).data('id'); var url = "{{ url('hasil_uji_maturasi') }}/" + id; 
         $.get(url, function (data) { 
             $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
             $('#detailNoKamar').text(data.no_kamar || '-'); 
             // Format Angka di Detail Modal (menggunakan floor)
-            $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) : '-');
+           $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) + ' %' : '-');
             $('#detailPo').text(data.po ? (Math.floor(data.po) == data.po ? parseInt(data.po) : data.po) : '-');
             $('#detailPa').text(data.pa ? (Math.floor(data.pa) == data.pa ? parseInt(data.pa) : data.pa) : '-');
             $('#detailPri').text(data.pri ? (Math.floor(data.pri) == data.pri ? parseInt(data.pri) : data.pri) : '-');
@@ -287,8 +310,8 @@ $(document).ready(function() {
     // EDIT
     $(document).on('click', '.btn-edit', function () {
         var id = $(this).data('id');
-        var urlGet = "{{ url('hasil-uji-maturasi') }}/" + id + "/edit"; 
-        var urlPost = "{{ url('hasil-uji-maturasi') }}/" + id; 
+        var urlGet = "{{ url('hasil_uji_maturasi') }}/" + id + "/edit"; 
+        var urlPost = "{{ url('hasil_uji_maturasi') }}/" + id; 
         $.get(urlGet, function (data) {
             $('#editTanggal').val(data.tanggal); $('#editNoKamar').val(data.no_kamar); $('#editK3').val(data.k3);
             $('#editPo').val(data.po); $('#editPa').val(data.pa); $('#editPri').val(data.pri);

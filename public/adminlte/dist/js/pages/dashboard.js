@@ -2,7 +2,7 @@
  * Author: Abdullah A Almsaeed
  * Date: 4 Jan 2014
  * Description:
- *      This is a demo file used only for the main dashboard (index.html)
+ * This is a demo file used only for the main dashboard (index.html)
  **/
 
 /* global moment:false, Chart:false, Sparkline:false */
@@ -11,6 +11,7 @@ $(function () {
   'use strict'
 
   // Make the dashboard widgets sortable Using jquery UI
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('.connectedSortable').sortable({
     placeholder: 'sort-highlight',
     connectWith: '.connectedSortable',
@@ -19,18 +20,24 @@ $(function () {
     zIndex: 999999
   })
   $('.connectedSortable .card-header').css('cursor', 'move')
+  */
 
   // jQuery UI sortable for the todo list
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('.todo-list').sortable({
     placeholder: 'sort-highlight',
     handle: '.handle',
     forcePlaceholderSize: true,
     zIndex: 999999
   })
+  */
 
   // bootstrap WYSIHTML5 - text editor
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('.textarea').summernote()
+  */
 
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('.daterange').daterangepicker({
     ranges: {
       Today: [moment(), moment()],
@@ -46,11 +53,15 @@ $(function () {
     // eslint-disable-next-line no-alert
     alert('You chose: ' + start.format('MMMM D, YYYY') + ' - ' + end.format('MMMM D, YYYY'))
   })
+  */
 
   /* jQueryKnob */
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('.knob').knob()
+  */
 
   // jvectormap data
+  /* // Bagian ini (World Map) tidak diperlukan untuk halaman Anda
   var visitorsData = {
     US: 398, // USA
     SA: 400, // Saudi Arabia
@@ -90,8 +101,10 @@ $(function () {
       }
     }
   })
+  */
 
   // Sparkline charts
+  /* // INI YANG MENYEBABKAN ERROR
   var sparkline1 = new Sparkline($('#sparkline-1')[0], { width: 80, height: 50, lineColor: '#92c1dc', endColor: '#ebf4f9' })
   var sparkline2 = new Sparkline($('#sparkline-2')[0], { width: 80, height: 50, lineColor: '#92c1dc', endColor: '#ebf4f9' })
   var sparkline3 = new Sparkline($('#sparkline-3')[0], { width: 80, height: 50, lineColor: '#92c1dc', endColor: '#ebf4f9' })
@@ -99,20 +112,25 @@ $(function () {
   sparkline1.draw([1000, 1200, 920, 927, 931, 1027, 819, 930, 1021])
   sparkline2.draw([515, 519, 520, 522, 652, 810, 370, 627, 319, 630, 921])
   sparkline3.draw([15, 19, 20, 22, 33, 27, 31, 27, 19, 30, 21])
+  */
 
   // The Calender
+  // Bagian ini DIPERLUKAN
   $('#calendar').datetimepicker({
     format: 'L',
     inline: true
   })
 
   // SLIMSCROLL FOR CHAT WIDGET
+  /* // Bagian ini tidak diperlukan untuk halaman Anda
   $('#chat-box').overlayScrollbars({
     height: '250px'
   })
+  */
 
   /* Chart.js Charts */
   // Sales chart
+  // Bagian ini (Area Chart) DIPERLUKAN
   var salesChartCanvas = document.getElementById('revenue-chart-canvas').getContext('2d')
   // $('#revenue-chart').get(0).getContext('2d');
 
@@ -173,6 +191,7 @@ $(function () {
   })
 
   // Donut Chart
+  // Bagian ini (Donut Chart) DIPERLUKAN
   var pieChartCanvas = $('#sales-chart-canvas').get(0).getContext('2d')
   var pieData = {
     labels: [
@@ -204,6 +223,7 @@ $(function () {
   })
 
   // Sales graph chart
+  /* // Bagian ini (untuk #line-chart) tidak diperlukan untuk halaman Anda
   var salesGraphChartCanvas = $('#line-chart').get(0).getContext('2d')
   // $('#revenue-chart').get(0).getContext('2d');
 
@@ -264,4 +284,5 @@ $(function () {
     data: salesGraphChartData,
     options: salesGraphChartOptions
   })
+  */
 })

@@ -128,7 +128,7 @@
                                                 <button class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"><i class="fas fa-eye"></i></button>
                                                 <button class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id }}" title="Edit"><i class="fas fa-edit"></i></button>
                                                 {{-- Route Diperbaiki --}}
-                                                <form action="{{ route('hasil-uji-sir20.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block;"> 
+                                                <form action="{{ route('hasil_uji_sir_20.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block;"> 
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-danger btn-sm" title="Hapus"><i class="fas fa-trash"></i></button>
@@ -161,7 +161,14 @@
                     </div>
                     <div class="modal-body">
                         <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" class="form-control" required></div>
-                        <div class="form-group"><label>Jenis Kemasan</label><input type="text" name="jenis_kemasan" class="form-control" placeholder="Contoh: Plastik, Kayu..."></div> {{-- TAMBAHAN --}}
+                       <div class="form-group">
+                            <label>Jenis Kemasan</label>
+                            <select name="jenis_kemasan" class="form-control" required>
+                                <option value="">-- Pilih Jenis --</option>
+                                <option value="MB5" {{ old('jenis_kemasan') == 'MB5' ? 'selected' : '' }}>MB5</option>
+                                <option value="SW" {{ old('jenis_kemasan') == 'SW' ? 'selected' : '' }}>SW</option>
+                            </select>
+                        </div>
                         <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" class="form-control" required></div>
                         <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
@@ -181,31 +188,74 @@
         </div>
     </div>
 
-    <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
-         <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                 <div class="modal-header bg-success text-white"> 
-                    <h5 class="modal-title">Detail Hasil Uji SIR 20</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4">Tanggal</dt><dd class="col-sm-8" id="detailTanggal">-</dd>
-                        <dt class="col-sm-4">Jenis Kemasan</dt><dd class="col-sm-8" id="detailJenisKemasan">-</dd> {{-- TAMBAHAN --}}
-                        <dt class="col-sm-4">No. Palet</dt><dd class="col-sm-8" id="detailNoPalet">-</dd>
-                        <dt class="col-sm-4">Po</dt><dd class="col-sm-8" id="detailPo">-</dd>
-                        <dt class="col-sm-4">Pa</dt><dd class="col-sm-8" id="detailPa">-</dd>
-                        <dt class="col-sm-4">PRI</dt><dd class="col-sm-8" id="detailPri">-</dd>
-                        <dt class="col-sm-4">Dirt</dt><dd class="col-sm-8" id="detailDirt">-</dd>
-                        <dt class="col-sm-4">Ash</dt><dd class="col-sm-8" id="detailAsh">-</dd>
-                        <dt class="col-sm-4">VM</dt><dd class="col-sm-8" id="detailVm">-</dd>
-                        <dt class="col-sm-4">Mooney</dt><dd class="col-sm-8" id="detailMoney">-</dd>
-                        <dt class="col-sm-4">Nitrogen</dt><dd class="col-sm-8" id="detailNitrogen">-</dd>
-                    </dl>
-                </div>
+   <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white"> 
+                <h5 class="modal-title">Detail Hasil Uji SIR 20</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Tanggal</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailTanggal">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Jenis Kemasan</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailJenisKemasan">-</dd> {{-- TAMBAHAN --}}
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>No. Palet</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailNoPalet">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Po</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPo">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Pa</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPa">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>PRI</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPri">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Dirt</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailDirt">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Ash</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailAsh">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>VM</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailVm">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Mooney</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailMoney">-</dd>
+
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Nitrogen</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailNitrogen">-</dd>
+                </dl>
             </div>
         </div>
     </div>
+</div>
 
     <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -219,7 +269,14 @@
                     </div>
                     <div class="modal-body">
                         <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" id="editTanggal" class="form-control" required></div>
-                        <div class="form-group"><label>Jenis Kemasan</label><input type="text" name="jenis_kemasan" id="editJenisKemasan" class="form-control" placeholder="Contoh: Plastik, Kayu..."></div> {{-- TAMBAHAN --}}
+                       <div class="form-group">
+                            <label>Jenis Kemasan</label>
+                            <select name="jenis_kemasan" id="editJenisKemasan" class="form-control" required>
+                                <option value="">-- Pilih Jenis --</option>
+                                <option value="MB5">MB5</option>
+                                <option value="SW">SW</option>
+                            </select>
+                        </div>
                         <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" id="editNoPalet" class="form-control" required></div>
                         <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
                         <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
@@ -242,7 +299,7 @@
     @include('template.footer')
 </div>
 
-{{-- @include('template.script') --}} 
+@include('template.script')  
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -281,7 +338,7 @@ $(document).ready(function(){
 
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    // DETAIL
+// DETAIL
     $(document).on('click', '.btn-detail', function(){
         var id = $(this).data('id');
         var url = "{{ url('hasil_uji_sir_20') }}/" + id; // URL Diperbaiki
@@ -292,18 +349,35 @@ $(document).ready(function(){
             
             function formatNumber(num) {
                 if (!$.isNumeric(num)) return '-';
-                // Gunakan fmod versi JS (operato %)
+                // Gunakan fmod versi JS (operator %)
                 return (num % 1 === 0) ? parseInt(num) : parseFloat(num);
             }
 
             $('#detailPo').text(formatNumber(data.po));
             $('#detailPa').text(formatNumber(data.pa));
             $('#detailPri').text(formatNumber(data.pri));
-            $('#detailDirt').text(formatNumber(data.dirt));
-            $('#detailAsh').text(formatNumber(data.ash));
-            $('#detailVm').text(formatNumber(data.vm));
-            $('#detailMoney').text(formatNumber(data.money));
-            $('#detailNitrogen').text(formatNumber(data.nitrogen));
+            
+            // --- BAGIAN YANG DIPERBARUI ---
+            
+            // Format Dirt
+            var dirtVal = formatNumber(data.dirt);
+            $('#detailDirt').text(dirtVal !== '-' ? dirtVal + ' %' : '-');
+            
+            // Format Ash
+            var ashVal = formatNumber(data.ash);
+            $('#detailAsh').text(ashVal !== '-' ? ashVal + ' %' : '-');
+            
+            // Format Vm
+            var vmVal = formatNumber(data.vm);
+            $('#detailVm').text(vmVal !== '-' ? vmVal + ' %' : '-');
+            
+            $('#detailMoney').text(formatNumber(data.money)); // Money tidak pakai persen
+            
+            // Format Nitrogen
+            var nitrogenVal = formatNumber(data.nitrogen);
+            $('#detailNitrogen').text(nitrogenVal !== '-' ? nitrogenVal + ' %' : '-');
+            
+            // --- AKHIR BAGIAN ---
 
             $('#modalDetail').modal('show'); 
         }).fail(function(){ alert('Gagal memuat detail.'); });

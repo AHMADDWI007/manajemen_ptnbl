@@ -151,6 +151,7 @@
     </footer>
 </div>
 
+@include('template.script')
 {{-- MODAL TAMBAH --}}
 <div class="modal fade" id="modalTambah" tabindex="-1" role="dialog">
      <div class="modal-dialog" role="document">
@@ -195,25 +196,60 @@
             </div>
             <div class="modal-body">
                 <dl class="row mb-0">
-                    <dt class="col-sm-4">Tanggal</dt><dd class="col-sm-8" id="detailTanggal">-</dd>
-                    <dt class="col-sm-4">Supplier</dt><dd class="col-sm-8" id="detailSupplier">-</dd>
-                    <dt class="col-sm-4">No Sampel</dt><dd class="col-sm-8" id="detailNoSampel">-</dd>
-                    <dt class="col-sm-4">K3 (%)</dt><dd class="col-sm-8" id="detailK3">-</dd>
-                    <dt class="col-sm-4">Dirt (%)</dt><dd class="col-sm-8" id="detailDirt">-</dd>
-                    <dt class="col-sm-4">Ash (%)</dt><dd class="col-sm-8" id="detailAsk">-</dd>
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Tanggal</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailTanggal">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Supplier</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailSupplier">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>No Sampel</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailNoSampel">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>K3 (%)</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailK3">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Dirt (%)</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailDirt">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Ash (%)</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailAsk">-</dd>
+                    
                     {{-- ================== --}}
                     {{-- TAMBAHAN DETAIL --}}
                     {{-- ================== --}}
-                    <dt class="col-sm-4">Po</dt><dd class="col-sm-8" id="detailPo">-</dd>
-                    <dt class="col-sm-4">Pa</dt><dd class="col-sm-8" id="detailPa">-</dd>
-                    <dt class="col-sm-4">PRI</dt><dd class="col-sm-8" id="detailPri">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Po</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPo">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>Pa</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPa">-</dd>
+                    
+                    <dt class="col-sm-4 d-flex justify-content-between">
+                        <span>PRI</span><span>:</span>
+                    </dt>
+                    <dd class="col-sm-8" id="detailPri">-</dd>
                     {{-- ================== --}}
                 </dl>
             </div>
         </div>
     </div>
 </div>
-
 {{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -250,6 +286,7 @@
 </div>
 
 {{-- SCRIPTS --}}
+
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -293,16 +330,41 @@ $(document).ready(function() {
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
     // DETAIL
+   // DETAIL
     $(document).on('click','.btn-detail',function(){
         var id = $(this).data('id');
         var url = "{{ url('hasil_uji_lab_bokar') }}/" + id;
         $.get(url, function(data){
-            $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
+            
+            // --- PERBAIKAN BARU DI SINI ---
+            var tanggalFormatted = '-'; // Default
+            if (data.tanggal) {
+                // 1. Coba parse tanggal apa adanya
+                var dateObj = new Date(data.tanggal);
+
+                // 2. Cek apakah hasil parse-nya valid
+                if (isNaN(dateObj.getTime())) {
+                    // Jika tidak valid (hasilnya NaN), biarkan '-'
+                    tanggalFormatted = '-'; 
+                } else {
+                    // Jika valid, format ke bahasa Indonesia
+                    tanggalFormatted = dateObj.toLocaleDateString('id-ID', { 
+                        day: '2-digit', 
+                        month: 'long', 
+                        year: 'numeric',
+                        // Gunakan UTC agar konsisten jika inputnya YYYY-MM-DD
+                        timeZone: 'UTC' 
+                    });
+                }
+            }
+            $('#detailTanggal').text(tanggalFormatted);
+            // --- AKHIR PERBAIKAN ---
+
             $('#detailSupplier').text(data.suplier ?? '-');
             $('#detailNoSampel').text(data.no_sampel ?? '-');
-            $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) : '-');
-            $('#detailDirt').text(data.dirt ? (Math.floor(data.dirt) == data.dirt ? parseInt(data.dirt) : data.dirt) : '-');
-            $('#detailAsk').text(data.ask ? (Math.floor(data.ask) == data.ask ? parseInt(data.ask) : data.ask) : '-');
+           $('#detailK3').text(data.k3 ? ((Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) + ' %') : '-');
+            $('#detailDirt').text(data.dirt ? ((Math.floor(data.dirt) == data.dirt ? parseInt(data.dirt) : data.dirt) + ' %') : '-');
+            $('#detailAsk').text(data.ask ? ((Math.floor(data.ask) == data.ask ? parseInt(data.ask) : data.ask) + ' %') : '-');
              // ===========================================
              // TAMBAHAN JS DETAIL (Po, Pa, PRI)
              // ===========================================

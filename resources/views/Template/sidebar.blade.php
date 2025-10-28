@@ -19,17 +19,7 @@
             </div>
         </div>
 
-        <div class="form-inline">
-            <div class="input-group" data-widget="sidebar-search">
-                <input class="form-control form-control-sidebar" type="search" placeholder="Cari..." aria-label="Search"
-                    style="background-color: #446644; color:#fff; border: none;">
-                <div class="input-group-append">
-                    <button class="btn btn-sidebar" style="background-color:#FFD700; color:#355E3B;">
-                        <i class="fas fa-search fa-fw"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
+        
 
         <nav class="mt-2">
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
@@ -44,7 +34,7 @@
                 {{-- Data Laboratorium --}}
                 @php
                     // Tambahkan URL baru ke pengecekan $isLabOpen
-                    $isLabOpen = request()->is('hasil_uji_lab_bokar*', 'uji-bokar-diolah*', 'hasil_uji_maturasi*', 'hasil_uji_troli*', 'hasil_uji_sir_20*');
+                    $isLabOpen = request()->is('hasil_uji_lab_bokar*', 'hasil_uji_bokar_diolah*', 'hasil_uji_maturasi*', 'hasil_uji_troli*', 'hasil_uji_sir_20*');
                 @endphp
                 <li id="menu-laboratorium" class="nav-item has-treeview {{ $isLabOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isLabOpen ? 'active' : '' }}">
@@ -66,7 +56,7 @@
                         {{-- =================================== --}}
                         <li class="nav-item">
                             {{-- Ganti URL '/uji-bokar-diolah' sesuai route Anda nanti --}}
-                            <a href="{{ url('/uji-bokar-diolah') }}" class="nav-link {{ request()->is('uji-bokar-diolah*') ? 'active' : '' }}">
+                            <a href="{{ url('/hasil_uji_bokar_diolah') }}" class="nav-link {{ request()->is('hasil_uji_bokar_diolah*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Uji Bokar Diolah</p>
                             </a>
@@ -95,7 +85,7 @@
 
                 {{-- Data Pengolahan --}}
                 @php
-                    $isPengolahanOpen = request()->is('bokar*', 'maturasi*', 'produksi*');
+                    $isPengolahanOpen = request()->is('pengolahan_basah*', 'maturasi*', 'produksi*');
                 @endphp
                 <li id="menu-pengolahan" class="nav-item has-treeview {{ $isPengolahanOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isPengolahanOpen ? 'active' : '' }}">
@@ -107,7 +97,7 @@
                     </a>
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
-                            <a href="{{ url('/bokar') }}" class="nav-link {{ request()->is('bokar*') ? 'active' : '' }}">
+                            <a href="{{ url('/pengolahan_basah') }}" class="nav-link {{ request()->is('bokar*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Pengolahan Basah</p>
                             </a>

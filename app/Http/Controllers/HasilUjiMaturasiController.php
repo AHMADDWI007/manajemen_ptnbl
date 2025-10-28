@@ -32,7 +32,7 @@ class HasilUjiMaturasiController extends Controller
 
         HasilUjiMaturasi::create($validator->validated());
 
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data hasil uji maturasi berhasil ditambahkan!');
+        return redirect()->route('hasil_uji_maturasi.index')->with('success', 'Data hasil uji maturasi berhasil ditambahkan!');
     }
 
     public function show($id)
@@ -65,14 +65,14 @@ class HasilUjiMaturasiController extends Controller
         $hasilUji = HasilUjiMaturasi::findOrFail($id);
         $hasilUji->update($validator->validated());
 
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil diperbarui!');
+        return redirect()->route('hasil_uji_maturasi.index')->with('success', 'Data berhasil diperbarui!');
     }
 
     public function destroy($id)
     {
         $hasilUji = HasilUjiMaturasi::findOrFail($id);
         $hasilUji->delete();
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil dihapus!');
+        return redirect()->route('hasil_uji_maturasi.index')->with('success', 'Data berhasil dihapus!');
     }
 }
 
