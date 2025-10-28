@@ -22,7 +22,7 @@ class HasilUjiTroliApiController extends Controller
             'pa' => 'required|numeric',
             'pri' => 'required|numeric',
             'jam_sample' => 'required|string|max:20',
-            'lama_pengeringan' => 'required|string|max:50',
+            //'lama_pengeringan' => 'required|string|max:50',
         ]);
 
         try {
@@ -92,7 +92,7 @@ class HasilUjiTroliApiController extends Controller
             'pa'               => 'required|numeric',
             'pri'              => 'required|numeric',
             'jam_sample'       => 'required|string|max:20',
-            'lama_pengeringan' => 'required|string|max:50',
+            //'lama_pengeringan' => 'required|string|max:50',
         ]);
 
         try {
