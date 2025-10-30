@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Models\PengolahanBasah; // Tetap pakai model utama
-// Hapus 'use App\Http\Resources\HasilUjiBokarOlahResource;'
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator; // Untuk validasi
+use App\Models\HasilUjiBokarDiolah; // Model untuk tabel kedua
 
 class HasilUjiBokarOlahApiController extends Controller
 {
@@ -17,9 +18,7 @@ class HasilUjiBokarOlahApiController extends Controller
     {
         try {
             // Ambil data yang K3-nya TIDAK NULL
-            $data = PengolahanBasah::whereNotNull('k3')
-                        ->orderBy('tanggal', 'desc')
-                        ->get();
+           $data = HasilUjiBokarDiolah::orderBy('tanggal', 'desc')->get();
             
             // ✅ PERUBAHAN: Langsung kirim data mentah
             // Resource tidak dipakai lagi
@@ -29,6 +28,53 @@ class HasilUjiBokarOlahApiController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    // -------------------------------------------------------------------
+    // ✅ PERBAIKAN: TAMBAHKAN FUNGSI 'store' BARU INI
+    // -------------------------------------------------------------------
+    /**
+     * [FORM 2 SIMPAN] Menerima data BARU untuk tabel hasil_uji_bokar_diolah.
+     * Endpoint: POST /hasil-uji-bokar-olah
+     */
+    public function store(Request $request)
+    {
+        // Validasi data yang dikirim dari Android
+        $validator = Validator::make($request->all(), [
+            'id_timbang' => 'required|integer|exists:pengolahan_basah,id',
+            'tanggal' => 'required|date_format:Y-m-d H:i:s,Y-m-d\TH:i:s.u\Z,Y-m-d', // Sesuaikan format tanggal
+            'bak_maturasi' => 'required|string',
+            'jenis' => 'required|string',
+            'netto_basah' => 'required|numeric',
+            'k3' => 'required|numeric',
+            'netto_kering' => 'required|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            // Buat baris baru di tabel 'hasil_uji_bokar_diolah'
+            $dataBaru = HasilUjiBokarDiolah::create([
+                'tanggal' => $request->tanggal,
+                'bak_maturasi' => $request->bak_maturasi,
+                'jenis' => $request->jenis,
+                'netto_basah' => $request->netto_basah,
+                'k3' => $request->k3,
+                'netto_kering' => $request->netto_kering,
+                // Anda bisa tambahkan 'id_pengolahan_basah' => $request->id_timbang jika ada kolomnya
+            ]);
+
+            return response()->json(['success' => true, 'data' => $dataBaru, 'message' => 'Data berhasil disimpan ke tabel hasil uji'], 201);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    // -------------------------------------------------------------------
+    // ✅ AKHIR FUNGSI BARU
+    // -------------------------------------------------------------------
+
 
     /**
      * [TABEL 2] "Hapus" data (Reset K3 dan Netto Kering menjadi NULL).

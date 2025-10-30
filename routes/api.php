@@ -88,3 +88,9 @@ Route::get('hasil-uji-bokar-olah', [HasilUjiBokarOlahApiController::class, 'inde
 // [Tabel 2] Mereset/Menghapus K3 (mengembalikan ke pending)
 Route::delete('uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'destroy']);
 
+// ✅ TAMBAHKAN RUTE INI
+// [Form 2] Menerima data BARU untuk tabel hasil_uji_bokar_diolah
+Route::post('hasil-uji-bokar-olah', [HasilUjiBokarOlahApiController::class, 'store']);
+
+// [Tabel 2] Mereset/Menghapus K3 (mengembalikan ke pending)
+Route::delete('uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'destroy']);
