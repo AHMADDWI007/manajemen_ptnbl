@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PengolahanBasah; // <-- PENTING! Gunakan model PengolahanBasah
+use App\Models\HasilUjiBokarDiolah; // <-- 1. TAMBAHKAN IMPORT INI
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -19,8 +20,8 @@ class HasilUjiBokarDiolahController extends Controller
         // Ambil data 'pengolahan_basah' yang K3-nya masih KOSONG
         // untuk mengisi dropdown di modal tambah K3
         $daftar_bak_belum_uji = PengolahanBasah::whereNull('k3')
-                                ->orderBy('tanggal', 'desc')
-                                ->get();
+                                        ->orderBy('tanggal', 'desc')
+                                        ->get();
 
         return view('Pengolahan.hasil_uji_bokar_diolah', compact('data_diolah', 'daftar_bak_belum_uji'));
     }
@@ -54,11 +55,26 @@ class HasilUjiBokarDiolahController extends Controller
         // 3. Hitung Netto Kering
         $netto_kering = $netto_basah * ($k3_value / 100);
 
-        // 4. Update data tersebut
+        // 4. Update data tersebut (Tabel: pengolahan_basah)
         $data->update([
             'k3' => $k3_value,
             'netto_kering' => $netto_kering,
         ]);
+
+        // ==========================================================
+        // 2. PERBAIKAN: TAMBAHKAN LOGIKA SIMPAN KE 'hasil_uji_bokar_diolah'
+        // ==========================================================
+        // Ini akan membuat catatan/log di tabel 'hasil_uji_bokar_diolah'
+        // sesuai keinginan Anda.
+        HasilUjiBokarDiolah::create([
+            'tanggal'       => $data->tanggal,       // Ambil dari data basah
+            'bak_maturasi'  => $data->bak_maturasi,  // Ambil dari data basah
+            'jenis'         => $data->jenis,         // Ambil dari data basah
+            'netto_basah'   => $netto_basah,
+            'k3'            => $k3_value,
+            'netto_kering'  => $netto_kering
+        ]);
+        // ==========================================================
 
         return redirect()->route('hasil_uji_bokar_diolah.index')->with('success', 'Data K3 berhasil disimpan.');
     }
@@ -99,6 +115,12 @@ class HasilUjiBokarDiolahController extends Controller
             'k3' => $request->k3,
             'netto_kering' => $netto_kering
         ]);
+        
+        // --- PERBAIKAN DI UPDATE (JIKA DIPERLUKAN) ---
+        // Jika Anda ingin tabel 'hasil_uji_bokar_diolah' juga terupdate 
+        // saat diedit, tambahkan logika update di sini juga.
+        // Jika tidak, biarkan saja.
+        // --- ---
 
         return redirect()->route('hasil_uji_bokar_diolah.index')->with('success', 'Data K3 berhasil diperbarui.');
     }
@@ -108,6 +130,15 @@ class HasilUjiBokarDiolahController extends Controller
         // Hati-hati! Ini akan menghapus data dari 'pengolahan_basah'
         $data = PengolahanBasah::find($id);
         if ($data) {
+            
+            // --- PERBAIKAN DI DELETE (JIKA DIPERLUKAN) ---
+            // Saat data basah dihapus, Anda mungkin ingin menghapus 
+            // data di 'hasil_uji_bokar_diolah' juga.
+            HasilUjiBokarDiolah::where('bak_maturasi', $data->bak_maturasi)
+                                ->where('tanggal', $data->tanggal)
+                                ->delete();
+            // --- ---
+
             $data->delete();
             return redirect()->route('hasil_uji_bokar_diolah.index')->with('success', 'Data berhasil dihapus.');
         }

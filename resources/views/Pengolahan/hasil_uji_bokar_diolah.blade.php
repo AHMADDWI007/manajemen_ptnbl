@@ -188,6 +188,7 @@
 </div>
 
 {{-- SCRIPTS --}}
+{{-- SCRIPTS --}}
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -195,68 +196,102 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 $(document).ready(function() {
-    @if (session('success'))
-        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
-    @endif
+    @if (session('success'))
+        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
+    @endif
 
-    var fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d" });
-    var fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d" });
-    function parseDMY(dateStr){
-        var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
-    }
-    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex){
-        var min = $('#min-date').val(), max = $('#max-date').val(), tableDateStr = data[1] || '';
-        if (!tableDateStr || tableDateStr === '-') return true; var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
-        var minDate = min ? new Date(min + 'T00:00:00') : null, maxDate = max ? new Date(max + 'T23:59:59') : null;
-        if ((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; return false;
+    // --- AWAL PERBAIKAN ---
+    // 1. Dapatkan tanggal hari ini dalam format YYYY-MM-DD
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0'); // Bulan mulai dari 0
+    var dd = String(today.getDate()).padStart(2, '0');
+    var todayStr = yyyy + '-' + mm + '-' + dd;
+
+    // 2. Set tanggal hari ini sebagai default di Flatpickr
+    var fpMin = flatpickr("#min-date", { 
+        altInput: true, 
+        altFormat: "d/m/Y", 
+        dateFormat: "Y-m-d",
+        defaultDate: todayStr // <-- Tambahkan ini
     });
-    var table = $('#dataTable').DataTable({"order": [[1,"desc"]]});
-    $('#filter-btn').on('click', function(e){ e.preventDefault(); table.draw(); });
-    $('#reset-filter').on('click', function(e){ e.preventDefault(); fpMin.clear(); fpMax.clear(); table.search('').draw(); });
-    $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
-
-    function formatNumber(num, precision = 2) {
-        if (num === null || num === undefined || num === '') return '-';
-        num = parseFloat(num);
-        return num.toLocaleString('id-ID', { minimumFractionDigits: precision, maximumFractionDigits: precision });
-    }
-    function formatTanggalDetail(dateStr) {
-        if (!dateStr) return '-';
-        try {
-            var dateObj = new Date(dateStr + 'T00:00:00');
-            if (isNaN(dateObj.getTime())) return '-';
-            return dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-        } catch (e) { return '-'; }
-    }
-
-    // --- AJAX DETAIL (Mengambil data PengolahanBasah) ---
-    $(document).on('click','.btn-detail',function(){
-        var id = $(this).data('id');
-        var url = "{{ url('hasil_uji_bokar_diolah') }}/" + id; // Route 'show'
-        $.get(url, function(data){
-            $('#detailTanggal').text(formatTanggalDetail(data.tanggal));
-            $('#detailBakMaturasi').text(data.bak_maturasi ?? '-');
-            $('#detailJenis').text(data.jenis ?? '-');
-            $('#detailNettoBasah').text(formatNumber(data.netto_basah) + ' Kg');
-            var k3Val = formatNumber(data.k3);
-            $('#detailK3').text(k3Val !== '-' ? k3Val + ' %' : '-');
-            $('#detailNettoKering').text(formatNumber(data.netto_kering) + ' Kg');
-            $('#modalDetail').modal('show');
-        }).fail(function(){ alert('Gagal memuat detail.'); });
+    var fpMax = flatpickr("#max-date", { 
+        altInput: true, 
+        altFormat: "d/m/Y", 
+        dateFormat: "Y-m-d",
+        defaultDate: todayStr // <-- Tambahkan ini
     });
+    // --- AKHIR PERBAIKAN ---
 
-    // --- AJAX EDIT K3 ---
-    $(document).on('click','.btn-edit-k3',function(){
-        var id = $(this).data('id');
-        var urlGet = "{{ url('hasil_uji_bokar_diolah') }}/" + id + "/edit";
-        var urlPost = "{{ url('hasil_uji_bokar_diolah') }}/" + id;
-        $.get(urlGet, function(data){
-            $('#editBakInfo').val(data.bak_maturasi + ' (Tgl: ' + formatTanggalDetail(data.tanggal) + ')');
-            $('#editK3').val(data.k3);
-            $('#formEditK3').attr('action', urlPost);
-            $('#modalEditK3').modal('show');
-        }).fail(function(){ alert('Gagal memuat data edit K3.'); });
-    });
+    function parseDMY(dateStr){
+        var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
+    }
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex){
+        var min = $('#min-date').val(), max = $('#max-date').val(), tableDateStr = data[1] || '';
+        if (!tableDateStr || tableDateStr === '-') return true; 
+        var tableDate = parseDMY(tableDateStr); 
+        if (!tableDate) return true;
+        var minDate = min ? new Date(min + 'T00:00:00') : null, maxDate = max ? new Date(max + 'T23:59:59') : null;
+        if ((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; 
+        return false;
+    });
+
+    // Inisialisasi DataTable
+    var table = $('#dataTable').DataTable({"order": [[1,"desc"]]});
+    
+    // 3. Terapkan filter (draw) SEKARANG setelah default di-set
+    // Ini akan langsung memfilter tabel untuk menampilkan data hari ini saja
+    table.draw();
+
+    $('#filter-btn').on('click', function(e){ e.preventDefault(); table.draw(); });
+    $('#reset-filter').on('click', function(e){ e.preventDefault(); fpMin.clear(); fpMax.clear(); table.search('').draw(); });
+    $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
+
+    // ... sisa kode Anda (formatNumber, formatTanggalDetail, AJAX, dll) ...
+    // ... (Saya salin sisa kode Anda di bawah ini agar lengkap) ...
+
+    function formatNumber(num, precision = 2) {
+        if (num === null || num === undefined || num === '') return '-';
+        num = parseFloat(num);
+        return num.toLocaleString('id-ID', { minimumFractionDigits: precision, maximumFractionDigits: precision });
+    }
+    function formatTanggalDetail(dateStr) {
+        if (!dateStr) return '-';
+        try {
+            var dateObj = new Date(dateStr + 'T00:00:00');
+            if (isNaN(dateObj.getTime())) return '-';
+            return dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+        } catch (e) { return '-'; }
+    }
+
+    // --- AJAX DETAIL (Mengambil data PengolahanBasah) ---
+    $(document).on('click','.btn-detail',function(){
+        var id = $(this).data('id');
+        var url = "{{ url('hasil_uji_bokar_diolah') }}/" + id; // Route 'show'
+        $.get(url, function(data){
+            $('#detailTanggal').text(formatTanggalDetail(data.tanggal));
+            $('#detailBakMaturasi').text(data.bak_maturasi ?? '-');
+            $('#detailJenis').text(data.jenis ?? '-');
+            $('#detailNettoBasah').text(formatNumber(data.netto_basah) + ' Kg');
+            var k3Val = formatNumber(data.k3);
+            $('#detailK3').text(k3Val !== '-' ? k3Val + ' %' : '-');
+            $('#detailNettoKering').text(formatNumber(data.netto_kering) + ' Kg');
+            $('#modalDetail').modal('show');
+        }).fail(function(){ alert('Gagal memuat detail.'); });
+    });
+
+    // --- AJAX EDIT K3 ---
+    $(document).on('click','.btn-edit-k3',function(){
+        var id = $(this).data('id');
+        var urlGet = "{{ url('hasil_uji_bokar_diolah') }}/" + id + "/edit";
+        var urlPost = "{{ url('hasil_uji_bokar_diolah') }}/" + id;
+        $.get(urlGet, function(data){
+            $('#editBakInfo').val(data.bak_maturasi + ' (Tgl: ' + formatTanggalDetail(data.tanggal) + ')');
+            $('#editK3').val(data.k3);
+            $('#formEditK3').attr('action', urlPost);
+            $('#modalEditK3').modal('show');
+        }).fail(function(){ alert('Gagal memuat data edit K3.'); });
+    });
 });
 </script>
 </body>

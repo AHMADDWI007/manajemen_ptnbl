@@ -110,7 +110,7 @@
                                        <tr class="{{ is_null($item['id']) ? 'data-default' : '' }}">
                                            <td>{{ $item['uraian'] ?? '-' }}</td>
                                            <td>{{ $item['created_at_view'] ? $item['created_at_view']->format('d-m-Y') : $item['tanggal_input_view'] }}</td>
-                                           <td>{{ number_format($item['stok_awal'] ?? 0, 2, ',', '.') }}</td>
+                                           <td>{{ number_format($item['stok_awal'] ?? 0, 0, ',', '.') }}</td>
                                            <td>
                                                @if($item['tgl_masuk'])
                                                    {{ \Carbon\Carbon::parse($item['tgl_masuk'])->format('d-m-Y') }}
@@ -119,10 +119,10 @@
                                                @endif
                                            </td>
                                            <td>{{ $item['umur'] ?? 0 }} hari</td>
-                                           <td>{{ number_format($item['diolah'] ?? 0, 2, ',', '.') }}</td>
-                                           <td>{{ number_format($item['mutasi'] ?? 0, 2, ',', '.') }}</td>
-                                           <td>{{ number_format($item['masuk_hi'] ?? 0, 2, ',', '.') }}</td>
-                                           <td>{{ number_format($item['stok_akhir'] ?? 0, 2, ',', '.') }}</td>
+                                           <td>{{ number_format($item['diolah'] ?? 0, 0, ',', '.') }}</td>
+                                           <td>{{ number_format($item['mutasi'] ?? 0, 0, ',', '.') }}</td>
+                                           <td>{{ number_format($item['masuk_hi'] ?? 0, 0, ',', '.') }}</td>
+                                           <td>{{ number_format($item['stok_akhir'] ?? 0, 0, ',', '.') }}</td>
                                            <td>{{ $item['keterangan'] ?? '-' }}</td>
                                            <td class="text-center action-buttons">
                                                @if(!is_null($item['id']))
@@ -170,7 +170,7 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label>Tanggal Input Harian</label>
-                             {{-- Name berbeda untuk JS getPreviousData vs form submit --}}
+                            {{-- Name berbeda ('tanggal_input_harian') agar tidak bentrok dengan name 'tanggal_input' di controller update --}}
                             <input type="date" name="tanggal_input_harian" id="tanggal_input_tambah" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -184,6 +184,7 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Stok Awal (Kg)</label>
+                            {{-- Input type text karena value diformat JS, name tetap stok_awal --}}
                             <input type="text" name="stok_awal" id="stok_awal" class="form-control form-control-sm" readonly required>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -200,7 +201,9 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Masuk Hari Ini (Kg)</label>
-                            <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm" value="0" step="0.01" min="0">
+                            {{-- Input type text karena value diformat JS, name tetap masuk_hi --}}
+                            {{-- TAMBAHKAN readonly DI SINI --}}
+                            <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm" value="0,00" readonly>
                         </div>
                          <div class="col-md-6 mb-3">
                             <label>Asal Bokar</label>
@@ -225,12 +228,11 @@
         </div>
     </div>
 </div>
-
 {{-- MODAL DETAIL --}}
 <div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
      <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">Detail Data Maturasi</h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
             </div>
@@ -261,7 +263,7 @@
             <form id="formEdit" method="POST" data-error-id="{{ session('edit_id') }}">
                 @csrf
                 @method('PUT')
-                <div class="modal-header bg-warning text-white">
+                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title">Edit Data Maturasi</h5>
                     <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
@@ -398,10 +400,10 @@ $(document).ready(function() {
     // ----- EVENT HANDLER LAINNYA -----
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    function formatNumber(num, precision = 2) {
-        if (num === null || typeof num === 'undefined' || num === '') return '0,00';
+    function formatNumber(num, precision = 0) {
+        if (num === null || typeof num === 'undefined' || num === '') return '0';
         let parsedNum = parseFloat(String(num).replace(/[^0-9,.-]+/g,"").replace(',','.')); // Handle negatif & koma
-        if (isNaN(parsedNum)) return '0,00';
+        if (isNaN(parsedNum)) return '0';
         return parsedNum.toLocaleString('id-ID', { minimumFractionDigits: precision, maximumFractionDigits: precision });
     }
      function formatTanggalModal(dateStr) { // Format YYYY-MM-DD
@@ -448,9 +450,10 @@ $(document).ready(function() {
         if (tanggalInput) {
             try {
                 let dateObj = new Date(tanggalInput + 'T00:00:00Z');
-                if (isNaN(dateObj.getTime())) throw new Error("Invalid Date");
-                let options = { day: 'numeric', month: 'long', timeZone: 'UTC' };
-                $(keteranganId).val(dateObj.toLocaleDateString('id-ID', options));
+                if (isNaN(dateObj.getTime())) throw new Error("Invalid Date");
+                // TAMBAHKAN 'year: 'numeric''
+                let options = { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' };
+                $(keteranganId).val(dateObj.toLocaleDateString('id-ID', options));
             } catch (e) {
                 console.error("Error parsing date:", e);
                 $(keteranganId).val('Tanggal Invalid');
@@ -524,7 +527,7 @@ $(document).ready(function() {
             $('#detailUraian').text(data.uraian || '-');
             $('#detailTglInputAsli').text(data.created_at ? formatTanggalDetailModal(data.created_at.split('T')[0]) : '-');
             $('#detailStokAwal').text(formatNumber(data.stok_awal));
-            $('#detailTglMasuk').text(formatTanggalDetailModal(data.tgl_masuk));
+            $('#detailTglMasuk').text(data.tgl_masuk ? formatTanggalDetailModal(data.tgl_masuk.split('T')[0]) : 'KOSONG');
             $('#detailUmur').text((data.umur ?? 0) + ' hari');
             $('#detailDiolah').text(formatNumber(data.diolah));
             $('#detailMutasi').text(formatNumber(data.mutasi));
@@ -548,12 +551,12 @@ $(document).ready(function() {
 
              $('#editUraian').val(data.uraian);
              // Set nilai numerik langsung, tanpa format
-             $('#editStokAwal').val(data.stok_awal !== null ? parseFloat(data.stok_awal).toFixed(2) : '0.00');
+             $('#editStokAwal').val(data.stok_awal !== null ? parseFloat(data.stok_awal).toFixed(2) : '0');
              $('#editUmur').val(data.umur !== null ? data.umur : 0);
              $('#editTglMasuk').val(data.tgl_masuk ? formatTanggalModal(data.tgl_masuk) : ''); // Format YYYY-MM-DD
-             $('#editDiolah').val(data.diolah !== null ? parseFloat(data.diolah).toFixed(2) : '0.00');
-             $('#editMutasi').val(data.mutasi !== null ? parseFloat(data.mutasi).toFixed(2) : '0.00');
-             $('#editMasukHi').val(data.masuk_hi !== null ? parseFloat(data.masuk_hi).toFixed(2) : '0.00');
+             $('#editDiolah').val(data.diolah !== null ? parseFloat(data.diolah).toFixed(2) : '0');
+             $('#editMutasi').val(data.mutasi !== null ? parseFloat(data.mutasi).toFixed(2) : '0');
+             $('#editMasukHi').val(data.masuk_hi !== null ? parseFloat(data.masuk_hi).toFixed(2) : '0');
              $('#editAsalBokar').val(data.asal_bokar);
              // Keterangan akan di-set oleh trigger change
              $('#formEdit').attr('action', urlPost);

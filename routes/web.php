@@ -31,11 +31,16 @@ Route::middleware(['auth'])->group(function () {
     
     
 
-    // --- PERUBAHAN DI SINI ---
-    // Route resource untuk Maturasi (sudah ada)
+    // --- PERBAIKAN DI SINI ---
+    // Route khusus untuk AJAX get data terakhir.
+    // INI HARUS DITEMPATKAN SEBELUM Route::resource
+    Route::get('/maturasi/getPreviousData', [PengolahanMaturasiController::class, 'getPreviousData'])
+    ->name('maturasi.getPreviousData');
+
+    // Route resource untuk Maturasi (sekarang di bawah rute getPreviousData)
     Route::resource('maturasi', PengolahanMaturasiController::class);
-    // Tambahkan route khusus untuk AJAX get data terakhir.
-    Route::get('/maturasi/get-previous-data', [PengolahanMaturasiController::class, 'getPreviousDayData'])->name('maturasi.getPreviousData');
+    // --- AKHIR PERBAIKAN ---
+
     Route::resource('produksi', BahanProsesController::class);
     Route::resource('bahan-proses', BahanProsesController::class);
 
@@ -51,7 +56,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('produksi_sir20', ProduksiSir20Controller::class);
     Route::resource('penjualan_sir20', PenjualanSir20Controller::class);
 
-   
+    
 
     // Laporan Harian
     Route::get('/laporan-harian', [LaporanHarianController::class,'index'])->name('laporan.harian');
@@ -60,4 +65,3 @@ Route::middleware(['auth'])->group(function () {
 
 Route::resource('users', UserController::class);
     Route::get('/data_pengguna', [UserController::class, 'index'])->name('data_pengguna');
-

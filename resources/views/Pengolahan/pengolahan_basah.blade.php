@@ -45,12 +45,12 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>{{ number_format($summary_data['stok_awal'], 2) }}</td>
-                                    <td>{{ number_format($summary_data['masuk_hi'], 2) }}</td>
-                                    <td>{{ number_format($summary_data['masuk_sdhi'], 2) }}</td>
-                                    <td>{{ number_format($summary_data['diolah_hi'], 2) }}</td>
-                                    <td>{{ number_format($summary_data['diolah_sdhi'], 2) }}</td>
-                                    <td>{{ number_format($summary_data['stok_akhir'], 2) }}</td>
+                                    <td>{{ number_format($summary_data['stok_awal'], 0) }}</td>
+                                    <td>{{ number_format($summary_data['masuk_hi'], 0) }}</td>
+                                    <td>{{ number_format($summary_data['masuk_sdhi'], 0) }}</td>
+                                    <td>{{ number_format($summary_data['diolah_hi'], 0) }}</td>
+                                    <td>{{ number_format($summary_data['diolah_sdhi'], 0) }}</td>
+                                    <td>{{ number_format($summary_data['stok_akhir'], 0) }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -95,11 +95,11 @@
                                         <td>{{ $item->tanggal ? \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') : '-' }}</td>
                                         <td>{{ $item->bak_maturasi ?? '-' }}</td>
                                         <td>{{ $item->jenis ?? '-' }}</td>
-                                        <td>{{ number_format($item->berat_truck, 2) }}</td>
-                                        <td>{{ number_format($item->berat_timbang, 2) }}</td>
-                                        <td>{{ number_format($item->netto_basah, 2) }}</td>
-                                        <td>{{ is_numeric($item->k3) ? number_format($item->k3, 2) : '-' }}</td>
-                                        <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 2) : '-' }}</td>
+                                        <td>{{ number_format($item->berat_truck, 0) }}</td>
+                                        <td>{{ number_format($item->berat_timbang, 0) }}</td>
+                                        <td>{{ number_format($item->netto_basah, 0) }}</td>
+                                        <td>{{ is_numeric($item->k3) ? number_format($item->k3, 0) : '-' }}</td>
+                                        <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 0) : '-' }}</td>
                                         <td>
                                             <div class="action-buttons">
                                                 <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"> <i class="fas fa-eye"></i> </button>
@@ -118,11 +118,11 @@
                         <tfoot>
                             
                             <tr>
-                                <td colspan="8"></td> <td class="total-label">Total DS</td> <td>{{ number_format($total_data['total_ds_netto_kering'], 2) }}</td> </tr>
+                                <td colspan="8"></td> <td class="total-label">Total DS</td> <td>{{ number_format($total_data['total_ds_netto_kering'], 0) }}</td> </tr>
                             <tr>
-                                <td colspan="8"></td> <td class="total-label">Total PT</td> <td>{{ number_format($total_data['total_pt_netto_kering'], 2) }}</td> </tr>
+                                <td colspan="8"></td> <td class="total-label">Total PT</td> <td>{{ number_format($total_data['total_pt_netto_kering'], 0) }}</td> </tr>
                             <tr>
-                                <td colspan="8"></td> <td class="total-label">Jumlah</td> <td>{{ number_format($total_data['jumlah_netto_kering'], 2) }}</td> </tr>
+                                <td colspan="8"></td> <td class="total-label">Jumlah</td> <td>{{ number_format($total_data['jumlah_netto_kering'], 0) }}</td> </tr>
                         </tfoot>
                         </table>
                         </table>
@@ -151,24 +151,6 @@
                          <input type="date" name="tanggal" class="form-control" value="{{ old('tanggal', date('Y-m-d')) }}" required>
                      </div>
                      <div class="form-group">
-                        <label>Bak Maturasi</label>
-                        <select name="bak_maturasi" class="form-control" required>
-                            <option value="">-- Pilih Bak --</option>
-                            @for ($i = 1; $i <= 49; $i++)
-                                @php $bakName = "Bak Maturasi " . $i; @endphp
-                                <option value="{{ $bakName }}" {{ old('bak_maturasi') == $bakName ? 'selected' : '' }}>{{ $bakName }}</option>
-                            @endfor
-                        </select>
-                     </div>
-                     <div class="form-group">
-                        <label>Jenis</label>
-                        <select name="jenis" class="form-control" required>
-                            <option value="">-- Pilih Jenis --</option>
-                            <option value="PT" {{ old('jenis') == 'PT' ? 'selected' : '' }}>PT</option>
-                            <option value="DS" {{ old('jenis') == 'DS' ? 'selected' : '' }}>DS</option>
-                        </select>
-                     </div>
-                     <div class="form-group">
                          <label>Berat Truck (Kg)</label>
                          <input type="number" name="berat_truck" id="add_berat_truck" class="form-control" step="0.01" value="{{ old('berat_truck') }}" required>
                      </div>
@@ -180,6 +162,24 @@
                      <div class="form-group">
                          <label>Netto Basah (Kg)</label>
                          <input type="number" id="add_netto_basah" class="form-control" step="0.01" readonly style="background-color: #e9ecef;">
+                     </div>
+                      <div class="form-group">
+                        <label>Jenis</label>
+                        <select name="jenis" class="form-control" required>
+                            <option value="">-- Pilih Jenis --</option>
+                            <option value="PT" {{ old('jenis') == 'PT' ? 'selected' : '' }}>PT</option>
+                            <option value="DS" {{ old('jenis') == 'DS' ? 'selected' : '' }}>DS</option>
+                        </select>
+                     </div>
+                      <div class="form-group">
+                        <label>Bak Maturasi</label>
+                        <select name="bak_maturasi" class="form-control" required>
+                            <option value="">-- Pilih Bak --</option>
+                            @for ($i = 1; $i <= 49; $i++)
+                                @php $bakName = "Bak Maturasi " . $i; @endphp
+                                <option value="{{ $bakName }}" {{ old('bak_maturasi') == $bakName ? 'selected' : '' }}>{{ $bakName }}</option>
+                            @endfor
+                        </select>
                      </div>
                  </div>
                  <div class="modal-footer">
