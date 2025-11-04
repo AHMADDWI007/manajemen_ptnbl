@@ -8,49 +8,29 @@ use Illuminate\Support\Carbon; // <-- Import Carbon
 
 class PengolahanMaturasi extends Model
 {
-    use HasFactory;
+    // GANTI NAMA TABEL DARI 'maturasis'
+    protected $table = 'pengolahan_maturasi'; 
 
-    /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
-    protected $table = 'maturasis';
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'uraian',
-        'stok_awal',
-        'tgl_masuk', // Tanggal bokar asli masuk
-        'umur',
-        'diolah',
-        'mutasi',
-        'masuk_hi',
-        'stok_akhir',
-        'asal_bokar',
+        'maturasi_id',
+        'tanggal_input', 
+        'stok_awal', 
+        'diolah', 
+        'mutasi', 
+        'masuk_hi', 
+        'stok_akhir', 
         'keterangan',
-        // 'tanggal_input' tidak ada di fillable karena tidak disimpan (Opsi 1)
+        'tgl_masuk_log', // <-- 1. TAMBAHKAN INI
+        'umur_log',      // <-- 2. TAMBAHKAN INI
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        // Pastikan tgl_masuk selalu di-cast sebagai objek datetime (Carbon)
-        // Ini membantu mencegah error saat memanggil method tanggal padanya
-        'tgl_masuk' => 'datetime',
-        // Anda juga bisa menambahkan cast untuk kolom numerik jika perlu
-        'stok_awal' => 'decimal:2', // Contoh jika ingin presisi 2 desimal
-        'diolah' => 'decimal:2',
-        'mutasi' => 'decimal:2',
-        'masuk_hi' => 'decimal:2',
-        'stok_akhir' => 'decimal:2',
-        'umur' => 'integer',
+        'tanggal_input' => 'datetime', // <-- 3. TAMBAHKAN INI
+        'tgl_masuk_log' => 'datetime', // <-- 4. TAMBAHKAN INI
     ];
+
+    // Relasi: 1 Log Transaksi milik 1 Master Bak
+    public function maturasi() {
+        return $this->belongsTo(Maturasi::class, 'maturasi_id');
+    }
 }

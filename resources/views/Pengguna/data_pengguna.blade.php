@@ -3,7 +3,7 @@
 <head>
     @include('template.head')
     {{-- Tambahkan CSS untuk DataTables jika belum ada di template.head --}}
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"> 
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap4.min.css">
     <style>
         .table th, .table td { vertical-align: middle; }
         .btn-add-user { float: right; }
@@ -13,7 +13,7 @@
             text-align: right !important;
         }
         .dataTables_length {
-             float: left !important; /* Rata kiri untuk Show entries */
+            float: left !important; /* Rata kiri untuk Show entries */
         }
         .modal { z-index: 1055 !important; } /* Pastikan modal di atas overlay */
 
@@ -84,10 +84,22 @@
                                         <td>{{ $user->username }}</td>
                                         <td>{{ $user->jabatan }}</td>
                                         <td class="text-center">
-                                            <span class="badge bg-{{ $user->role === 'admin' ? 'success' : 'secondary' }}">
+                                            @php
+                                                $roleColors = [
+                                                    'admin' => 'success',
+                                                    'laboratorium' => 'info',
+                                                    'penimbangan' => 'primary',
+                                                    'pengolahan' => 'warning',
+                                                    'produksi' => 'danger',
+                                                    'penjualan' => 'purple', // Anda bisa ganti 'purple' dengan 'dark' jika 'purple' tidak ada di BS4
+                                                    'user' => 'secondary'
+                                                ];
+                                                $color = $roleColors[$user->role] ?? 'secondary'; // Default ke secondary jika role tidak terdaftar
+                                            @endphp
+                                            <span class="badge bg-{{ $color }}">
                                                 {{ ucfirst($user->role) }}
                                             </span>
-                                        </td>
+                                            </td>
                                         <td class="text-center">
                                             <div class="action-buttons d-inline-flex"> {{-- Bungkus tombol aksi --}}
                                                 {{-- Menggunakan data-toggle (Bootstrap 4) --}}
@@ -165,9 +177,14 @@
                         <select class="form-control" id="role" name="role" required> 
                             <option value="" disabled selected>Pilih Role</option>
                             <option value="admin">Admin</option>
+                            <option value="laboratorium">Laboratorium</option>
+                            <option value="penimbangan">Penimbangan</option>
+                            <option value="pengolahan">Pengolahan</option>
+                            <option value="produksi">Produksi</option>
+                            <option value="penjualan">Penjualan</option>
                             <option value="user">User</option>
                         </select>
-                    </div>
+                        </div>
                     <div class="mb-3">
                         <label class="form-label">Password</label>
                         <input type="password" class="form-control" id="password" name="password">
