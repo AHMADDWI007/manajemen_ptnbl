@@ -46,7 +46,8 @@
                         
                         <form method="GET" action="{{ route('maturasi.index') }}" class="form-inline ml-auto">
                             <label for="filter_tanggal" class="mr-2 text-white">Tampilkan Tanggal:</label>
-                            <input type="date" id="filter_tanggal" name="filter_tanggal" class="form-control form-control-sm mr-2" value="{{ $selected_date }}">
+                            <input type="date" name="filter_tanggal" class="form-control form-control-sm mr-2" value="{{ $selected_date ?? \Carbon\Carbon::today()->format('Y-m-d') }}">
+
                             <button type="submit" class="btn btn-light btn-sm">Tampilkan</button>
                         </form>
                     </div>
@@ -76,15 +77,20 @@
                                 <thead class="bg-light">
                                 <tr>
                                     <th>Uraian</th>
-                                    <th>Tgl Update Terakhir</th>
+                                    {{-- Tgl Update Terakhir dihilangkan dari tabel sesuai permintaan --}}
                                     <th>Stok Awal (Kg)</th>
                                     <th>Tgl Masuk Stok</th>
                                     <th>Umur</th>
                                     <th>Diolah (Kg)</th>
                                     <th>Mutasi (Kg)</th>
                                     <th>Masuk HI (Kg)</th>
+                                    <th>K3 Masuk</th>
+                                    <th>K3 Olah</th>
+                                    <th>PO</th>
+                                    <th>PRI</th>
+                                    <th>Tgl Uji</th>
                                     <th>Stok Akhir (Kg)</th>
-                                    <th>Asal Bokar</th> {{-- <-- KOLOM DITAMBAHKAN --}}
+                                    <th>Asal Bokar</th>
                                     <th>Keterangan</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -93,11 +99,17 @@
                                 @foreach ($data_maturasi as $item)
                                     <tr>
                                         <td>{{ $item->uraian }}</td>
-                                        <td>{{ $item->updated_at->format('d-m-Y') }}</td> 
+                                        {{-- kolom Tgl Update Terakhir sengaja dihapus dari baris tabel --}}
                                         <td>{{ number_format($item->stok_awal, 0, ',', '.') }}</td>
                                         <td>
                                             @if($item->tgl_masuk)
-                                                {{ $item->tgl_masuk->format('d-m-Y') }}
+                                                {{-- tampilkan tanggal masuk jika ada --}}
+                                                @if($item->tgl_masuk instanceof \Carbon\Carbon)
+                                                    {{ $item->tgl_masuk->format('d-m-Y') }}
+                                                @else
+                                                    {{-- if stored as string --}}
+                                                    {{ \Carbon\Carbon::parse($item->tgl_masuk)->format('d-m-Y') }}
+                                                @endif
                                             @else
                                                 -
                                             @endif
@@ -106,21 +118,47 @@
                                         <td>{{ number_format($item->diolah, 0, ',', '.') }}</td>
                                         <td>{{ number_format($item->mutasi, 0, ',', '.') }}</td>
                                         <td>{{ number_format($item->masuk_hi, 0, ',', '.') }}</td>
-                                        <td>{{ number_format($item->stok_akhir, 0, ',', '.') }}</td>
-                                        <td>{{ $item->asal_bokar ?? '-' }}</td> {{-- <-- KOLOM DITAMBAHKAN --}}
-                                        <td>{{ $item->keterangan ?? '-' }}</td>
-                                        <td class="text-center action-buttons">
-                                            <div class="btn-group gap-1" role="group">
-                                                <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"> <i class="fas fa-eye"></i> </button>
-                                                <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id }}" title="Edit"> <i class="fas fa-edit"></i> </button>
-                                                <form action="{{ route('maturasi.reset', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin ME-RESET data Bak ini kembali ke KOSONG?')" style="display:inline;">
-                                                    @csrf 
-                                                    <button type="submit" class="btn btn-secondary btn-sm" title="Reset Data"> 
-                                                        <i class="fas fa-undo"></i>
-                                                    </button>
-                                                </form>
-                                            </div>
+                                        {{-- kolom baru --}}
+                                        <td>{{ number_format($item->k3_masuk ?? 0, 0, ',', '.') }}</td>
+                                        <td>{{ number_format($item->k3_olah ?? 0, 0, ',', '.') }}</td>
+                                        <td>{{ $item->po ?? '0' }}</td>
+                                        <td>{{ $item->pri ?? '0' }}</td>
+                                        <td>
+                                            @if($item->tgl_uji)
+                                            {{ \Carbon\Carbon::parse($item->tgl_uji)->format('d-m-Y') }}
+                                            @else
+                                            -
+                                            @endif
                                         </td>
+                                        <td>{{ number_format($item->stok_akhir, 0, ',', '.') }}</td>
+                                        <td>{{ $item->asal_bokar ?? '-' }}</td>
+                                        <td>{{ $item->keterangan ?? '-' }}</td>
+<td class="text-center">
+    <div class="dropdown">
+        <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $item->id }}" data-toggle="dropdown" aria-expanded="false">
+            Aksi
+        </button>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $item->id }}">
+            <a class="dropdown-item btn-detail" href="javascript:void(0)"
+               data-uraian="{{ $item->uraian }}"
+               data-tanggal="{{ $selected_date }}">
+                <i class="fas fa-eye text-info mr-2"></i> Detail
+            </a>
+            <a class="dropdown-item btn-edit" href="javascript:void(0)"
+               data-id="{{ $item->id }}">
+                <i class="fas fa-edit text-warning mr-2"></i> Edit
+            </a>
+            <form action="{{ route('maturasi.reset', $item->id) }}" method="POST"
+            class="reset-form" style="display:inline;">
+            @csrf 
+                <button type="submit" class="dropdown-item text-danger">
+                <i class="fas fa-undo mr-2"></i> Reset
+                 </button>
+            </form>
+        </div>
+    </div>
+</td>
+
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -131,6 +169,7 @@
             </div>
         </div>
     </div>
+
     @include('template.footer')
 </div>
 
@@ -185,7 +224,28 @@
                             <label>Masuk Hari Ini (Kg)</label>
                             <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm" value="0,00" readonly>
                         </div>
-                         
+                        <div class="col-md-6 mb-3">
+                            <label>K3 Masuk</label>
+                            <input type="number" name="k3_masuk" id="editK3Masuk" class="form-control form-control-sm" step="0.01">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                            <label>K3 Olah</label>
+                            <input type="number" name="k3_olah" id="editK3Olah" class="form-control form-control-sm" step="0.01">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                            <label>PO</label>
+                            <input type="text" name="po" id="editPO" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                            <label>PRI</label>
+                            <input type="text" name="pri" id="editPRI" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                            <label>Tanggal Uji</label>
+                            <input type="date" name="tgl_uji" id="editTglUji" class="form-control form-control-sm">
+                            </div>
+
+
                          {{-- PERBAIKAN: Input Asal Bokar menjadi Dropdown --}}
                          <div class="col-md-6 mb-3">
                             <label>Asal Bokar</label>
@@ -193,10 +253,10 @@
                                 <option value="INHUT">INHUT</option>
                                 <option value="PT">PT</option>
                                 <option value="CMP">CMP</option>
-                                <option value="Petani" selected>Petani</option> {{-- Default 'Petani' --}}
+                                <option value="Petani" selected>Petani</option>
                             </select>
                         </div>
-                        
+
                         <hr class="col-12 my-2">
                         <div class="col-md-6 mb-3">
                             <label>Perkiraan Stok Akhir (Kg)</label>
@@ -228,16 +288,23 @@
             <div class="modal-body">
                 <dl class="row mb-0 detail-list">
                     <dt class="col-sm-5">Uraian</dt><dd class="col-sm-7" id="detailUraian">-</dd>
-                    <dt class="col-sm-5">Tgl Update Terakhir</dt><dd class="col-sm-7" id="detailTglInputAsli">-</dd>
+                    
                     <dt class="col-sm-5">Stok Awal (Kg)</dt><dd class="col-sm-7" id="detailStokAwal">-</dd>
                     <dt class="col-sm-5">Tgl Masuk Stok</dt><dd class="col-sm-7" id="detailTglMasuk">-</dd>
                     <dt class="col-sm-5">Umur</dt><dd class="col-sm-7" id="detailUmur">-</dd>
                     <dt class="col-sm-5">Diolah (Kg)</dt><dd class="col-sm-7" id="detailDiolah">-</dd>
                     <dt class="col-sm-5">Mutasi (Kg)</dt><dd class="col-sm-7" id="detailMutasi">-</dd>
                     <dt class="col-sm-5">Masuk HI (Kg)</dt><dd class="col-sm-7" id="detailMasukHi">-</dd>
+                    <dt class="col-sm-5">K3 Masuk</dt><dd class="col-sm-7" id="detailK3Masuk">-</dd>
+                    <dt class="col-sm-5">K3 Olah</dt><dd class="col-sm-7" id="detailK3Olah">-</dd>
+                    <dt class="col-sm-5">PO</dt><dd class="col-sm-7" id="detailPO">-</dd>
+                    <dt class="col-sm-5">PRI</dt><dd class="col-sm-7" id="detailPRI">-</dd>
+                    <dt class="col-sm-5">Tgl Uji</dt><dd class="col-sm-7" id="detailTglUji">-</dd>
+
                     <dt class="col-sm-5">Stok Akhir (Kg)</dt><dd class="col-sm-7" id="detailStokAkhir">-</dd>
-                    <dt class="col-sm-5">Asal Bokar</dt><dd class="col-sm-7" id="detailAsalBokar">-</dd> {{-- <-- DITAMBAHKAN --}}
+                    <dt class="col-sm-5">Asal Bokar</dt><dd class="col-sm-7" id="detailAsalBokar">-</dd>
                     <dt class="col-sm-5">Keterangan</dt><dd class="col-sm-7" id="detailKeterangan">-</dd>
+                    <dt class="col-sm-5">Tgl Update Terakhir</dt><dd class="col-sm-7" id="detailTglInputAsli">-</dd>
                 </dl>
             </div>
         </div>
@@ -289,7 +356,7 @@
                             <label>Masuk HI (Kg)</label>
                             <input type="number" name="masuk_hi" id="editMasukHi" class="form-control form-control-sm" step="0.01">
                         </div>
-                        
+
                         {{-- PERBAIKAN: Input Asal Bokar menjadi Dropdown --}}
                         <div class="col-md-6 mb-3">
                             <label>Asal Bokar</label>
@@ -298,10 +365,9 @@
                                 <option value="INHUT">INHUT</option>
                                 <option value="PT">PT</option>
                                 <option value="CMP">CMP</option>
-                                <option value="Petani">Petani</option>
                             </select>
                         </div>
-                         
+
                          <div class="col-md-6 mb-3">
                             <label>Keterangan</label>
                             <input type="text" name="keterangan" id="editKeterangan" class="form-control form-control-sm" readonly>
@@ -317,13 +383,26 @@
     </div>
 </div>
 
-
 {{-- Script Libraries --}}
-@include('template.script')
+
+{{-- 
+  BERHENTI! File 'template.script' kemungkinan besar memuat jQuery dan Bootstrap.
+  Untuk menghindari duplikat, kita nonaktifkan baris ini.
+--}}
+{{-- @include('template.script') --}} 
+
+{{-- 
+  PERBAIKAN: 
+  Kita akan memuat semua script secara manual HANYA SATU KALI
+  dan dalam urutan yang benar.
+--}}
+
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
@@ -339,16 +418,8 @@ $(document).ready(function() {
         "language": { "zeroRecords": "Tidak ada data yang cocok"},
         "dom": 'rt'
     });
-    
-    // ----- INISIALISASI FLATPICKR (DIHAPUS) -----
-    
-    // ----- FUNGSI PARSE TANGGAL (DIHAPUS) -----
-    
-    // ----- FUNGSI FILTER CLIENT-SIDE (DIHAPUS) -----
-    
-    // --- Tombol Reset Client-Side (DIHAPUS) ---
-     
-     // --- Listener search input custom (SATU-SATUNYA FILTER) ---
+
+     // --- Listener search input custom ---
      $('#searchInput').on('keyup', function() {
         table.search(this.value).draw();
      });
@@ -356,12 +427,37 @@ $(document).ready(function() {
     // ----- EVENT HANDLER LAINNYA -----
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    // ----- FUNGSI FORMATTING (Sama) -----
+    // ===================================================
+    // ===== TAMBAHKAN KODE INI UNTUK TOMBOL RESET =====
+    // ===================================================
+   $(document).on('submit', '.reset-form', function(e) {
+                e.preventDefault(); 
+                const form = $(this); 
+                Swal.fire({
+                title: 'Yakin ingin reset data?',
+                            text: "Data akan dikembalikan ke status KOSONG.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Reset!',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d'
+                }).then((result) => {
+                if (result.isConfirmed) {
+                form[0].submit(); 
+                }
+                });
+                });
+    // ===================================================
+    // ============ AKHIR TAMBAHAN KODE RESET ============
+    // ===================================================
+
+    // ----- FUNGSI FORMATTING -----
     function formatNumber(num, precision = 0) { if (num === null || typeof num === 'undefined' || num === '') return '0'; let parsedNum = parseFloat(String(num).replace(/[^0-9,.-]+/g,"").replace(',','.')); if (isNaN(parsedNum)) return '0'; return parsedNum.toLocaleString('id-ID', { minimumFractionDigits: precision, maximumFractionDigits: precision }); }
     function formatTanggalModal(dateStr) { if (!dateStr) return ''; try { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; let dateObj = new Date(dateStr); if (isNaN(dateObj.getTime())) return ''; let year = dateObj.getFullYear(); let month = ('0' + (dateObj.getMonth() + 1)).slice(-2); let day = ('0' + dateObj.getDate()).slice(-2); return `${year}-${month}-${day}`; } catch(e) { return ''; } }
     function formatTanggalDetailModal(dateStr) { if (!dateStr) return 'KOSONG'; try { let dateObj = new Date(dateStr + 'T00:00:00Z'); if (isNaN(dateObj.getTime())) return 'Invalid Date'; return dateObj.toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric', timeZone: 'UTC'}); } catch(e) { return 'Error'; } }
 
-    // --- LOGIKA MODAL TAMBAH (Sama) ---
+    // --- LOGIKA MODAL TAMBAH ---
     function calculateStokAkhirDisplay() {
         let stok_awal_str = $('#stok_awal').val();
         let stok_awal = parseFloat(stok_awal_str.replace(/[^0-9,.-]+/g,"").replace(',','.')) || 0;
@@ -374,42 +470,46 @@ $(document).ready(function() {
     }
 
     function updateKeterangan(prefix = '') {
-        let tanggalInputId = (prefix === 'edit') ? '#editTanggalInput' : '#tanggal_input_tambah';
-        let keteranganId = (prefix === 'edit') ? '#editKeterangan' : '#keterangan';
-        let tanggalInput = $(tanggalInputId).val();
-        if (tanggalInput) {
-            try {
-                let dateObj = new Date(tanggalInput + 'T00:00:00Z');
-                if (isNaN(dateObj.getTime())) throw new Error("Invalid Date");
-                let options = { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' };
-                $(keteranganId).val(dateObj.toLocaleDateString('id-ID', options));
-            } catch (e) {
-                console.error("Error parsing date:", e);
-                $(keteranganId).val('Tanggal Invalid');
-            }
-        } else {
-            $(keteranganId).val('');
+    let tanggalInputId = (prefix === 'edit') ? '#editTanggalInput' : '#tanggal_input_tambah';
+    let keteranganId = (prefix === 'edit') ? '#editKeterangan' : '#keterangan';
+    let tanggalInput = $(tanggalInputId).val();
+
+    if (tanggalInput) {
+        try {
+            let dateObj = new Date(tanggalInput + 'T00:00:00Z');
+            if (isNaN(dateObj.getTime())) throw new Error("Invalid Date");
+
+            // Ambil bagian tanggal, bulan singkat, dan tahun
+            const day = ('0' + dateObj.getUTCDate()).slice(-2);
+            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+            const month = monthNames[dateObj.getUTCMonth()];
+            const year = dateObj.getUTCFullYear();
+
+            $(keteranganId).val(`${day} ${month} ${year}`);
+        } catch (e) {
+            console.error("Error parsing date:", e);
+            $(keteranganId).val('Tanggal Invalid');
         }
+    } else {
+        $(keteranganId).val('');
     }
+}
 
     function fetchPreviousData() {
         const selectedUraian = $('#uraian').val();
         const selectedDate = $('#tanggal_input_tambah').val();
         if (selectedUraian && selectedDate) {
-            console.log("Fetching data for:", selectedUraian, selectedDate);
             $.ajax({
                 url: "{{ route('maturasi.getPreviousData') }}", type: 'GET',
                 data: { uraian: selectedUraian, tanggal_filter: selectedDate },
                 dataType: 'json',
                 success: function(data) {
-                    console.log("Data received:", data);
                     $('#stok_awal').val(formatNumber(data.stok_awal));
                     $('#umur').val(data.umur !== null ? data.umur : 0);
                     $('#masuk_hi').val(formatNumber(data.netto_kering_hi));
                     calculateStokAkhirDisplay();
                 },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error("AJAX Error:", textStatus, errorThrown, jqXHR.responseText);
+                error: function(jqXHR) {
                     var errorMsg = jqXHR.responseJSON && jqXHR.responseJSON.error ? jqXHR.responseJSON.error : 'Gagal mengambil data sebelumnya.';
                     alert('Gagal: ' + errorMsg);
                     $('#stok_awal').val('0,00'); $('#umur').val(0); $('#masuk_hi').val('0,00');
@@ -428,36 +528,63 @@ $(document).ready(function() {
 
     $('#modalTambah').on('show.bs.modal', function () {
          $('#formTambah')[0].reset();
-         $('#asal_bokar').val('Petani'); // <-- PERBAIKAN: Set default dropdown
+         $('#asal_bokar').val('Petani');
          $('#diolah, #mutasi').val('0');
          $('#masuk_hi').val('0,00');
          $('#stok_awal, #umur').val('');
          $('#stok_akhir_display, #keterangan').val('');
-         let defaultDate = "{{ $selected_date }}"; 
+         let defaultDate = "{{ $selected_date }}";
          $('#tanggal_input_tambah').val(defaultDate).trigger('change');
     });
 
     $(document).on('change', '#editTanggalInput', function() { updateKeterangan('edit'); });
 
-
-    // --- LOGIKA DETAIL & EDIT (Sama) ---
+    // --- LOGIKA DETAIL (memanggil snapshot berdasarkan uraian + tanggal) ---
     $(document).on('click', '.btn-detail', function () {
-        var id = $(this).data('id');
-        var url = "{{ url('maturasi') }}/" + id;
-        $.get(url, function (data) {
-            $('#detailUraian').text(data.uraian || '-');
-            $('#detailTglInputAsli').text(data.updated_at ? formatTanggalDetailModal(data.updated_at.split('T')[0]) : '-');
-            $('#detailStokAwal').text(formatNumber(data.stok_awal));
-            $('#detailTglMasuk').text(data.tgl_masuk ? formatTanggalDetailModal(data.tgl_masuk.split('T')[0]) : 'KOSONG');
-            $('#detailUmur').text((data.umur ?? 0) + ' hari');
-            $('#detailDiolah').text(formatNumber(data.diolah));
-            $('#detailMutasi').text(formatNumber(data.mutasi));
-            $('#detailMasukHi').text(formatNumber(data.masuk_hi));
-            $('#detailStokAkhir').text(formatNumber(data.stok_akhir));
-            $('#detailAsalBokar').text(data.asal_bokar || '-'); // <-- DITAMBAHKAN
-            $('#detailKeterangan').text(data.keterangan || '-');
-            $('#modalDetail').modal('show');
-         }).fail(function() { alert('Gagal memuat detail data.'); });
+        const uraian = $(this).data('uraian');
+        const tanggal = $(this).data('tanggal'); // tanggal halaman aktif
+
+        $.ajax({
+            url: "{{ route('maturasi.getPreviousData') }}",
+            method: "GET",
+            data: {
+                uraian: uraian,
+                tanggal_filter: tanggal
+            },
+            dataType: "json",
+            success: function (data) {
+                // format tanggal tampil
+                const formatTanggal = (tgl) => {
+                    if (!tgl) return 'KOSONG';
+                    const d = new Date(tgl);
+                    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                };
+
+                $('#detailUraian').text(uraian);
+                // Tgl Update Terakhir ditampilkan di modal menggunakan selected tanggal snapshot
+                $('#detailStokAwal').text(formatNumber(data.stok_awal));
+                $('#detailTglMasuk').text(data.tgl_masuk ? formatTanggal(data.tgl_masuk) : 'KOSONG');
+                $('#detailUmur').text((data.umur ?? 0) + ' hari');
+                $('#detailDiolah').text(formatNumber(data.diolah));
+                $('#detailMutasi').text(formatNumber(data.mutasi));
+                $('#detailMasukHi').text(formatNumber(data.netto_kering_hi));
+                $('#detailK3Masuk').text(formatNumber(data.k3_masuk));
+                $('#detailK3Olah').text(formatNumber(data.k3_olah));
+                $('#detailPO').text(data.po ?? '-');
+                $('#detailPRI').text(data.pri ?? '-');
+                $('#detailTglUji').text(data.tgl_uji ? formatTanggal(data.tgl_uji) : '-');
+                $('#detailStokAkhir').text(formatNumber(data.stok_akhir));
+                $('#detailAsalBokar').text(data.asal_bokar ?? '-');
+                $('#detailKeterangan').text(data.keterangan ?? '-');
+                $('#detailTglInputAsli').text(formatTanggal(tanggal));
+
+                $('#modalDetail').modal('show');
+            },
+            error: function (xhr) {
+                console.error(xhr.responseText);
+                alert('Gagal memuat data detail.');
+            }
+        });
     });
 
     $(document).on('click', '.btn-edit', function () {
@@ -475,13 +602,18 @@ $(document).ready(function() {
              $('#editDiolah').val(data.diolah !== null ? parseFloat(data.diolah).toFixed(2) : '0');
              $('#editMutasi').val(data.mutasi !== null ? parseFloat(data.mutasi).toFixed(2) : '0');
              $('#editMasukHi').val(data.masuk_hi !== null ? parseFloat(data.masuk_hi).toFixed(2) : '0');
-             $('#editAsalBokar').val(data.asal_bokar); // <-- PERBAIKAN: Set value dropdown
+             $('#editK3Masuk').val(data.k3_masuk ?? 0);
+             $('#editK3Olah').val(data.k3_olah ?? 0);
+             $('#editPO').val(data.po ?? '');
+             $('#editPRI').val(data.pri ?? '');
+             $('#editTglUji').val(data.tgl_uji ? formatTanggalModal(data.tgl_uji) : '');
+
+             $('#editAsalBokar').val(data.asal_bokar);
              $('#formEdit').attr('action', urlPost);
              $('#formEdit').attr('data-error-id', id);
              $('#modalEdit').modal('show');
          }).fail(function() { alert('Gagal memuat data untuk diedit.'); });
     });
-
 
     // --- Notifikasi Sukses ---
     @if (session('success'))
@@ -489,7 +621,7 @@ $(document).ready(function() {
              Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
         } else { alert("{{ session('success') }}"); }
     @endif
-    
+
     @if (session('error'))
         if (typeof Swal !== 'undefined') {
              Swal.fire({ icon: 'error', title: 'Gagal!', text: "{{ session('error') }}", showConfirmButton: false, timer: 2500 });

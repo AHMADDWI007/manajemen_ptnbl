@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 // ----- IMPORT SEMUA MODEL DAN CLASS YANG KITA BUTUHKAN -----
 use App\Models\PengolahanBasah;
 use App\Models\HasilUjiBokarDiolah; 
-use App\Models\Maturasi;
-use App\Models\PengolahanMaturasi;
+use App\Models\Maturasi;             // <-- DITAMBAHKAN
+use App\Models\PengolahanMaturasi;   // <-- DITAMBAHKAN
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Routing\Controller; // <-- PERBAIKAN: Import Controller dasar
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Log; // Untuk mencatat log error
+use Illuminate\Routing\Controller; // <-- DITAMBAHKAN
+use Carbon\Carbon;                   // <-- DITAMBAHKAN
+use Illuminate\Support\Facades\Log; // <-- DITAMBAHKAN
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -70,6 +70,8 @@ class HasilUjiBokarDiolahController extends Controller
             'k3' => $k3_value,
             'netto_kering' => $netto_kering,
         ]);
+        
+
 
         // 5. Buat catatan/log di tabel 'hasil_uji_bokar_diolah'
         HasilUjiBokarDiolah::create([
@@ -83,8 +85,10 @@ class HasilUjiBokarDiolahController extends Controller
         
         // ==========================================================
         // 6. INI ADALAH TRIGGER (PEMICU) YANG HILANG KE FITUR 3
+        //    (Sekarang akan berfungsi karena fungsinya sudah ada di bawah)
         // ==========================================================
-        $this->updateMaturasiMasukHI($data->bak_maturasi, $netto_kering, $data->tanggal);
+     $this->updateMaturasiMasukHI($data->bak_maturasi, $netto_kering, $data->tanggal, $data->jenis);
+
         // ==========================================================
 
         return redirect()->route('hasil_uji_bokar_diolah.index')->with('success', 'Data K3 berhasil disimpan dan Maturasi diupdate.');
@@ -129,6 +133,8 @@ class HasilUjiBokarDiolahController extends Controller
             'netto_kering' => $netto_kering
         ]);
         
+
+        
         // 2. Update juga log 'hasil_uji_bokar_diolah'
         HasilUjiBokarDiolah::where('bak_maturasi', $data->bak_maturasi)
                            ->where('tanggal', $data->tanggal)
@@ -138,7 +144,8 @@ class HasilUjiBokarDiolahController extends Controller
                            ]);
                            
         // 3. JALANKAN TRIGGER JUGA DI UPDATE
-        $this->updateMaturasiMasukHI($data->bak_maturasi, $netto_kering, $data->tanggal);
+        $this->updateMaturasiMasukHI($data->bak_maturasi, $netto_kering, $data->tanggal, $data->jenis);
+
 
         return redirect()->route('hasil_uji_bokar_diolah.index')->with('success', 'Data K3 berhasil diperbarui.');
     }
@@ -161,16 +168,13 @@ class HasilUjiBokarDiolahController extends Controller
     
     
     // ===================================================================
-    // FUNGSI TRIGGER OTOMATIS KE PENGOLAHAN MATURASI (SUDAH DIPERBAIKI)
+    // FUNGSI TRIGGER OTOMATIS KE PENGOLAHAN MATURASI (YANG HILANG)
     // ===================================================================
-    private function updateMaturasiMasukHI(string $bakNameFromBasah, float $masuk_hi, string $tanggalInput): void
+    private function updateMaturasiMasukHI(string $bakNameFromBasah, float $masuk_hi, string $tanggalInput, ?string $asal_bokar = null): void
     {
         // $bakNameFromBasah adalah "Bak Maturasi 1" (dari tabel pengolahan_basah)
         
-        // --- 1. PERBAIKI SYNTAX ERROR ---
-        $today = Carbon::parse($tanggalInput); // Hapus 'time:'
-        
-        // --- 2. TERJEMAHKAN NAMA ---
+        // --- 1. TERJEMAHKAN NAMA (SESUAI DATABASE ANDA) ---
         $nomor = (int) filter_var($bakNameFromBasah, FILTER_SANITIZE_NUMBER_INT);
         if ($nomor == 0) {
             Log::error("Trigger Gagal: Tidak bisa menemukan nomor Bak dari '$bakNameFromBasah'");
@@ -178,6 +182,7 @@ class HasilUjiBokarDiolahController extends Controller
         }
         // Buat nama yang benar: "Di Bak Maturasi-1" (sesuai tabel 'maturasis')
         $uraianMaturasi = "Di Bak Maturasi-" . $nomor;
+        // --- AKHIR PERBAIKAN NAMA ---
 
         $maturasi = Maturasi::where('uraian', $uraianMaturasi)->first();
         if (!$maturasi) { 
@@ -185,9 +190,12 @@ class HasilUjiBokarDiolahController extends Controller
             return; 
         }
 
-        // --- 3. PERBAIKI LOGIKA REDUNDANT ---
-        if ($maturasi->updated_at->isSameDay($today)) {
-            // $maturasi->stok_awal = $maturasi->stok_awal; // <-- BARIS INI DIHAPUS
+        // Tentukan tanggal kejadian
+        $tanggalKejadian = Carbon::parse($tanggalInput);
+
+        // Cek apakah data di DB adalah data pada tanggal kejadian
+        if ($maturasi->updated_at->isSameDay($tanggalKejadian)) {
+            // Data sudah di-input/di-trigger hari ini, tambahkan 'masuk_hi'
             $maturasi->masuk_hi += $masuk_hi; 
             $maturasi->stok_akhir = $maturasi->stok_awal - $maturasi->diolah - $maturasi->mutasi + $maturasi->masuk_hi;
         } else {
@@ -195,24 +203,35 @@ class HasilUjiBokarDiolahController extends Controller
             $maturasi->stok_awal = $maturasi->stok_akhir;
             $maturasi->diolah = 0;
             $maturasi->mutasi = 0;
-            $maturasi->masuk_hi = $masuk_hi; 
+            $maturasi->masuk_hi = $masuk_hi; // Set 'masuk_hi' baru
             $maturasi->stok_akhir = $maturasi->stok_awal + $masuk_hi;
         }
         
+        // Jika ada 'masuk_hi' baru, reset tgl_masuk & umur
         if ($masuk_hi > 0) {
-             $maturasi->tgl_masuk = $today;
+             $maturasi->tgl_masuk = $tanggalKejadian;
              $maturasi->umur = 0;
-             $maturasi->keterangan = $today->isoFormat('D MMMM YYYY');
+             $maturasi->keterangan = strtoupper(Carbon::parse($tanggalKejadian)->locale('en')->translatedFormat('d M Y'));
         }
+        // 🔹 Tambahan ini: isi atau ubah asal bokar otomatis dari jenis pengolahan basah
+if (!empty($asal_bokar)) {
+    if (empty($maturasi->asal_bokar)) {
+        // Kalau belum ada asal, isi langsung
+        $maturasi->asal_bokar = $asal_bokar;
+    } elseif ($maturasi->asal_bokar !== $asal_bokar && $maturasi->asal_bokar !== 'CMP') {
+        // Kalau sudah ada tapi berbeda dan belum CMP, ubah jadi CMP
+        $maturasi->asal_bokar = 'CMP';
+    }
+}
 
         // Aksi 1: Update tabel Status 'maturasis'
-        $maturasi->updated_at = $today;
+        $maturasi->updated_at = $tanggalKejadian;
         $maturasi->save();
 
         // Aksi 2: Buat Log di 'pengolahan_maturasi'
         PengolahanMaturasi::create([
             'maturasi_id' => $maturasi->id,
-            'tgl_laporan' => $today,
+            'tgl_laporan' => $tanggalKejadian,
             'diolah' => 0, 'mutasi' => 0,
             'masuk_hi' => $masuk_hi,
             'keterangan' => 'Otomatis dari Uji Bokar'

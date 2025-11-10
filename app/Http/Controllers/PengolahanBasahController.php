@@ -57,36 +57,76 @@ class PengolahanBasahController extends Controller
         return view('Pengolahan.pengolahan_basah', compact('data_pengolahan', 'summary_data', 'total_data'));
     }
 
-    public function store(Request $request)
-    {
-        // Hapus K3 dari validasi
-        $validator = Validator::make($request->all(), [
-            'tanggal' => 'required|date',
-            'bak_maturasi' => 'required|string',
-            'jenis' => 'required|string|in:PT,DS',
-            'berat_truck' => 'required|numeric|min:0',
-            'berat_timbang' => 'required|numeric|min:'.$request->input('berat_truck', 0),
-        ], [
-            'berat_timbang.min' => 'Berat Timbang harus lebih besar dari Berat Truck.'
-        ]);
+   public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'tanggal' => 'required|date',
+        'bak_maturasi' => 'required|string',
+        'jenis' => 'required|string|in:PT,DS,INHUT',
+        'berat_truck' => 'required|numeric|min:0',
+        'berat_timbang' => 'required|numeric|min:' . $request->input('berat_truck', 0),
+    ], [
+        'berat_timbang.min' => 'Berat Timbang harus lebih besar dari Berat Truck.'
+    ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-        $data = $validator->validated();
-
-        // Hitung Netto Basah
-        $netto_basah = $data['berat_timbang'] - $data['berat_truck'];
-        
-        // Simpan, tapi k3 dan netto_kering biarkan NULL
-        PengolahanBasah::create(array_merge($data, [
-            'netto_basah' => $netto_basah,
-            'k3' => null,
-            'netto_kering' => null,
-        ]));
-
-        return redirect()->route('pengolahan_basah.index')->with('success', 'Data pengolahan basah berhasil ditambahkan.');
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
     }
+
+    $data = $validator->validated();
+    $netto_basah = $data['berat_timbang'] - $data['berat_truck'];
+
+    // Simpan data di pengolahan basah
+    $basah = PengolahanBasah::create(array_merge($data, [
+        'netto_basah' => $netto_basah,
+        'k3' => null,
+        'netto_kering' => null,
+    ]));
+
+    /**
+     * =============================
+     * LOGIKA OTOMATIS KE MATURASI
+     * =============================
+     */
+    $bak = $data['bak_maturasi'];
+    $jenis = strtoupper($data['jenis']);
+
+    // Cari data maturasi berdasarkan uraian bak (misal: "Di Bak Maturasi-1")
+    $maturasi = \App\Models\Maturasi::where('uraian', 'LIKE', "%$bak%")->first();
+
+    if ($maturasi) {
+        // Cek asal bokar terakhir
+        $asalSebelumnya = $maturasi->asal_bokar;
+
+        if (!$asalSebelumnya) {
+            // Belum ada asal bokar → set langsung sesuai jenis baru
+            $asalBaru = $jenis;
+        } else {
+            // Kalau beda jenis dengan sebelumnya, jadikan CMP
+            if ($asalSebelumnya !== $jenis && $asalSebelumnya !== 'CMP') {
+                $asalBaru = 'CMP';
+            } else {
+                $asalBaru = $asalSebelumnya;
+            }
+        }
+
+        // Update asal bokar di maturasi
+        $maturasi->update(['asal_bokar' => $asalBaru]);
+
+        // Catat juga masuk_hi ke tabel pengolahan maturasi
+        \App\Models\PengolahanMaturasi::create([
+            'maturasi_id' => $maturasi->id,
+            'tgl_laporan' => $data['tanggal'],
+            'masuk_hi' => $netto_basah,
+            'diolah' => 0,
+            'mutasi' => 0,
+            'keterangan' => 'Auto-import dari Pengolahan Basah (' . $jenis . ')',
+        ]);
+    }
+
+    return redirect()->route('pengolahan_basah.index')->with('success', 'Data pengolahan basah berhasil ditambahkan dan diperbarui di Maturasi.');
+}
+
 
     public function show($id)
     {
