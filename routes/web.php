@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\{
-    LoginController, UserController, PengolahanMaturasiController,
+    LoginController, UserController, MaturasiController,
     BahanProsesController, HasilUjiLabBokarController, HasilUjiMaturasiController,
     HasilUjiSir20Controller, HasilUjiTroliController, ProduksiSir20Controller,
     PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController
@@ -34,13 +34,13 @@ Route::middleware(['auth'])->group(function () {
     // --- PERBAIKAN DI SINI ---
     // Route khusus untuk AJAX get data terakhir.
     // INI HARUS DITEMPATKAN SEBELUM Route::resource
-    Route::get('/maturasi/getPreviousData', [PengolahanMaturasiController::class, 'getPreviousData'])
-    ->name('maturasi.getPreviousData');
+    
+// Rute KHUSUS untuk AJAX 'getPreviousData' dari Modal Tambah Anda
+    Route::get('/maturasi-get-previous-data', [MaturasiController::class, 'getPreviousData'])->name('maturasi.getPreviousData');
 
-    // Route resource untuk Maturasi (sekarang di bawah rute getPreviousData)
-    Route::resource('maturasi', PengolahanMaturasiController::class);
-    // --- AKHIR PERBAIKAN ---
-
+    // Rute resource untuk index, store, update, destroy
+    Route::resource('maturasi', MaturasiController::class);
+    Route::post('/maturasi/{maturasi}/reset', [MaturasiController::class, 'reset'])->name('maturasi.reset');
     Route::resource('produksi', BahanProsesController::class);
     Route::resource('bahan-proses', BahanProsesController::class);
 

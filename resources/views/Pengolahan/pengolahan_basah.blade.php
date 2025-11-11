@@ -169,6 +169,7 @@
                             <option value="">-- Pilih Jenis --</option>
                             <option value="PT" {{ old('jenis') == 'PT' ? 'selected' : '' }}>PT</option>
                             <option value="DS" {{ old('jenis') == 'DS' ? 'selected' : '' }}>DS</option>
+                             <option value="INHUT" {{ old('jenis') == 'INHUT' ? 'selected' : '' }}>INHUT</option>
                         </select>
                      </div>
                       <div class="form-group">

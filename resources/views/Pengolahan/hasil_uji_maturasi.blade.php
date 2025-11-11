@@ -94,7 +94,7 @@
                             <thead class="text-center bg-light"> 
                                 <tr>
                                     <th>No</th>
-                                    <th>Tanggal</th>
+                                    <th>Tanggal Uji</th>
                                     <th>No. Kamar</th>
                                     <th>K3 (%)</th>
                                     <th>Po</th>
@@ -155,14 +155,41 @@
                         <h5 class="modal-title fw-bold">Tambah Hasil Uji Maturasi</h5>
                         <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                     </div>
-                    <div class="modal-body">
-                        <div class="form-group"> <label>Tanggal</label> <input type="date" name="tanggal" class="form-control" required> </div>
-                        <div class="form-group"> <label>No. Kamar</label> <input type="text" name="no_kamar" class="form-control" required> </div>
-                        <div class="form-group"> <label>K3 (%)</label> <input type="number" name="k3" class="form-control" step="0.01"> </div>
-                        <div class="form-group"> <label>Po</label> <input type="number" name="po" class="form-control" step="0.01"> </div>
-                        <div class="form-group"> <label>Pa</label> <input type="number" name="pa" class="form-control" step="0.01"> </div>
-                        <div class="form-group"> <label>PRI</label> <input type="number" name="pri" class="form-control" step="0.01"> </div>
-                    </div>
+                   <div class="modal-body">
+    <div class="form-group">
+        <label>Bak Maturasi</label>
+        <select name="no_kamar" class="form-control" required>
+            <option value="" disabled selected>-- Pilih Bak Maturasi --</option>
+            @foreach ($bak_maturasi as $bak)
+                <option value="{{ $bak->uraian }}">
+                    {{ $bak->uraian }} (Stok: {{ $bak->stok_akhir }})
+                </option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Tanggal Uji</label>
+        <input type="date" name="tanggal" class="form-control" required>
+    </div>
+
+    <div class="form-group">
+        <label>K3 (%)</label>
+        <input type="number" name="k3" class="form-control" step="0.01">
+    </div>
+    <div class="form-group">
+        <label>Po</label>
+        <input type="number" name="po" class="form-control" step="0.01">
+    </div>
+    <div class="form-group">
+        <label>Pa</label>
+        <input type="number" name="pa" class="form-control" step="0.01">
+    </div>
+    <div class="form-group">
+        <label>PRI</label>
+        <input type="number" name="pri" class="form-control" step="0.01">
+    </div>
+</div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-success">Simpan</button>
