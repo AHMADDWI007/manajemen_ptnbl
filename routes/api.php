@@ -101,6 +101,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // [TABEL 2 - Hapus] Menghapus data Uji Bokar Olah (Reset K3)
     Route::delete('/uji-bokar-olah/{id}', [HasilUjiBokarOlahApiController::class, 'destroy']);
 
+    // ==========================================================
+    // ✅ PERBAIKAN: TAMBAHKAN RUTE BARU INI UNTUK EDIT K3
+    // {id} di sini adalah ID dari 'pengolahan_basah' (Tabel 1)
+    // ==========================================================
+    Route::put('/hasil-uji-bokar-olah/update-k3/{id}', [HasilUjiBokarOlahApiController::class, 'updateK3']);
+
 
     // ✅ PERBAIKAN: Tambahkan rute untuk Controller Maturasi BARU
     // ================================================================
