@@ -2,14 +2,17 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MaturasiApiController;
+use App\Http\Controllers\Api\GudangSirApiController;
+use App\Http\Controllers\Api\BahanProsesApiController;
+use App\Http\Controllers\Api\PenjualanSirApiController;
+use App\Http\Controllers\Api\TimbangBokarApiController;
+use App\Http\Controllers\Api\HasilUjiSir20ApiController;
+use App\Http\Controllers\Api\HasilUjiTroliApiController;
 use App\Http\Controllers\Api\HasilUjiLabBokarApiController;
 use App\Http\Controllers\Api\HasilUjiMaturasiApiController;
-use App\Http\Controllers\Api\HasilUjiTroliApiController;
-use App\Http\Controllers\Api\HasilUjiSir20ApiController;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\TimbangBokarApiController;
 use App\Http\Controllers\Api\HasilUjiBokarOlahApiController;
-use App\Http\Controllers\Api\MaturasiApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -121,5 +124,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/maturasi/list-available', [MaturasiApiController::class, 'getListAvailable']);
     // ✅ AKHIR PERBAIKAN
 
+    // ✅ PERBAIKAN: Tambahkan rute STORE untuk Olah Harian
+    Route::post('/pengolahan-maturasi/store', [MaturasiApiController::class, 'store']);
+    // ✅ AKHIR PERBAIKAN
+
+    // ✅ PERBAIKAN: Rute BAHAN DALAM PROSES (WIP)
+    Route::get('/bahan-proses', [BahanProsesApiController::class, 'index']);
+    Route::post('/bahan-proses', [BahanProsesApiController::class, 'store']);
+    // ✅ AKHIR PERBAIKAN
+
+    // [GUDANG SIR]
+    Route::get('gudang-sir', [GudangSirApiController::class, 'index']);
+    Route::post('gudang-sir', [GudangSirApiController::class, 'store']);
+
+    // [PENJUALAN SIR]
+    Route::get('penjualan-sir20', [PenjualanSirApiController::class, 'index']);
+    Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);
 });
 // ✅ AKHIR GROUP MIDDLEWARE

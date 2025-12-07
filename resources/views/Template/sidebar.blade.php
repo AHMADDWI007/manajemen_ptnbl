@@ -120,7 +120,7 @@
                 {{-- Data Produksi --}}
                 @php
                     // Perbaiki pengecekan request is untuk Data Produksi
-                    $isProduksiOpen = request()->is('produksi_sir20*', 'penjualan_sir20*'); 
+                    $isProduksiOpen = request()->is('produksi_sir20*', 'produksi-sir*', 'penjualan_sir20*'); 
                 @endphp
                 <li id="menu-produksi" class="nav-item has-treeview {{ $isProduksiOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isProduksiOpen ? 'active' : '' }}">
@@ -135,6 +135,12 @@
                             <a href="{{ url('/produksi_sir20') }}" class="nav-link {{ request()->is('produksi_sir20*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Produksi SIR 20</p>
+                            </a>
+                        </li>
+                         <li class="nav-item">
+                            <a href="{{ url('/produksi-sir') }}" class="nav-link {{ request()->is('produksi-sir*') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Data Produksi</p>
                             </a>
                         </li>
                         <li class="nav-item">

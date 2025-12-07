@@ -18,11 +18,13 @@ class BahanProses extends Model
      * Daftar kolom yang boleh diisi secara massal (mass assignable).
      */
     protected $fillable = [
+        'tanggal',      // <--- Pastikan ini ada
         'uraian',
+        'saldo_awal',   // <--- Pastikan ini ada
         'wip_masuk',
         'wip_keluar',
         'produksi_sir20',
-        'rekfif',
+        'rekfif',       // <--- Pastikan ini ada
         'saldo_akhir',
         'keterangan',
     ];

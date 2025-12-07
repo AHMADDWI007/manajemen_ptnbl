@@ -2,12 +2,12 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\{
     LoginController, UserController, MaturasiController,
     BahanProsesController, HasilUjiLabBokarController, HasilUjiMaturasiController,
     HasilUjiSir20Controller, HasilUjiTroliController, ProduksiSir20Controller,
-    PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController
+    PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController,
+    ProduksiSirController
 };
 
 // Redirect root ke beranda jika login, atau ke login jika belum
@@ -82,6 +82,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('pengolahan_basah', PengolahanBasahController::class);
     Route::resource('produksi_sir20', ProduksiSir20Controller::class);
     Route::resource('penjualan_sir20', PenjualanSir20Controller::class);
+    Route::resource('produksi-sir', ProduksiSirController::class);
 
     
 

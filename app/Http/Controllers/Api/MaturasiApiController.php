@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB; 
 use Carbon\Carbon; 
 use Illuminate\Database\Eloquent\Collection; 
+use Illuminate\Validation\ValidationException; // ✅ Tambahkan ini
 
 
 class MaturasiApiController extends Controller
@@ -49,7 +50,7 @@ class MaturasiApiController extends Controller
                 
                 $ujiK3 = null;
                 if ($nomorBak) {
-                    $ujiK3 = \App\Models\HasilUjiBokarDiolah::where('bak_maturasi', $nomorBak)
+                    $ujiK3 = HasilUjiBokarDiolah::where('bak_maturasi', $nomorBak)
                         ->whereDate('tanggal', '<=', $selectedDate)
                         ->latest('tanggal')
                         ->first();
@@ -356,4 +357,75 @@ class MaturasiApiController extends Controller
         ];
     }
     // ✅ AKHIR SALINAN FUNGSI HELPER
+
+    public function store(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'uraian'        => 'required|string|exists:maturasis,uraian',
+                'tanggal_input' => 'required|date',
+                'diolah'        => 'nullable|numeric|min:0',
+                'mutasi'        => 'nullable|numeric|min:0',
+                'keterangan'    => 'nullable|string|max:255',
+            ]);
+
+            $tanggalInput = Carbon::parse($validatedData['tanggal_input']);
+            $maturasi = Maturasi::where('uraian', $validatedData['uraian'])->firstOrFail();
+
+            $diolah = $validatedData['diolah'] ?? 0;
+            $mutasi = $validatedData['mutasi'] ?? 0;
+
+            if ($maturasi->stok_akhir < ($diolah + $mutasi)) {
+                return response()->json(['success' => false, 'message' => 'Stok akhir tidak mencukupi untuk pengolahan/mutasi ini.'], 400);
+            }
+
+            $stok_akhir_baru = $maturasi->stok_akhir - $diolah - $mutasi;
+
+            PengolahanMaturasi::create([
+                'maturasi_id' => $maturasi->id,
+                'tgl_laporan' => $tanggalInput,
+                'diolah'      => $diolah,
+                'mutasi'      => $mutasi,
+                'masuk_hi'    => 0,
+                'keterangan'  => $validatedData['keterangan'] ?? 'Input Mobile',
+            ]);
+
+            $tgl_masuk_stok = $maturasi->tgl_masuk;
+            if ($stok_akhir_baru <= 0) {
+                $stok_akhir_baru = 0;
+                $tgl_masuk_stok = null;
+            }
+            
+            // ✅ PERBAIKAN 2 (PHP0406): Pastikan parsing string ke Carbon dulu
+            $umurBaru = $maturasi->umur;
+            if ($tgl_masuk_stok) {
+                 // Paksa cast ke string dulu agar parser tidak bingung
+                 $umurBaru = Carbon::parse((string)$tgl_masuk_stok)->diffInDays($tanggalInput);
+            } else {
+                 $umurBaru = 0;
+            }
+
+            $maturasi->update([
+                'diolah'     => $maturasi->diolah + $diolah,
+                'mutasi'     => $maturasi->mutasi + $mutasi,
+                'stok_akhir' => $stok_akhir_baru,
+                'tgl_masuk'  => $tgl_masuk_stok,
+                'umur'       => $umurBaru,
+                'keterangan' => $validatedData['keterangan'] ?? $maturasi->keterangan,
+                'updated_at' => $tanggalInput
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Olah/Mutasi berhasil disimpan.',
+                'data'    => $maturasi
+            ], 201);
+
+        } catch (ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'Validasi gagal', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Error store OlahMaturasi API: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
