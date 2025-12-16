@@ -2,13 +2,34 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
-use App\Http\Controllers\{
-    LoginController, UserController, MaturasiController,
-    BahanProsesController, HasilUjiLabBokarController, HasilUjiMaturasiController,
-    HasilUjiSir20Controller, HasilUjiTroliController, ProduksiSir20Controller,
-    PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController,
-    ProduksiSirController
-};
+
+// --- 1. IMPORT CONTROLLER UTAMA ---
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\LaporanHarianController;
+
+// --- 2. IMPORT CONTROLLER DATA LABORATORIUM ---
+use App\Http\Controllers\DataLaboratorium\HasilUjiBokarController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiBokarDiolahController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiMaturasiController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiSir20Controller;
+use App\Http\Controllers\DataLaboratorium\HasilUjiTroliController;
+
+// --- 3. IMPORT CONTROLLER DATA PENGOLAHAN ---
+use App\Http\Controllers\DataPengolahan\BahanProsesController;
+use App\Http\Controllers\DataPengolahan\MaturasiController;
+use App\Http\Controllers\DataPengolahan\PengolahanBasahController;
+
+// --- 4. IMPORT CONTROLLER DATA PRODUKSI ---
+use App\Http\Controllers\DataProduksi\DataProduksiSir20Controller; // Gudang & Mutu
+use App\Http\Controllers\DataProduksi\ProduksiSir20Controller;     // Proses Produksi
+use App\Http\Controllers\DataProduksi\PenjualanSir20Controller;    // Penjualan
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
 // Redirect root ke beranda jika login, atau ke login jika belum
 Route::get('/', function () {
@@ -29,44 +50,70 @@ Route::middleware(['auth'])->group(function () {
     })->name('beranda');
 
     // Data Pengguna
-    
-    
+    Route::resource('users', UserController::class);
+    Route::get('/data-pengguna', [UserController::class, 'index'])->name('data_pengguna');
 
-    // --- PERBAIKAN DI SINI ---
-    // Route khusus untuk AJAX get data terakhir.
-    // INI HARUS DITEMPATKAN SEBELUM Route::resource
+    // ====================================================
+    // MODUL: DATA PENGOLAHAN
+    // ====================================================
     
-// Rute KHUSUS untuk AJAX 'getPreviousData' dari Modal Tambah Anda
+    // 1. Maturasi
     Route::get('/maturasi-get-previous-data', [MaturasiController::class, 'getPreviousData'])->name('maturasi.getPreviousData');
-
-    // Route Maturasi
-    Route::get('/maturasi/cetak', [MaturasiController::class, 'cetakPdf'])->name('maturasi.cetak'); // ✅ Tambahkan ini
-    Route::get('/maturasi-get-previous-data', [MaturasiController::class, 'getPreviousData'])->name('maturasi.getPreviousData');
-    Route::resource('maturasi', MaturasiController::class);
+    Route::get('/maturasi/cetak', [MaturasiController::class, 'cetakPdf'])->name('maturasi.cetak');
     Route::post('/maturasi/{maturasi}/reset', [MaturasiController::class, 'reset'])->name('maturasi.reset');
-
-    // Rute resource untuk index, store, update, destroy
     Route::resource('maturasi', MaturasiController::class);
-    Route::post('/maturasi/{maturasi}/reset', [MaturasiController::class, 'reset'])->name('maturasi.reset');
-    Route::resource('produksi', BahanProsesController::class);
+
+    // 2. Bahan Proses (WIP)
+    // Note: Dulu 'data_produksi', sekarang kita standarkan jadi bahan-proses
     Route::resource('bahan-proses', BahanProsesController::class);
+    
+    // 3. Pengolahan Basah
+    // Menggunakan strip (-)
+    Route::get('/pengolahan-basah/rekap', [PengolahanBasahController::class, 'rekap'])->name('pengolahan-basah.rekap');
+    Route::post('/pengolahan-basah/update-rektif', [PengolahanBasahController::class, 'updateRektif'])->name('pengolahan-basah.updateRektif');
+    Route::resource('pengolahan-basah', PengolahanBasahController::class);
 
-     // Data Laboratorium
-    Route::resource('hasil_uji_lab_bokar', HasilUjiLabBokarController::class);
-    Route::resource('hasil_uji_bokar_diolah', HasilUjiBokarDiolahController::class);
-    Route::resource('hasil_uji_maturasi', HasilUjiMaturasiController::class);
-    Route::resource('hasil_uji_troli', HasilUjiTroliController::class);
-    Route::resource('hasil_uji_sir_20', HasilUjiSir20Controller::class);
 
-    // Data Produksi
-    Route::get('/pengolahan_basah/rekap', [PengolahanBasahController::class, 'rekap'])->name('pengolahan_basah.rekap');
-    // Route baru untuk menyimpan nilai rektif harian
-    Route::post('/pengolahan_basah/update_rektif', [PengolahanBasahController::class, 'updateRektif'])->name('pengolahan_basah.updateRektif');
+    // ====================================================
+    // MODUL: DATA LABORATORIUM
+    // ====================================================
+    // Semua menggunakan strip (-) agar konsisten dengan nama view & folder
+    
+    Route::resource('hasil-uji-bokar', HasilUjiBokarController::class);
+    Route::resource('hasil-uji-bokar-diolah', HasilUjiBokarDiolahController::class);
+    Route::resource('hasil-uji-maturasi', HasilUjiMaturasiController::class);
+    Route::resource('hasil-uji-troli', HasilUjiTroliController::class);
+    Route::resource('hasil-uji-sir20', HasilUjiSir20Controller::class);
+
+
+    // ====================================================
+    // MODUL: DATA PRODUKSI
+    // ====================================================
+
+    // 1. Data Gudang & Mutu (Tabel IV & VI)
+    // Dulu: produksi-sir (kita pertahankan nama ini agar controller tidak error redirectnya)
+    Route::get('/data-sir/get-production', [DataProduksiSir20Controller::class, 'getProductionToday'])->name('data-sir.getProductionToday');
+    Route::resource('data-sir', DataProduksiSir20Controller::class);
+
+    // 2. Proses Produksi Harian (Mesin, Dryer, dll)
+    Route::resource('produksi-sir20', ProduksiSir20Controller::class);
+
+    // 3. Penjualan
+    Route::get('/penjualan-sir20/get-pengiriman', [PenjualanSir20Controller::class, 'getPengirimanGudang'])
+        ->name('penjualan-sir20.getPengiriman');
+
+    // 2. BARU TARUH RESOURCE DI BAWAHNYA
+    Route::resource('penjualan-sir20', PenjualanSir20Controller::class)
+        ->parameters(['penjualan-sir20' => 'id']);
+
+    // ====================================================
+    // LAIN - LAIN
+    // ====================================================
+
+    // Sync Manual (API)
     Route::post('/sync-bokar-manual', function () {
         try {
-            // Menjalankan perintah artisan 'bokar:sync'
             Artisan::call('bokar:sync');
-            
             return response()->json([
                 'success' => true, 
                 'message' => 'Data API berhasil disinkronisasi!'
@@ -79,17 +126,7 @@ Route::middleware(['auth'])->group(function () {
         }
     })->name('bokar.sync.manual');
 
-    Route::resource('pengolahan_basah', PengolahanBasahController::class);
-    Route::resource('produksi_sir20', ProduksiSir20Controller::class);
-    Route::resource('penjualan_sir20', PenjualanSir20Controller::class);
-    Route::resource('produksi-sir', ProduksiSirController::class);
-
-    
-
     // Laporan Harian
     Route::get('/laporan-harian', [LaporanHarianController::class,'index'])->name('laporan.harian');
     Route::get('/laporan-harian/export', [LaporanHarianController::class,'exportExcel'])->name('laporan.harian.excel');
 });
-
-Route::resource('users', UserController::class);
-    Route::get('/data_pengguna', [UserController::class, 'index'])->name('data_pengguna');

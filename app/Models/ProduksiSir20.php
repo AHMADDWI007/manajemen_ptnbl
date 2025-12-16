@@ -9,9 +9,8 @@ class ProduksiSir20 extends Model
 {
     use HasFactory;
 
-    // Nama tabel sesuai permintaan
     protected $table = 'produksi_sir20';
-
-    // Izinkan semua kolom diisi secara massal
-    protected $guarded = [];
+    
+    // Izinkan mass assignment untuk semua kolom
+    protected $guarded = []; 
 }

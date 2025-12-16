@@ -10,15 +10,15 @@ class PenjualanSir20 extends Model
     use HasFactory;
 
     protected $table = 'penjualan_sir20';
+    
+    protected $guarded = [];
 
-    protected $fillable = [
-        'tanggal', // ✅ WAJIB ADA
-        'uraian',
-        'sd_bulan_lalu',
-        'penjualan_bulan_ini_yg_lalu',
-        'penjualan_bulan_ini_hari_ini', // Mapping input 'hari_ini'
-        'total_bulan_ini',
-        'total_penjualan_sd_hari_ini',
-        'keterangan',
+    protected $casts = [
+        'tanggal' => 'date',
+        'sd_bulan_lalu' => 'float',
+        'bln_ini_lalu' => 'float',
+        'hari_ini' => 'float',
+        'total_bln_ini' => 'float',
+        'total_sd_hari_ini' => 'float',
     ];
 }

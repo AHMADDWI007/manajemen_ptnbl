@@ -18,7 +18,7 @@ class PerbaikanDataSaldoSeeder extends Seeder
         // --- KONFIGURASI TANGGAL ---
         // Ganti tanggal di bawah ini sesuai kebutuhan (misal: '2025-11-28')
         // Atau gunakan Carbon::yesterday()->format('Y-m-d') untuk dinamis
-        $targetDate = '2025-11-28'; 
+        $targetDate = '2025-11-30'; 
         
         $this->command->info("Memulai perbaikan data saldo untuk tanggal: $targetDate");
 
