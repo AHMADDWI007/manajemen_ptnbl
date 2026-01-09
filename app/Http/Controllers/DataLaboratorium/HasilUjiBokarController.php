@@ -17,13 +17,15 @@ class HasilUjiBokarController extends Controller
 
     public function store(Request $request)
     {
+        // Validasi input
         $validated = $request->validate([
             'tanggal'   => 'required|date',
             'suplier'   => 'required|string|max:255',
+            // Cek unique pada kolom no_sampel di tabel hasil_uji_lab_bokar
             'no_sampel' => 'required|string|max:100|unique:hasil_uji_lab_bokar,no_sampel',
             'k3'        => 'nullable|numeric|min:0',
             'dirt'      => 'nullable|numeric|min:0',
-            'ask'       => 'nullable|numeric|min:0',
+            'ask'       => 'nullable|numeric|min:0', // Sesuai migrasi: 'ask' (Ash Content)
             'po'        => 'nullable|numeric|min:0', 
             'pa'        => 'nullable|numeric|min:0', 
             'pri'       => 'nullable|numeric|min:0', 
@@ -35,42 +37,40 @@ class HasilUjiBokarController extends Controller
                          ->with('success', 'Data hasil uji lab berhasil disimpan.');
     }
 
-    /**
-     * [PERBAIKAN] Gunakan $id biasa, lalu cari manual
-     */
     public function show($id)
     {
+        // 🔥 PERBAIKAN: Karena PK custom, find() mungkin tetap bekerja jika model dikonfigurasi benar.
+        // Tapi untuk amannya, kita bisa pakai findOrFail atau where().
         $data = HasilUjiLabBokar::find($id);
+        
+        if (!$data) {
+            return response()->json(['error' => 'Data tidak ditemukan'], 404);
+        }
+        
         return response()->json($data);
     }
 
-    /**
-     * [PERBAIKAN] Gunakan $id biasa, lalu cari manual
-     */
     public function edit($id)
     {
         $data = HasilUjiLabBokar::find($id);
         
-        // Cek jika data tidak ditemukan (opsional, biar aman)
-        if(!$data) {
+        if (!$data) {
             return response()->json(['error' => 'Data tidak ditemukan'], 404);
         }
 
         return response()->json($data);
     }
 
-    /**
-     * [PERBAIKAN] Gunakan $id biasa
-     */
     public function update(Request $request, $id)
     {
-        // 1. Cari dulu datanya
+        // 1. Cari Data
         $hasilUjiLabBokar = HasilUjiLabBokar::find($id);
 
-        if(!$hasilUjiLabBokar) {
+        if (!$hasilUjiLabBokar) {
             return redirect()->back()->with('error', 'Data tidak ditemukan.');
         }
 
+        // 2. Validasi
         $validated = $request->validate([
             'tanggal'   => 'required|date',
             'suplier'   => 'required|string|max:255',
@@ -78,8 +78,9 @@ class HasilUjiBokarController extends Controller
                 'required',
                 'string',
                 'max:100',
-                // Perhatikan pemanggilan ID di sini
-                Rule::unique('hasil_uji_lab_bokar')->ignore($hasilUjiLabBokar->id),
+                // 🔥 PERBAIKAN PENTING: Unique ignore harus mengacu pada KOLOM PRIMARY KEY yang baru
+                // Format: Rule::unique('nama_tabel')->ignore($id_value, 'nama_kolom_pk')
+                Rule::unique('hasil_uji_lab_bokar')->ignore($hasilUjiLabBokar->id_hasil_uji_lab_bokar, 'id_hasil_uji_lab_bokar'),
             ],
             'k3'        => 'nullable|numeric|min:0',
             'dirt'      => 'nullable|numeric|min:0',
@@ -89,15 +90,13 @@ class HasilUjiBokarController extends Controller
             'pri'       => 'nullable|numeric|min:0', 
         ]);
 
+        // 3. Update
         $hasilUjiLabBokar->update($validated);
 
         return redirect()->route('hasil-uji-bokar.index') 
                          ->with('success', 'Data hasil uji lab berhasil diperbarui.');
     }
 
-    /**
-     * [PERBAIKAN] Gunakan $id biasa
-     */
     public function destroy($id)
     {
         $hasilUjiLabBokar = HasilUjiLabBokar::find($id);

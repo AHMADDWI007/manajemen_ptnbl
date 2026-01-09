@@ -91,7 +91,7 @@
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right">
                                                     {{-- DETAIL --}}
-                                                    @if($item->id)
+                                                    @if($item->id_produksi_sir)
                                                         <a class="dropdown-item" href="javascript:void(0)"
                                                            onclick="bukaDetailIV(this)"
                                                            data-uraian="{{ $item->uraian }}"
@@ -109,15 +109,15 @@
                                                        data-uraian="{{ $item->uraian }}"
                                                        data-masuk="{{ $item->masuk }}"
                                                        data-ket="{{ $item->keterangan }}" 
-                                                       data-id="{{ $item->id }}">
-                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id ? 'Edit' : 'Edit' }}
+                                                       data-id="{{ $item->id_produksi_sir }}">
+                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id_produksi_sir ? 'Edit' : 'Edit' }}
                                                     </a>
 
                                                     <div class="dropdown-divider"></div>
 
                                                     {{-- RESET --}}
-                                                    @if($item->id)
-                                                        <form action="{{ route('data-sir.destroy', $item->id) }}" method="POST" class="form-reset">
+                                                    @if($item->id_produksi_sir)
+                                                        <form action="{{ route('data-sir.destroy', $item->id_produksi_sir) }}" method="POST" class="form-reset">
                                                             @csrf @method('DELETE')
                                                             <button type="button" class="dropdown-item text-danger btn-reset">
                                                                 <i class="fas fa-undo mr-2"></i> Reset
@@ -183,7 +183,7 @@
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right">
                                                     {{-- DETAIL --}}
-                                                    @if($item->id)
+                                                    @if($item->id_produksi_sir)
                                                         <a class="dropdown-item" href="javascript:void(0)" 
                                                            onclick="bukaDetailVI(this)"
                                                            data-uraian="{{ $item->uraian }}"
@@ -202,15 +202,15 @@
                                                        data-kg="{{ $item->kg }}"
                                                        data-pallet="{{ $item->pallet }}"
                                                        data-ket="{{ $item->keterangan }}"
-                                                       data-id="{{ $item->id }}">
-                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id ? 'Edit' : 'Input' }}
+                                                       data-id="{{ $item->id_produksi_sir }}">
+                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id_produksi_sir ? 'Edit' : 'Input' }}
                                                     </a>
 
                                                     <div class="dropdown-divider"></div>
 
                                                     {{-- RESET --}}
-                                                    @if($item->id)
-                                                        <form action="{{ route('data-sir.destroy', $item->id) }}" method="POST" class="form-reset">
+                                                    @if($item->id_produksi_sir)
+                                                        <form action="{{ route('data-sir.destroy', $item->id_produksi_sir) }}" method="POST" class="form-reset">
                                                             @csrf @method('DELETE')
                                                             <button type="button" class="dropdown-item text-danger btn-reset">
                                                                 <i class="fas fa-undo mr-2"></i> Reset

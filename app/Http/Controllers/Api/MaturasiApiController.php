@@ -4,149 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Maturasi; // Model utama
-use App\Models\PengolahanMaturasi; // Untuk histori
-use App\Models\HasilUjiBokarDiolah; // Untuk K3 Masuk
-use App\Models\HasilUjiMaturasi; // ✅ PERBAIKAN: Import model ini
+use App\Models\Maturasi;
+use App\Models\PengolahanMaturasi;
+use App\Models\HasilUjiBokarDiolah;
+use App\Models\HasilUjiMaturasi;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB; 
-use Carbon\Carbon; 
-use Illuminate\Database\Eloquent\Collection; 
-use Illuminate\Validation\ValidationException; // ✅ Tambahkan ini
-
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class MaturasiApiController extends Controller
 {
-    /**
-     * ✅ PERBAIKAN: [TABEL MATURASI] Mengambil data status maturasi
-     * Logika disamakan dengan MaturasiController@index (Web)
-     * Endpoint: GET /pengolahan-maturasi
-     */
-    public function index(Request $request)
-    {
-        try {
-            // Mobile tidak mengirim filter, jadi kita selalu gunakan HARI INI
-            $selectedDate = Carbon::today();
+    // =========================================================================
+    // 1. HELPER FUNCTIONS (COPY-PASTE DARI WEB ADMIN AGAR SINKRON)
+    // =========================================================================
 
-            // ✅ PERBAIKAN: Ubah 'hasilUji' ke relasi yang benar 'hasilUjiMaturasi'
-            $data_maturasi_db = Maturasi::with(['hasilUjiMaturasi'])->orderBy('id')->get();
-            
-            $dataTampilan = new Collection();
-
-            // Loop setiap Bak dan hitung snapshot-nya
-            foreach ($data_maturasi_db as $bak) {
-                // Panggil helper hitungSnapshot (dicopy dari web controller)
-                $snap = $this->hitungSnapshot($bak, $selectedDate);
-                
-                $row = clone $bak;
-                foreach ($snap as $k => $v) $row->$k = $v;
-                $row->updated_at = $selectedDate;
-
-                // --- Logika K3 Masuk (dari HasilUjiBokarDiolah) ---
-                $nomorBak = null;
-                if (preg_match('/Di Bak Maturasi-(\d+)/', $bak->uraian, $matches)) {
-                    $nomorBak = "Bak Maturasi " . $matches[1];
-                }
-                
-                $ujiK3 = null;
-                if ($nomorBak) {
-                    $ujiK3 = HasilUjiBokarDiolah::where('bak_maturasi', $nomorBak)
-                        ->whereDate('tanggal', '<=', $selectedDate)
-                        ->latest('tanggal')
-                        ->first();
-                }
-                $row->k3_masuk = $ujiK3->k3 ?? 0;
-                // --- Akhir Logika K3 Masuk ---
-
-                // ✅ PERBAIKAN: TAMBAHKAN BLOK INI (untuk K3 Olah, PO, PRI)
-                // (Disalin dari MaturasiController.php)
-                // ==========================================================
-                // Ambil nilai dari hasil uji maturasi jika ada
-                $ujiTerakhir = $bak->hasilUjiMaturasi() // Gunakan relasi
-                    ->whereDate('tanggal', '<=', $selectedDate)
-                    ->latest('tanggal')
-                    ->first();
-
-                if ($ujiTerakhir) {
-                    $row->k3_olah = $ujiTerakhir->k3 ?? 0;
-                    $row->po      = $ujiTerakhir->po ?? 0;
-                    $row->pri     = $ujiTerakhir->pri ?? 0;
-                    $row->tgl_uji = $ujiTerakhir->tanggal;
-                } else {
-                    $row->k3_olah = 0;
-                    $row->po      = 0;
-                    $row->pri     = 0;
-                    $row->tgl_uji = null;
-                }
-                // ==============================================================
-                // ✅ AKHIR BLOK TAMBAHAN
-                
-                // ✅ PERBAIKAN: Sempurnakan Logika Asal Bokar (dari web controller)
-                // (Logika $snap['tgl_masuk'] sudah dihitung oleh hitungSnapshot)
-                if ($row->stok_akhir > 0 && $row->tgl_masuk && $selectedDate->gte(Carbon::parse($row->tgl_masuk)->startOfDay())) {
-                    // asal_bokar tetap tampil (nilainya sudah ada dari $row = clone $bak)
-                } else {
-                    $row->asal_bokar = null; // Sembunyikan
-                }
-                // --- Akhir Perbaikan Asal Bokar ---
-
-                // Masukkan hasil kalkulasi ke data
-                $dataTampilan->push($row);
-            }
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Data Pengolahan Maturasi berhasil diambil.',
-                'data' => $dataTampilan // Kirim data yang sudah dikalkulasi
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Error index MaturasiApi: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-    // ✅ AKHIR PERBAIKAN FUNGSI INDEX
-
-    /**
-     * ✅ [FORM 2 - SPINNER] Mengambil daftar Bak Maturasi yang stoknya > 0
-     * Endpoint: GET /maturasi/list-available
-     */
-    public function getListAvailable()
-    {
-        try {
-            // ✅ PERBAIKAN: Kita ambil snapshot hari ini untuk cek stok
-            // Ini lebih akurat daripada $bak->stok_akhir di DB
-            $selectedDate = Carbon::today();
-            $bak_aktif_list = [];
-            $data_maturasi_db = Maturasi::orderBy('id')->get();
-
-            foreach ($data_maturasi_db as $bak) {
-                 $snap = $this->hitungSnapshot($bak, $selectedDate);
-                 if ($snap['stok_akhir'] > 0) {
-                    // Hanya kirim data yang perlu untuk spinner
-                    $bak_aktif_list[] = [
-                        'id' => $bak->id,
-                        'uraian' => $bak->uraian
-                    ];
-                 }
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar Bak Maturasi (stok > 0) berhasil diambil.',
-                'data' => $bak_aktif_list // Kirim daftar yang sudah difilter
-            ], 200);
-
-        } catch (\Exception $e) {
-             Log::error('Error getListAvailable MaturasiApi: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    // ✅ SEMUA FUNGSI HELPER DI BAWAH INI SUDAH BENAR
-    // (Fungsi-fungsi ini disalin dari MaturasiController web Anda
-    // dan penting untuk kalkulasi snapshot)
-    // -------------------------------------------------------------------
     protected function getNetBeforeDate(int $maturasi_id, Carbon $date): float
     {
         $sums = PengolahanMaturasi::where('maturasi_id', $maturasi_id)
@@ -222,7 +95,7 @@ class MaturasiApiController extends Controller
         }
         return (float)$s;
     }
-
+    
     protected function hasAnyLogUpToDate(int $maturasi_id, Carbon $date, ?string $nomorBak = null): bool
     {
         $countLog = PengolahanMaturasi::where('maturasi_id', $maturasi_id)
@@ -263,10 +136,17 @@ class MaturasiApiController extends Controller
         $sumsToday = $this->getSumsOnDate($maturasi->id, $selectedDate);
         $diolah_today_raw = $sumsToday['diolah'];
         $mutasi_today = $sumsToday['mutasi'];
-        
-        // ✅ PERBAIKAN: Pastikan memanggil helper yang benar
-        $masuk_hi_today = $this->getMasukHiOnDateFromSources($maturasi->id, $selectedDate, $nomorBak);
-        
+        $masuk_hi_today_from_pengolahan = $sumsToday['masuk_hi'];
+
+        $masuk_from_uji = 0;
+        if ($nomorBak) {
+            $masuk_from_uji = (float) HasilUjiBokarDiolah::where('bak_maturasi', $nomorBak)
+                ->whereDate('tanggal', $selectedDate)
+                ->sum('netto_kering');
+        }
+
+        $masuk_hi_today = max($masuk_hi_today_from_pengolahan, $masuk_from_uji);
+
         $diolah_today = $diolah_today_raw;
         if ($stok_awal == 0 && $masuk_hi_today > 0) {
             $diolah_today = 0;
@@ -280,29 +160,25 @@ class MaturasiApiController extends Controller
         $tgl_masuk = null;
         $umur = 0;
 
-        // (Logika tgl_masuk dan umur disalin dari web controller)
         if ($stok_akhir > 0) {
             if (!($stok_awal == 0 && $masuk_hi_today > 0)) {
                 if ($last_before) {
                     $tgl_masuk = $last_before->toDateString();
                     $umur = $last_before->diffInDays($selectedDate);
                 } else {
-                     if ($maturasi->tgl_masuk) {
+                    if ($maturasi->tgl_masuk) {
                         try {
                             $candidate = Carbon::parse($maturasi->tgl_masuk);
                             if ($candidate->lte($selectedDate)) {
                                 $tgl_masuk = $candidate->toDateString();
                                 $umur = $candidate->diffInDays($selectedDate);
                             }
-                        } catch (\Exception $e) {}
+                        } catch (\Exception $e) { }
                     }
                 }
-            } else {
-                $tgl_masuk = null;
-                $umur = 0;
             }
         } else {
-            if ($stok_awal > 0) {
+             if ($stok_awal > 0) {
                 if ($last_before) {
                     $tgl_masuk = $last_before->toDateString();
                     $umur = $last_before->diffInDays($selectedDate);
@@ -317,13 +193,9 @@ class MaturasiApiController extends Controller
                         } catch (\Exception $e) {}
                     }
                 }
-            } else {
-                $tgl_masuk = null;
-                $umur = 0;
             }
         }
-        
-        // (Logika keterangan disalin dari web controller)
+
         if ($stok_akhir <= 0) {
                 $keterangan = '-';
             } else {
@@ -356,64 +228,194 @@ class MaturasiApiController extends Controller
             'keterangan' => $keterangan,
         ];
     }
-    // ✅ AKHIR SALINAN FUNGSI HELPER
 
+    // =========================================================================
+    // 2. ENDPOINT UTAMA (INDEX, SPINNER, STORE)
+    // =========================================================================
+
+    /**
+     * [LIST UTAMA] GET /pengolahan-maturasi
+     * Mengembalikan data status maturasi dengan kalkulasi real-time (SNAPSHOT)
+     */
+    public function index(Request $request)
+    {
+        try {
+            // Mobile selalu menampilkan status HARI INI
+            $selectedDate = Carbon::today();
+
+            // Load data Master dengan relasi ke Hasil Uji Maturasi
+            // (Agar kita bisa mengambil data K3 Olah, Po, Pri)
+            $data_maturasi_db = Maturasi::with(['hasilUjiMaturasi'])->orderBy('id')->get();
+            
+            $dataTampilan = new Collection();
+
+            // Loop untuk hitung snapshot setiap bak
+            foreach ($data_maturasi_db as $bak) {
+                $snap = $this->hitungSnapshot($bak, $selectedDate);
+                
+                // Clone object agar tidak mengubah data asli di loop
+                $row = clone $bak;
+                foreach ($snap as $k => $v) $row->$k = $v;
+                $row->updated_at = $selectedDate;
+
+                // --- LOGIKA K3 MASUK (Dari Uji Bokar Diolah) ---
+                $nomorBak = null;
+                if (preg_match('/Di Bak Maturasi-(\d+)/', $bak->uraian, $matches)) {
+                    $nomorBak = "Bak Maturasi " . $matches[1];
+                }
+                
+                $ujiK3Masuk = null;
+                if ($nomorBak) {
+                    $ujiK3Masuk = HasilUjiBokarDiolah::where('bak_maturasi', $nomorBak)
+                        ->whereDate('tanggal', '<=', $selectedDate)
+                        ->latest('tanggal')
+                        ->first();
+                }
+                $row->k3_masuk = $ujiK3Masuk->k3 ?? 0;
+
+                // --- LOGIKA K3 OLAH / HASIL UJI LAB (Dari Hasil Uji Maturasi) ---
+                // Cari data uji terakhir
+                $ujiTerakhir = $bak->hasilUjiMaturasi()
+                    ->whereDate('tanggal', '<=', $selectedDate)
+                    ->latest('tanggal')
+                    ->first();
+
+                if ($ujiTerakhir) {
+                    $row->k3_olah = $ujiTerakhir->k3 ?? 0;
+                    $row->po      = $ujiTerakhir->po ?? 0;
+                    $row->pri     = $ujiTerakhir->pri ?? 0;
+                    $row->tgl_uji = $ujiTerakhir->tanggal;
+                } else {
+                    $row->k3_olah = 0;
+                    $row->po      = 0;
+                    $row->pri     = 0;
+                    $row->tgl_uji = null;
+                }
+
+                // --- LOGIKA ASAL BOKAR ---
+                // Jika stok habis atau belum masuk hari ini, sembunyikan asal bokar
+                if ($row->stok_akhir > 0 && $row->tgl_masuk && $selectedDate->gte(Carbon::parse($row->tgl_masuk)->startOfDay())) {
+                    // Biarkan $row->asal_bokar apa adanya
+                } else {
+                    $row->asal_bokar = null; 
+                }
+
+                $dataTampilan->push($row);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Maturasi berhasil dihitung dan diambil.',
+                'data' => $dataTampilan
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error index MaturasiApi: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * [SPINNER] GET /maturasi/list-available
+     * Mengambil daftar Bak yang STOK-nya > 0 (Untuk pilihan di Produksi)
+     */
+    public function getListAvailable()
+    {
+        try {
+            $selectedDate = Carbon::today();
+            $bak_aktif_list = [];
+            $data_maturasi_db = Maturasi::orderBy('id')->get();
+
+            foreach ($data_maturasi_db as $bak) {
+                 $snap = $this->hitungSnapshot($bak, $selectedDate);
+                 // Hanya ambil yang stok akhirnya positif
+                 if ($snap['stok_akhir'] > 0) {
+                    $bak_aktif_list[] = [
+                        'id' => $bak->id,
+                        'uraian' => $bak->uraian,
+                        // Kirim juga stok & k3 kalau-kalau android butuh
+                        'stok_akhir' => $snap['stok_akhir'], 
+                    ];
+                 }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar Bak Aktif berhasil diambil.',
+                'data' => $bak_aktif_list
+            ], 200);
+
+        } catch (\Exception $e) {
+             Log::error('Error getListAvailable MaturasiApi: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * [INPUT MANUAL] POST /pengolahan-maturasi/store
+     * Menyimpan data DIOLAH / MUTASI dari Android
+     */
     public function store(Request $request)
     {
         try {
+            // Helper cleaning number (jika android kirim format indo 1.000,00)
+            $cleanNumber = function ($value) {
+                if (empty($value)) return 0;
+                if (is_string($value)) {
+                    return (float) str_replace(',', '.', str_replace('.', '', $value));
+                }
+                return (float) $value;
+            };
+
             $validatedData = $request->validate([
                 'uraian'        => 'required|string|exists:maturasis,uraian',
                 'tanggal_input' => 'required|date',
-                'diolah'        => 'nullable|numeric|min:0',
-                'mutasi'        => 'nullable|numeric|min:0',
+                'diolah'        => 'nullable', // Bisa string/number
+                'mutasi'        => 'nullable',
                 'keterangan'    => 'nullable|string|max:255',
             ]);
 
             $tanggalInput = Carbon::parse($validatedData['tanggal_input']);
             $maturasi = Maturasi::where('uraian', $validatedData['uraian'])->firstOrFail();
 
-            $diolah = $validatedData['diolah'] ?? 0;
-            $mutasi = $validatedData['mutasi'] ?? 0;
-
-            if ($maturasi->stok_akhir < ($diolah + $mutasi)) {
-                return response()->json(['success' => false, 'message' => 'Stok akhir tidak mencukupi untuk pengolahan/mutasi ini.'], 400);
-            }
-
-            $stok_akhir_baru = $maturasi->stok_akhir - $diolah - $mutasi;
-
-            PengolahanMaturasi::create([
-                'maturasi_id' => $maturasi->id,
-                'tgl_laporan' => $tanggalInput,
-                'diolah'      => $diolah,
-                'mutasi'      => $mutasi,
-                'masuk_hi'    => 0,
-                'keterangan'  => $validatedData['keterangan'] ?? 'Input Mobile',
-            ]);
-
-            $tgl_masuk_stok = $maturasi->tgl_masuk;
-            if ($stok_akhir_baru <= 0) {
-                $stok_akhir_baru = 0;
-                $tgl_masuk_stok = null;
-            }
+            // Bersihkan input angka
+            $diolah = $cleanNumber($request->diolah);
+            $mutasi = $cleanNumber($request->mutasi);
             
-            // ✅ PERBAIKAN 2 (PHP0406): Pastikan parsing string ke Carbon dulu
-            $umurBaru = $maturasi->umur;
-            if ($tgl_masuk_stok) {
-                 // Paksa cast ke string dulu agar parser tidak bingung
-                 $umurBaru = Carbon::parse((string)$tgl_masuk_stok)->diffInDays($tanggalInput);
-            } else {
-                 $umurBaru = 0;
-            }
+            // Cek Stok Cukup atau Tidak (Optional Validation)
+            // if ($maturasi->stok_akhir < ($diolah + $mutasi)) {
+            //     return response()->json(['success' => false, 'message' => 'Stok tidak cukup!'], 400);
+            // }
 
-            $maturasi->update([
-                'diolah'     => $maturasi->diolah + $diolah,
-                'mutasi'     => $maturasi->mutasi + $mutasi,
-                'stok_akhir' => $stok_akhir_baru,
-                'tgl_masuk'  => $tgl_masuk_stok,
-                'umur'       => $umurBaru,
-                'keterangan' => $validatedData['keterangan'] ?? $maturasi->keterangan,
-                'updated_at' => $tanggalInput
-            ]);
+            // 1. Simpan/Update Log Harian (PengolahanMaturasi)
+            // Hati-hati: Kita update log harian untuk tanggal tersebut
+            $logHarian = PengolahanMaturasi::updateOrCreate(
+                ['maturasi_id' => $maturasi->id, 'tgl_laporan' => $tanggalInput],
+                [
+                    // Kita gunakan DB::raw untuk increment jika mau, tapi replace lebih aman utk input manual
+                    'diolah'   => $diolah,
+                    'mutasi'   => $mutasi,
+                    // Jangan ubah masuk_hi di sini (biarkan urusan lab), kecuali null
+                    // 'masuk_hi' => DB::raw('masuk_hi'), 
+                    'keterangan' => $validatedData['keterangan'] ?? 'Input Mobile',
+                ]
+            );
+
+            // 2. Update Master Maturasi (Hitung Ulang Stok Akhir Master)
+            // Ambil snapshot terakhir untuk tanggal ini agar akurat
+            $snap = $this->hitungSnapshot($maturasi, $tanggalInput);
+            
+            // Update tabel master
+            $maturasi->stok_awal = $snap['stok_awal'];
+            $maturasi->diolah = $snap['diolah'];
+            $maturasi->mutasi = $snap['mutasi'];
+            $maturasi->masuk_hi = $snap['masuk_hi'];
+            $maturasi->stok_akhir = $snap['stok_akhir'];
+            $maturasi->umur = $snap['umur'];
+            $maturasi->tgl_masuk = $snap['tgl_masuk'];
+            $maturasi->keterangan = $snap['keterangan'];
+            $maturasi->updated_at = $tanggalInput;
+            $maturasi->save();
 
             return response()->json([
                 'success' => true,

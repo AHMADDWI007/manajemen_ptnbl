@@ -10,5 +10,6 @@ class RektifikasiStok extends Model
     use HasFactory;
     
     protected $table = 'rektifikasi_stok';
+    protected $primaryKey = 'id_rektifikasi_stok';
     protected $guarded = [];
 }

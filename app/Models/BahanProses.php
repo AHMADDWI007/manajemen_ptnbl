@@ -9,23 +9,13 @@ class BahanProses extends Model
 {
     use HasFactory;
 
-    /**
-     * Nama tabel database.
-     */
     protected $table = 'bahan_proses';
+    protected $primaryKey = 'id_bahan_proses';
 
-    /**
-     * Daftar kolom yang boleh diisi secara massal (mass assignable).
-     */
     protected $fillable = [
-        'tanggal',      // <--- Pastikan ini ada
-        'uraian',
-        'saldo_awal',   // <--- Pastikan ini ada
-        'wip_masuk',
-        'wip_keluar',
-        'produksi_sir20',
-        'rekfif',       // <--- Pastikan ini ada
-        'saldo_akhir',
-        'keterangan',
+        'tanggal', 'uraian', 'saldo_awal', 'wip_masuk', 'wip_keluar', 'produksi_sir20', 'rekfif', 'saldo_akhir', 'keterangan',
+    ];
+    protected $casts = [
+        'tanggal' => 'date',
     ];
 }

@@ -9,15 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('hasil_uji_lab_bokar', function (Blueprint $table) {
-            $table->id();
+            $table->id('id_hasil_uji_lab_bokar'); // Ganti id
             $table->date('tanggal');
             $table->string('suplier');
-            $table->string('no_sampel')->unique(); // Unik per sampel
+            $table->string('no_sampel')->unique();
             
-            // Parameter Uji (Decimal untuk presisi)
             $table->decimal('k3', 8, 2)->nullable();
             $table->decimal('dirt', 8, 2)->nullable();
-            $table->decimal('ask', 8, 2)->nullable(); // Ash Content
+            $table->decimal('ask', 8, 2)->nullable();
             $table->decimal('po', 8, 2)->nullable();
             $table->decimal('pa', 8, 2)->nullable();
             $table->decimal('pri', 8, 2)->nullable();

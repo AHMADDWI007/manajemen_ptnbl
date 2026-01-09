@@ -95,16 +95,17 @@
                                         <tr>
                                             <td>{{ $loop->iteration }}</td>
                                             <td>{{ $item->tanggal ? \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') : '-' }}</td>
-                                            <td>{{ $item->bak_maturasi ?? '-' }}</td>
+                                            {{-- 🔥 PERBAIKAN: Menggunakan Relasi --}}
+                                            <td>{{ $item->maturasi->uraian ?? 'Bak Terhapus' }}</td>
                                             <td>{{ $item->jenis ?? '-' }}</td>
                                             <td>{{ is_numeric($item->netto_basah) ? number_format($item->netto_basah, 2) : '-' }}</td>
                                             <td>{{ is_numeric($item->k3) ? number_format($item->k3, 2) : '-' }}</td>
                                             <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 2) : '-' }}</td>
                                             <td>
                                                 <div class="action-buttons">
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"> <i class="fas fa-eye"></i> </button>
-                                                    <button type="button" class="btn btn-warning btn-sm btn-edit-k3" data-id="{{ $item->id }}" title="Edit K3"> <i class="fas fa-edit"></i> </button>
-                                                    <form action="{{ route('hasil-uji-bokar-diolah.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
+                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_pengolahan_basah }}" title="Detail"> <i class="fas fa-eye"></i> </button>
+                                                    <button type="button" class="btn btn-warning btn-sm btn-edit-k3" data-id="{{ $item->id_pengolahan_basah }}" title="Edit K3"> <i class="fas fa-edit"></i> </button>
+                                                    <form action="{{ route('hasil-uji-bokar-diolah.destroy', $item->id_pengolahan_basah) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
                                                         @csrf @method('DELETE')
                                                         <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
                                                     </form>
@@ -138,11 +139,13 @@
                  <div class="modal-body">
                      <div class="form-group">
                         <label>Pilih Bak Maturasi (Hanya yang belum diuji)</label>
-                        <select name="pengolahan_basah_id" class="form-control" required>
+                        {{-- 🔥 PERBAIKAN: Name=id_pengolahan_basah (sesuai controller) --}}
+                        <select name="id_pengolahan_basah" class="form-control" required>
                             <option value="">-- Pilih Bak --</option>
                             @foreach ($daftar_bak_belum_uji as $bak)
-                                <option value="{{ $bak->id }}" {{ old('pengolahan_basah_id') == $bak->id ? 'selected' : '' }}>
-                                    {{ $bak->bak_maturasi }} (Tgl: {{ \Carbon\Carbon::parse($bak->tanggal)->format('d-m-Y') }}, Netto: {{ $bak->netto_basah }} Kg)
+                                {{-- Ganti value jadi id_pengolahan_basah --}}
+                                <option value="{{ $bak->id_pengolahan_basah }}">
+                                    {{ $bak->maturasi->uraian ?? 'Bak ???' }} (Tgl: {{ \Carbon\Carbon::parse($bak->tanggal)->format('d-m-Y') }}, Netto: {{ number_format($bak->netto_basah, 0) }} Kg)
                                 </option>
                             @endforeach
                         </select>
@@ -293,7 +296,7 @@ $(document).ready(function() {
         var url = "{{ url('hasil-uji-bokar-diolah') }}/" + id; 
         $.get(url, function(data){
             $('#detailTanggal').text(formatTanggalDetail(data.tanggal));
-            $('#detailBakMaturasi').text(data.bak_maturasi ?? '-');
+            $('#detailBakMaturasi').text(data.maturasi ? data.maturasi.uraian : '-');
             $('#detailJenis').text(data.jenis ?? '-');
             $('#detailNettoBasah').text(formatNumber(data.netto_basah) + ' Kg');
             var k3Val = formatNumber(data.k3);
@@ -309,7 +312,8 @@ $(document).ready(function() {
         var urlGet = "{{ url('hasil-uji-bokar-diolah') }}/" + id + "/edit";
         var urlPost = "{{ url('hasil-uji-bokar-diolah') }}/" + id;
         $.get(urlGet, function(data){
-            $('#editBakInfo').val(data.bak_maturasi + ' (Tgl: ' + formatTanggalDetail(data.tanggal) + ')');
+            var uraian = data.maturasi ? data.maturasi.uraian : 'Bak Terhapus';
+            $('#editBakInfo').val(uraian + ' (Tgl: ' + formatTanggalDetail(data.tanggal) + ')');
             $('#editK3').val(data.k3);
             $('#formEditK3').attr('action', urlPost);
             $('#modalEditK3').modal('show');

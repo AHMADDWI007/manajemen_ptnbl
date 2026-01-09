@@ -68,7 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ✅ PERBAIKAN: Rute spesifik HARUS di atas rute wildcard {id}
     
     // [FORM 2 - Spinner] Mengambil daftar Bak yang K3-nya masih NULL
-    Route::get('/timbang-bokar/pending-k3', [TimbangBokarApiController::class, 'getPendingK3']);
+    Route::get('/timbang-bokar/pending-k3', [HasilUjiBokarOlahApiController::class, 'getPendingK3']);
     
     // [TABEL 1] Mengambil SEMUA data Timbang Bokar
     Route::get('/hasil-timbang-bokar', [TimbangBokarApiController::class, 'index']);

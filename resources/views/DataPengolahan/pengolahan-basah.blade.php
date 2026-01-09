@@ -162,19 +162,30 @@
                                         <tr>
                                             <td>{{ $loop->iteration }}</td>
                                             <td>{{ $item->tanggal ? \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') : '-' }}</td>
-                                            <td>{{ $item->bak_maturasi ?? '-' }}</td>
+                                            
+                                            {{-- 🔥 PERBAIKAN: Gunakan Relasi Maturasi untuk menampilkan Nama Bak --}}
+                                            <td>{{ $item->maturasi->uraian ?? 'Bak Terhapus' }}</td>
+                                            
                                             <td>{{ $item->jenis ?? '-' }}</td>
                                             <td>{{ number_format($item->berat_truck, 0) }}</td>
                                             <td>{{ number_format($item->berat_timbang, 0) }}</td>
                                             <td>{{ number_format($item->netto_basah, 0) }}</td>
-                                            <td>{{ is_numeric($item->k3) ? number_format($item->k3, 0) : '-' }}</td>
+                                            <td>{{ is_numeric($item->k3) ? number_format($item->k3, 2) : '-' }}</td>
                                             <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 0) : '-' }}</td>
                                             <td>
                                                 <div class="action-buttons">
                                                     {{-- Tombol Aksi: Detail, Edit, Hapus --}}
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id }}" title="Detail"> <i class="fas fa-eye"></i> </button>
-                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id }}" title="Edit"> <i class="fas fa-edit"></i> </button>
-                                                    <form action="{{ route('pengolahan-basah.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
+                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_pengolahan_basah }}" title="Detail"> <i class="fas fa-eye"></i> </button>
+                                                    
+                                                    {{-- 🔥 PERBAIKAN: Kirim maturasi-id agar modal edit bisa auto-select --}}
+                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" 
+                                                        data-id="{{ $item->id_pengolahan_basah }}" 
+                                                        data-maturasi-id="{{ $item->id_maturasi }}" 
+                                                        title="Edit"> 
+                                                        <i class="fas fa-edit"></i> 
+                                                    </button>
+
+                                                    <form action="{{ route('pengolahan-basah.destroy', $item->id_pengolahan_basah) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
                                                         @csrf @method('DELETE')
                                                         <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
                                                     </form>
@@ -257,12 +268,15 @@
                       </div>
                       <div class="form-group">
                          <label>Bak Maturasi</label>
-                         <select name="bak_maturasi" class="form-control" required>
+                         <select name="id_maturasi" class="form-control" required>
                              <option value="">-- Pilih Bak --</option>
-                             @for ($i = 1; $i <= 49; $i++)
-                                 @php $bakName = "Bak Maturasi " . $i; @endphp
-                                 <option value="{{ $bakName }}" {{ old('bak_maturasi') == $bakName ? 'selected' : '' }}>{{ $bakName }}</option>
-                             @endfor
+                             {{-- Loop data Bak dari Model Maturasi --}}
+                             @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
+                                {{-- Value pakai id_maturasi --}}
+                                <option value="{{ $bak->id_maturasi }}">
+                                    {{ $bak->uraian }}
+                                </option>
+                            @endforeach
                          </select>
                       </div>
                  </div>
@@ -293,12 +307,15 @@
                      </div>
                      <div class="form-group">
                          <label>Bak Maturasi</label>
-                         <select name="bak_maturasi" id="editBakMaturasi" class="form-control" required>
+                         {{-- 🔥 UPDATE: Name jadi id_maturasi --}}
+                         <select name="id_maturasi" id="editBakMaturasi" class="form-control" required>
                              <option value="">-- Pilih Bak --</option>
-                             @for ($i = 1; $i <= 49; $i++)
-                                 @php $bakName = "Bak Maturasi " . $i; @endphp
-                                 <option value="{{ $bakName }}">{{ $bakName }}</option>
-                             @endfor
+                             @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
+                                {{-- Value pakai id_maturasi --}}
+                                <option value="{{ $bak->id_maturasi }}">
+                                    {{ $bak->uraian }}
+                                </option>
+                            @endforeach
                          </select>
                      </div>
                      <div class="form-group">
@@ -365,7 +382,7 @@
      </div>
 </div>
 
-{{-- ✅ MODAL INPUT REKTIF BARU (DITAMBAHKAN DI SINI) --}}
+{{-- ✅ MODAL INPUT REKTIF BARU --}}
 <div class="modal fade" id="modalInputRektif" tabindex="-1" role="dialog" aria-labelledby="modalInputRektifLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -380,7 +397,6 @@
                     </div>
                     <div class="form-group">
                         <label for="rektifTanggal">Tanggal Laporan</label>
-                        {{-- Ambil tanggal dari filter ringkasan untuk default --}}
                         <input type="date" id="rektifTanggal" name="tanggal" class="form-control" required readonly style="background-color: #e9ecef;">
                         <small class="form-text text-muted">Data akan direktif pada tanggal ini.</small>
                     </div>
@@ -461,7 +477,6 @@
                                 <th rowspan="2">Stok Awal</th>
                                 <th colspan="3">Penerimaan Bokar (Kg KK)</th>
                                 
-                                {{-- ✅ PERBAIKAN: Diberi <br> agar "enter" --}}
                                 <th rowspan="2">Jumlah<br>Stock Bokar</th>
                                 
                                 <th colspan="2">Bokar Diproses (Kg KK)</th>
@@ -492,7 +507,6 @@ SKRIP-SKRIP JAVASCRIPT
 ======================================================================
 --}}
 
-{{-- Include Script Wajib (Template, jQuery, Bootstrap, DataTables, Flatpickr) --}}
 @include('template.script')
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
@@ -555,24 +569,17 @@ $(document).ready(function() {
                 var totalByJenis = function (jenis) {
                     
                     // 🚀 PERBAIKAN: Gunakan map() untuk membersihkan dan mengonversi string ke angka
-                    // Sebelum data masuk ke reduce, kita pastikan data tersebut murni angka
                     var dataNettoKering = api.rows({ filter: 'applied' }).data()
                         .filter(function(row) {
-                            // Filter baris berdasarkan Jenis (indeks 3)
                             return row[3] && row[3].trim() === jenis; 
                         })
                         .map(function(row) {
                             // 💥 KONVERSI KRITIS: Ambil nilai Netto Kering (indeks 8)
                             var nettoKeringStr = row[8] || '0';
-                            
-                            // Hapus semua karakter non-digit (menghilangkan koma/titik ribuan)
                             var numericValue = nettoKeringStr.toString().replace(/[^0-9]/g, ''); 
-                            
-                            // Konversi ke integer (diasumsikan netto kering adalah bilangan bulat ribuan)
                             return parseInt(numericValue) || 0; 
-                        }).toArray(); // Ubah ke array agar bisa di-reduce
+                        }).toArray();
 
-                    // Lakukan penjumlahan pada array angka yang sudah bersih
                     return dataNettoKering.reduce(function (a, b) {
                         return a + b;
                     }, 0);
@@ -626,19 +633,16 @@ $(document).ready(function() {
     });
 
     // 7. FUNGSI HELPER FORMATTING
-    
     function formatNumber(num, precision = 2) {
         if (num === null || num === undefined || num === '') return '-';
         num = parseFloat(num);
         if (isNaN(num)) return '-';
-
         return num.toLocaleString('id-ID', { 
             minimumFractionDigits: precision, 
             maximumFractionDigits: precision 
         });
     }
 
-    // Format tanggal (sisanya tetap sama)
     function formatTanggalDetail(dateStr) {
         if (!dateStr) return '-';
         try {
@@ -653,7 +657,6 @@ $(document).ready(function() {
     }
 
     // 8. LOGIKA PERHITUNGAN OTOMATIS (Modal Tambah & Edit)
-    
     function hitungNettoTambah() {
         var truck = parseFloat($('#add_berat_truck').val()) || 0;
         var timbang = parseFloat($('#add_berat_timbang').val()) || 0;
@@ -670,14 +673,15 @@ $(document).ready(function() {
     }
     $(document).on('input', '#editBeratTruck, #editBeratTimbang', hitungNettoEdit);
 
-    // 9. AJAX UNTUK MODAL (Detail & Edit) (Tetap sama)
+    // 9. AJAX UNTUK MODAL (Detail & Edit)
     $(document).on('click','.btn-detail',function(){
         var id = $(this).data('id');
         var url = "{{ url('pengolahan-basah') }}/" + id;
         
         $.get(url, function(data){
             $('#detailTanggal').text(formatTanggalDetail(data.tanggal));
-            $('#detailBakMaturasi').text(data.bak_maturasi ?? '-');
+            // 🔥 Perbaikan Tampilan Detail: Ambil nama bak dari relasi
+            $('#detailBakMaturasi').text(data.maturasi ? data.maturasi.uraian : '-');
             $('#detailJenis').text(data.jenis ?? '-');
             $('#detailBeratTruck').text(formatNumber(data.berat_truck, 0) + ' Kg');
             $('#detailBeratTimbang').text(formatNumber(data.berat_timbang, 0) + ' Kg');
@@ -694,12 +698,16 @@ $(document).ready(function() {
 
     $(document).on('click','.btn-edit',function(){
         var id = $(this).data('id');
+        var maturasiId = $(this).data('maturasi-id'); // 🔥 AMBIL ID DARI TOMBOL
         var urlGet = "{{ url('pengolahan-basah') }}/" + id + "/edit";
         var urlPost = "{{ url('pengolahan-basah') }}/" + id;
         
         $.get(urlGet, function(data){
             $('#editTanggal').val(data.tanggal);
-            $('#editBakMaturasi').val(data.bak_maturasi);
+            
+            // 🔥 SET DROPDOWN PAKE ID, BUKAN TEXT
+            $('#editBakMaturasi').val(maturasiId); 
+            
             $('#editJenis').val(data.jenis);
             $('#editBeratTruck').val(data.berat_truck);
             $('#editBeratTimbang').val(data.berat_timbang);
@@ -713,9 +721,7 @@ $(document).ready(function() {
     });
     
     // ✅ 10. LOGIKA MODAL INPUT REKTIF
-    
     $('#btnInputRektif').on('click', function() {
-        // Set tanggal modal rektif sesuai dengan tanggal filter ringkasan
         var selectedDate = $('#filter_tanggal_summary').val();
         $('#rektifTanggal').val(selectedDate);
         $('#modalInputRektif').modal('show');
@@ -723,15 +729,11 @@ $(document).ready(function() {
 
     $('#formInputRektif').on('submit', function(e) {
         e.preventDefault();
-
-        // Tampilkan loading SweetAlert
         Swal.fire({
             title: 'Memperbarui Rektifikasi...',
             text: 'Mohon tunggu sebentar.',
             allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
+            didOpen: () => { Swal.showLoading(); }
         });
 
         var formData = {
@@ -753,7 +755,6 @@ $(document).ready(function() {
                     timer: 2500
                 }).then(function() {
                     $('#modalInputRektif').modal('hide');
-                    // Muat ulang halaman untuk melihat perubahan di Ringkasan Stok
                     var currentUrl = new URL(window.location.href);
                     currentUrl.searchParams.set('tanggal', formData.tanggal);
                     window.location.href = currentUrl.toString();
@@ -769,17 +770,11 @@ $(document).ready(function() {
         });
     });
 
-    // 11. AJAX UNTUK MODAL REKAPITULASI (Tetap sama)
-    
+    // 11. AJAX UNTUK MODAL REKAPITULASI (Logic tetap sama)
     function formatRekap(num) {
         num = parseFloat(num);
-        if (isNaN(num) || num === 0) {
-            return '-';
-        }
-        return num.toLocaleString('id-ID', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 0 
-        });
+        if (isNaN(num) || num === 0) return '-';
+        return num.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
 
     $('#btnDetailRekap').on('click', function() {
@@ -787,9 +782,7 @@ $(document).ready(function() {
             title: 'Memuat Rekapitulasi...',
             text: 'Sedang mengambil data dari API dan database.',
             allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
+            didOpen: () => { Swal.showLoading(); }
         });
 
         var selectedDate = $('#filter_tanggal_summary').val(); 
@@ -798,7 +791,6 @@ $(document).ready(function() {
             { tanggal: selectedDate },
             function(response) {
                 Swal.close();
-                
                 $('#rekapBulan').text(response.bulan);
                 $('#rekapTanggal').text(response.hari_tanggal);
                 
@@ -837,8 +829,6 @@ $(document).ready(function() {
                 footer.append(`
                     <tr class="font-bold">
                         <td colspan="2">Total</td> 
-                        
-                        {{-- Data sisanya dimulai dari Stok Awal --}}
                         <td>${formatRekap(total.stok_awal)}</td>
                         <td>${formatRekap(total.penerimaan_sd_kemarin)}</td>
                         <td>${formatRekap(total.masuk_hi)}</td>
@@ -855,43 +845,27 @@ $(document).ready(function() {
                 $('#modalDetailRekap').modal('show');
             }
         ).fail(function(jqXHR, textStatus, errorThrown) {
-            Swal.fire(
-                'Gagal!',
-                'Gagal memuat data rekapitulasi. Coba lagi nanti.',
-                'error'
-            );
+            Swal.fire('Gagal!', 'Gagal memuat data rekapitulasi. Coba lagi nanti.', 'error');
             console.error("AJAX Error:", textStatus, errorThrown);
         });
     });
     
     $('#btnSyncApi').click(function(e) {
         e.preventDefault();
-        
-        // 1. Tes apakah tombol bisa diklik
-        console.log('Tombol diklik!'); 
-        
         Swal.fire({
             title: 'Menarik Data...',
             text: 'Mohon tunggu...',
             didOpen: () => { Swal.showLoading() }
         });
-
-        // 2. Tembak Route
         $.ajax({
-            url: "/sync-bokar-manual", // Kita pakai URL langsung biar aman
+            url: "/sync-bokar-manual", 
             type: "POST",
-            data: {
-                _token: $('meta[name="csrf-token"]').attr('content') // Pastikan token dikirim
-            },
+            data: { _token: $('meta[name="csrf-token"]').attr('content') },
             success: function(response) {
-                console.log('Sukses:', response);
                 Swal.fire('Berhasil!', 'Halaman akan direfresh', 'success')
-                .then(() => {
-                    location.reload();
-                });
+                .then(() => { location.reload(); });
             },
             error: function(xhr) {
-                console.log('Error:', xhr);
                 Swal.fire('Gagal', 'Cek Console Browser untuk detail', 'error');
             }
         });

@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\DataLaboratorium; // [UBAH 1] Namespace disesuaikan
+namespace App\Http\Controllers\DataLaboratorium;
 
-use App\Http\Controllers\Controller; // [UBAH 2] Import Controller induk
-use App\Models\HasilUjiMaturasi;
+use App\Http\Controllers\Controller;
+use App\Models\HasilUjiLabMaturasi; // 🔥 [PERBAIKAN] Nama Model Baru
 use App\Models\Maturasi; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -16,101 +16,87 @@ class HasilUjiMaturasiController extends Controller
 {
     public function index(): View
     {
-        $data_maturasi = HasilUjiMaturasi::orderBy('tanggal', 'desc')->get();
+        // 🔥 [PERBAIKAN] Gunakan Model Baru & Eager Loading 'maturasi'
+        $data_maturasi = HasilUjiLabMaturasi::with('maturasi')
+                                            ->orderBy('tanggal', 'desc')
+                                            ->get();
 
-        // Ambil hanya bak yang ada stok
+        // Ambil hanya bak yang ada stok untuk dropdown
+        // 🔥 [PERBAIKAN] Order by PK 'id_maturasi'
         $bak_maturasi = Maturasi::where('stok_akhir', '>', 0)
-            ->orderBy('uraian')
-            ->select('id', 'uraian') 
+            ->orderBy('id_maturasi') 
             ->get();
 
         return view('DataLaboratorium.hasil-uji-maturasi', compact('data_maturasi', 'bak_maturasi'));
     }
 
-
     public function store(Request $request): RedirectResponse
     {
+        // 🔥 PERBAIKAN: Validasi id_maturasi (bukan no_kamar/string)
         $validator = Validator::make($request->all(), [
-            'tanggal' => 'required|date',
-            'no_kamar' => 'required|string|max:255|exists:maturasis,uraian', // Validasi ke tabel maturasi
-            'k3' => 'nullable|numeric',
-            'po' => 'nullable|numeric',
-            'pa' => 'nullable|numeric',
-            'pri' => 'nullable|numeric',
+            'tanggal'     => 'required|date',
+            // 🔥 [PERBAIKAN] Validasi FK 'id_maturasi'
+            'id_maturasi' => 'required|exists:maturasi,id_maturasi', 
+            'k3'          => 'nullable|numeric',
+            'po'          => 'nullable|numeric',
+            'pa'          => 'nullable|numeric',
+            'pri'         => 'nullable|numeric',
         ],[
-            'no_kamar.exists' => 'Uraian Bak Maturasi tidak ditemukan di tabel status.'
+            'id_maturasi.exists' => 'Bak Maturasi tidak ditemukan.'
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        // 1. Simpan data uji maturasi DAN DAPATKAN ID-NYA
-        $hasilUji = HasilUjiMaturasi::create($validator->validated());
-
-        // 2. Update tabel maturasi
-        try {
-            $maturasi = Maturasi::where('uraian', $request->no_kamar)->firstOrFail();
-
-            // ==========================================================
-            // PERBAIKAN: HANYA SIMPAN ID-NYA
-            // (Kita gunakan nama kolom 'id_hasil_uji_maturasi' dari migrasi Anda)
-            // ==========================================================
-            $maturasi->id_hasil_uji_maturasi = $hasilUji->id; // <-- INI PERBAIKANNYA
-            $maturasi->save();
-            // ==========================================================
-
-        } catch (\Exception $e) {
-            Log::error("Gagal sinkronisasi hasil uji maturasi ke tabel maturasi: " . $e->getMessage());
-        }
+        // Simpan data
+        HasilUjiLabMaturasi::create($validator->validated());
 
         return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data hasil uji maturasi berhasil ditambahkan!');
     }
 
     public function show($id): JsonResponse
     {
-        $data = HasilUjiMaturasi::findOrFail($id);
+        // 🔥 [PERBAIKAN] Gunakan Model Baru (find otomatis cari di PK custom)
+        $data = HasilUjiLabMaturasi::with('maturasi')->find($id);
+        
+        if(!$data) return response()->json(['error' => 'Data tidak ditemukan'], 404);
+        
         return response()->json($data);
     }
 
     public function edit($id): JsonResponse
     {
-        $data = HasilUjiMaturasi::findOrFail($id);
+        $data = HasilUjiLabMaturasi::with('maturasi')->find($id);
+        
+        if(!$data) return response()->json(['error' => 'Data tidak ditemukan'], 404);
+        
         return response()->json($data);
     }
 
     public function update(Request $request, $id): RedirectResponse
     {
+        // 🔥 [PERBAIKAN] Cari data dulu
+        $hasilUji = HasilUjiLabMaturasi::find($id);
+        
+        if(!$hasilUji) {
+            return redirect()->back()->with('error', 'Data tidak ditemukan.');
+        }
+
         $validator = Validator::make($request->all(), [
-            'tanggal' => 'required|date',
-            'no_kamar' => 'required|string|max:255|exists:maturasis,uraian', // Validasi
-            'k3' => 'nullable|numeric',
-            'po' => 'nullable|numeric',
-            'pa' => 'nullable|numeric',
-            'pri' => 'nullable|numeric',
+            'tanggal'     => 'required|date',
+            'id_maturasi' => 'required|exists:maturasi,id_maturasi', // 🔥 Validasi FK
+            'k3'          => 'nullable|numeric',
+            'po'          => 'nullable|numeric',
+            'pa'          => 'nullable|numeric',
+            'pri'         => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $hasilUji = HasilUjiMaturasi::findOrFail($id);
         $hasilUji->update($validator->validated());
-
-        // 🔹 Setelah diupdate, sinkronkan lagi ke tabel maturasi
-        try {
-            $maturasi = Maturasi::where('uraian', $request->no_kamar)->firstOrFail();
-
-            // ==========================================================
-            // PERBAIKAN: HANYA SIMPAN ID-NYA
-            // ==========================================================
-            $maturasi->id_hasil_uji_maturasi = $hasilUji->id; // <-- INI PERBAIKANNYA
-            $maturasi->save();
-            // ==========================================================
-            
-        } catch (\Exception $e) {
-            Log::error("Gagal update hasil uji maturasi ke tabel maturasi: " . $e->getMessage());
-        }
 
         return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil diperbarui!');
     }
@@ -118,24 +104,18 @@ class HasilUjiMaturasiController extends Controller
     public function destroy($id): RedirectResponse
     {
         try {
-            $hasilUji = HasilUjiMaturasi::findOrFail($id);
+            $hasilUji = HasilUjiLabMaturasi::find($id);
             
-            // Cari maturasi yang terhubung
-            $maturasi = Maturasi::where('id_hasil_uji_maturasi', $hasilUji->id)->first();
-            
-            if ($maturasi) {
-                // Reset ID-nya di 'maturasis'
-                $maturasi->id_hasil_uji_maturasi = null;
-                $maturasi->save();
+            if ($hasilUji) {
+                $hasilUji->delete();
+                return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil dihapus!');
             }
             
-            $hasilUji->delete(); // Hapus log uji
+            return redirect()->route('hasil-uji-maturasi.index')->with('error', 'Data tidak ditemukan.');
             
         } catch (\Exception $e) {
              Log::error("Gagal menghapus hasil uji: " . $e->getMessage());
              return redirect()->route('hasil-uji-maturasi.index')->with('error', 'Gagal menghapus data.');
         }
-
-        return redirect()->route('hasil-uji-maturasi.index')->with('success', 'Data berhasil dihapus!');
     }
 }

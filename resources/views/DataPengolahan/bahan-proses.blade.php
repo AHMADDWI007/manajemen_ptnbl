@@ -134,7 +134,7 @@
                                                         {{-- 2. RESET (Hanya jika data sudah disimpan/bukan virtual) --}}
                                                         @if(!$isVirtual)
                                                             <div class="dropdown-divider"></div>
-                                                            <form action="{{ route('bahan-proses.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Yakin ingin mereset data rektifikasi ini?');">
+                                                            <form action="{{ route('bahan-proses.destroy', $item->id_bahan_proses) }}" method="POST" onsubmit="return confirm('Yakin ingin mereset data rektifikasi ini?');">
                                                                 @csrf @method('DELETE')
                                                                 <button type="submit" class="dropdown-item text-danger">
                                                                     <i class="fas fa-undo mr-2"></i> Reset

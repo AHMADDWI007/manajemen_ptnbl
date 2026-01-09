@@ -6,63 +6,92 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up(): void
+    public function up()
     {
+        // 1. TABEL UTAMA: PRODUKSI
         Schema::create('produksi_sir20', function (Blueprint $table) {
-            $table->id();
-            $table->date('tanggal')->unique();
-            
-            // 1. Remahan
-            $table->string('remah_ruang_maturasi')->nullable();
-            $table->decimal('remah_berat', 15, 2)->default(0);
-            $table->date('remah_tgl_masuk')->nullable();
-            $table->integer('remah_umur')->default(0);
-            
-            // 2. Pengeringan (Dryer)
-            $table->time('dryer_jam_start')->nullable();
-            $table->integer('dryer_troli_masuk')->default(0);
-            $table->string('dryer_aktual_temp')->nullable();
-            $table->string('dryer_waktu_cycle')->nullable();
-            
-            // Bahan Bakar & Utilitas
-            $table->decimal('bb_solar', 15, 2)->default(0);
-            $table->decimal('bb_batubara', 15, 2)->default(0);
-            $table->decimal('bb_cangkang', 15, 2)->default(0);
-            $table->decimal('jam_genset', 8, 2)->default(0);
-            $table->decimal('r_solar_ton', 15, 2)->default(0);
-            $table->decimal('listrik_kwh', 15, 2)->default(0); // Baru
-            
-            $table->integer('dryer_troli_keluar')->default(0);
-            $table->time('dryer_jam_stop')->nullable();
-            $table->decimal('dryer_jam_jalan', 8, 2)->default(0);
-            
-            // 3. Produksi (Press)
-            $table->integer('jml_bales_press')->default(0);
-            
-            // --- INI NILAI KUNCI YANG DIAMBIL WIP ---
-            $table->decimal('kg_press', 15, 2)->default(0); 
-            // ----------------------------------------
+            $table->id('id_produksi_sir20');
+            $table->date('tanggal_produksi');
+            $table->string('shift_kerja');
 
-            $table->decimal('capacity_per_jam', 15, 2)->default(0);
-            $table->decimal('jam_kerja', 8, 2)->default(0);
-            $table->decimal('produktivitas', 15, 2)->default(0);
-            $table->decimal('kg_sir_cake', 15, 2)->default(0);
+            // --- OPERASIONAL DRYER ---
+            $table->time('jam_start_dryer')->nullable();
+            $table->integer('jumlah_trolly_masuk')->default(0);
+            $table->integer('jumlah_trolly_keluar')->default(0);
+            $table->time('jam_stop_dryer')->nullable();
+            $table->float('jumlah_jam_dryer')->default(0); 
+
+            // --- PRESS & HASIL ---
+            $table->integer('jumlah_bales_dipress')->default(0);
+            $table->float('kg_yang_dipress')->default(0); 
+            $table->float('capacity_per_jam')->default(0); 
+            $table->float('jam_kerja')->default(0);
+            $table->float('produktivitas')->default(0); 
             
-            // Quality
-            $table->string('kontaminasi_logam')->nullable();
-            $table->decimal('berat_kontaminan', 8, 2)->default(0); // Baru
+            // --- QUALITY / WASTE ---
+            $table->float('kg_cake')->default(0);
+            $table->integer('bales_terkontaminasi')->default(0);
+            $table->float('berat_kontaminan')->default(0); 
+
+            // --- UTILITAS ---
+            $table->float('jam_operasional_genset')->default(0);
+            $table->float('pemakaian_listrik_pln')->default(0);
+
+            // --- PACKING ---
+            $table->integer('jumlah_pallet')->default(0);
+            $table->integer('total_nomor')->default(0);
+            $table->integer('mc_val')->default(0);
+            $table->string('nomor_start')->nullable();
+            $table->string('nomor_end')->nullable();
+            $table->integer('total_nomor_akhir')->default(0);
             
-            // 4. Packing
-            $table->integer('pack_pallet_sw')->default(0);
-            $table->string('pack_nomor')->nullable();
+            $table->string('petugas')->nullable();
+            $table->timestamps();
+        });
+
+        // 2. TABEL REMAHAN
+        Schema::create('remahan_sir20', function (Blueprint $table) {
+            $table->id('id_remahan_sir20');
+            $table->foreignId('id_produksi_sir20')
+                  ->constrained('produksi_sir20', 'id_produksi_sir20')
+                  ->onDelete('cascade');
             
-            $table->text('keterangan')->nullable();
+            $table->string('ruang_maturasi')->nullable();
+            $table->float('berat')->default(0);
+            $table->integer('umur')->default(0);
+            $table->timestamps();
+        });
+
+        // 3. TABEL AKTUAL TEMPERATURE
+        Schema::create('aktual_temperature_sir20', function (Blueprint $table) {
+            $table->id('id_aktual_temperature_sir20');
+            $table->foreignId('id_produksi_sir20')
+                  ->constrained('produksi_sir20', 'id_produksi_sir20')
+                  ->onDelete('cascade');
+            
+            $table->string('jenis');
+            $table->float('nilai_start')->default(0);
+            $table->float('nilai_end')->default(0);
+            $table->timestamps();
+        });
+
+        // 4. TABEL BAHAN BAKAR
+        Schema::create('bahan_bakar_sir20', function (Blueprint $table) {
+            $table->id('id_bahan_bakar_sir20');
+            $table->foreignId('id_produksi_sir20')
+                  ->constrained('produksi_sir20', 'id_produksi_sir20')
+                  ->onDelete('cascade');
+            $table->string('bahan_bakar');
+            $table->float('digunakan')->default(0);
             $table->timestamps();
         });
     }
 
-    public function down(): void
+    public function down()
     {
+        Schema::dropIfExists('bahan_bakar_sir20');
+        Schema::dropIfExists('aktual_temperature_sir20');
+        Schema::dropIfExists('remahan_sir20');
         Schema::dropIfExists('produksi_sir20');
     }
 };

@@ -104,12 +104,13 @@
                                                         <a class="dropdown-item btn-edit" href="javascript:void(0)" 
                                                            data-uraian="{{ $item->uraian }}"
                                                            data-hari_ini="{{ $item->hari_ini }}"
-                                                           data-ket="{{ $item->keterangan }}">
+                                                           data-ket="{{ $item->keterangan }}"
+                                                           data-id="{{ $item->id_penjualan_sir20 }}"> {{-- 🔥 UBAH INI --}}
                                                             <i class="fas fa-edit text-warning mr-2"></i> Input/Edit
                                                         </a>
                                                         <div class="dropdown-divider"></div>
-                                                        @if($item->id)
-                                                            <form action="{{ route('penjualan-sir20.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Reset data ini?');">
+                                                        @if($item->id_penjualan_sir20)
+                                                            <form action="{{ route('penjualan-sir20.destroy', $item->id_penjualan_sir20) }}" method="POST" onsubmit="return confirm('Reset data ini?');">
                                                                 @csrf @method('DELETE')
                                                                 <button type="submit" class="dropdown-item text-danger">
                                                                     <i class="fas fa-undo mr-2"></i> Reset

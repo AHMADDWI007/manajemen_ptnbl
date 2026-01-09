@@ -8,7 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transaksi_api_bokar', function (Blueprint $table) {
-            $table->id();
+            $table->id('id_transaksi_api_bokar');
             $table->date('tanggal');
             $table->string('kode_api');
             $table->decimal('masuk_sd_kemarin', 20, 2)->default(0);

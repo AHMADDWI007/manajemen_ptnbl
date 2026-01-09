@@ -8,7 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('bahan_proses', function (Blueprint $table) {
-            $table->id();
+            $table->id('id_bahan_proses');
             $table->date('tanggal')->index();
             $table->string('uraian');
             $table->decimal('saldo_awal', 15, 2)->default(0);

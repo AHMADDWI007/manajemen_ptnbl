@@ -8,7 +8,7 @@ use App\Models\PengolahanMaturasi;
 use App\Models\PengolahanBasah;
 use App\Models\TransaksiApiBokar;
 use App\Models\RektifikasiStok;
-use App\Models\ProduksiSir20; 
+use App\Models\ProduksiSir20; // Pastikan model ini ada dan sesuai
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -35,25 +35,25 @@ class BahanProsesController extends Controller
             : Carbon::today();
         
         // 🔥 STEP 1: JALANKAN KALKULASI & SIMPAN OTOMATIS
-        // Ini akan memastikan semua baris terisi di database berdasarkan data Maturasi & Produksi terbaru
         $this->recalculateAndSaveFlow($selectedDate);
 
-        // 🔥 STEP 2: AMBIL DATA YANG SUDAH DISIMPAN (Tinggal Tampil)
+        // 🔥 STEP 2: AMBIL DATA YANG SUDAH DISIMPAN
+        // Order by PK baru (id_bahan_proses) agar urutannya sesuai saat insert
         $dataProduksi = BahanProses::whereDate('tanggal', $selectedDate)
-                        ->orderBy('id') // Urutkan sesuai ID (urutan insert masterUraian)
+                        ->orderBy('id_bahan_proses') // [PERBAIKAN PK]
                         ->get();
 
         // Hitung Total untuk Footer View
         $totals = [
-            'saldo_awal' => $dataProduksi->sum('saldo_awal'),
-            'wip_masuk' => $dataProduksi->sum('wip_masuk'),
-            'wip_keluar' => $dataProduksi->sum('wip_keluar'),
+            'saldo_awal'     => $dataProduksi->sum('saldo_awal'),
+            'wip_masuk'      => $dataProduksi->sum('wip_masuk'),
+            'wip_keluar'     => $dataProduksi->sum('wip_keluar'),
             'produksi_sir20' => $dataProduksi->sum('produksi_sir20'),
-            'rekfif' => $dataProduksi->sum('rekfif'),
-            'saldo_akhir' => $dataProduksi->sum('saldo_akhir'),
+            'rekfif'         => $dataProduksi->sum('rekfif'),
+            'saldo_akhir'    => $dataProduksi->sum('saldo_akhir'),
         ];
 
-        // Hitung Grand Total Neraca Massa (Data Pendukung Footer)
+        // Hitung Grand Total Neraca Massa
         $stokAkhirBokar = $this->getStokAkhirBokar($selectedDate);
         $stokAkhirMaturasi = $this->getStokAkhirMaturasi($selectedDate);
         
@@ -61,43 +61,43 @@ class BahanProsesController extends Controller
         $grandTotalKeterangan = $totals['saldo_akhir'] + $stokAkhirMaturasi;
 
         return view('DataPengolahan.bahan-proses', [
-            'data_produksi' => $dataProduksi,
-            'selectedDate' => $selectedDate,
-            'totals' => $totals,
-            'grandTotalSaldoAkhir' => $grandTotalSaldoAkhir,
-            'grandTotalKeterangan' => $grandTotalKeterangan,
-            'detail_bokar' => $stokAkhirBokar,
-            'detail_maturasi' => $stokAkhirMaturasi,
-            'detail_wip' => $totals['saldo_akhir']
+            'data_produksi'       => $dataProduksi,
+            'selectedDate'        => $selectedDate,
+            'totals'              => $totals,
+            'grandTotalSaldoAkhir'=> $grandTotalSaldoAkhir,
+            'grandTotalKeterangan'=> $grandTotalKeterangan,
+            'detail_bokar'        => $stokAkhirBokar,
+            'detail_maturasi'     => $stokAkhirMaturasi,
+            'detail_wip'          => $totals['saldo_akhir']
         ]);
     }
 
     /**
      * FUNGSI UTAMA: MENGHITUNG DAN MENYIMPAN ALUR PROSES
-     * Dipanggil saat Index (Buka Halaman) dan Store (Simpan Rektif)
      */
     private function recalculateAndSaveFlow($date)
     {
-        // 1. Ambil Input Awal dari Maturasi (Total Diolah - Mutasi)
+        // 1. Ambil Input Awal dari Maturasi
         $maturasiToday = PengolahanMaturasi::whereDate('tgl_laporan', $date)
             ->selectRaw('SUM(diolah) as total_diolah, SUM(mutasi) as total_mutasi')->first();
         $inputDariMaturasi = $maturasiToday ? ($maturasiToday->total_diolah - $maturasiToday->total_mutasi) : 0;
 
-        // 2. Ambil Angka Produksi Real dari LHP (Menu Produksi SIR 20)
-        $realProduction = ProduksiSir20::whereDate('tanggal', $date)->sum('kg_press'); 
+        // 2. Ambil Angka Produksi Real
+        // Asumsi ProduksiSir20 belum diubah PK-nya, jika sudah sesuaikan
+        $realProduction = ProduksiSir20::whereDate('tanggal_produksi', $date)->sum('kg_yang_dipress');
 
-        $prevWipKeluar = 0; // Variabel estafet
+        $prevWipKeluar = 0; 
 
         foreach ($this->masterUraian as $index => $uraian) {
             
-            // A. Ambil Data yang ada saat ini (untuk mempertahankan Rektif user)
+            // A. Ambil Data (Rektif User)
             $existingRow = BahanProses::whereDate('tanggal', $date)
                             ->where('uraian', $uraian)->first();
             
             $rektifUser = $existingRow ? $existingRow->rekfif : 0;
             $ketUser = $existingRow ? $existingRow->keterangan : '-';
 
-            // B. Cari Saldo Awal (Dari Saldo Akhir data terakhir sebelum hari ini)
+            // B. Cari Saldo Awal (H-1)
             $lastData = BahanProses::where('uraian', $uraian)
                 ->whereDate('tanggal', '<', $date)
                 ->orderBy('tanggal', 'desc')
@@ -106,51 +106,43 @@ class BahanProsesController extends Controller
 
             // C. Tentukan WIP Masuk
             if ($index === 0) {
-                // Tahap 1: Dari Maturasi
                 $wipMasuk = $inputDariMaturasi;
             } else {
-                // Tahap Selanjutnya: Dari Output Mesin Sebelumnya
                 $wipMasuk = $prevWipKeluar;
             }
 
-            // D. Hitung WIP Keluar, Produksi, dan Saldo Akhir
+            // D. Hitung WIP Keluar & Saldo Akhir
             $produksi = 0;
             $wipKeluar = 0;
             $saldoAkhir = 0;
 
             if ($uraian == 'Di Dalam Dryer/Press Bale') {
-                // --- DRYER (Barang Jadi) ---
+                // DRYER (Barang Jadi)
                 $produksi = $realProduction;
                 $wipKeluar = $produksi; 
-                // Saldo Akhir = (Sisa + Masuk) - (Produksi) + Rektif
                 $saldoAkhir = $saldoAwal + $wipMasuk - $produksi + $rektifUser;
             } else {
-                // --- MESIN PERANTARA (Continuous Flow) ---
+                // MESIN PERANTARA
                 $produksi = 0;
-                
-                // Target Saldo Akhir = Saldo Awal + Rektif (Koreksi Fisik)
                 $targetSaldoAkhir = $saldoAwal + $rektifUser;
                 $saldoAkhir = max(0, $targetSaldoAkhir); 
-
-                // Yang Keluar = (Yang Tersedia) - (Yang Ditahan di Akhir)
                 $wipKeluar = max(0, ($saldoAwal + $wipMasuk) - $saldoAkhir);
             }
 
-            // E. SIMPAN KE DATABASE (Update atau Create)
+            // E. SIMPAN KE DATABASE
             BahanProses::updateOrCreate(
                 ['tanggal' => $date->format('Y-m-d'), 'uraian' => $uraian],
                 [
-                    'saldo_awal' => $saldoAwal,
-                    'wip_masuk' => $wipMasuk,
-                    'wip_keluar' => $wipKeluar,
+                    'saldo_awal'     => $saldoAwal,
+                    'wip_masuk'      => $wipMasuk,
+                    'wip_keluar'     => $wipKeluar,
                     'produksi_sir20' => $produksi,
-                    'rekfif' => $rektifUser, // Pastikan rektif user tidak hilang
-                    'saldo_akhir' => $saldoAkhir,
-                    'keterangan' => $ketUser
+                    'rekfif'         => $rektifUser,
+                    'saldo_akhir'    => $saldoAkhir,
+                    'keterangan'     => $ketUser
                 ]
             );
 
-            // Set nilai estafet untuk loop berikutnya
             $prevWipKeluar = $wipKeluar;
         }
     }
@@ -166,17 +158,16 @@ class BahanProsesController extends Controller
 
         if ($validator->fails()) return redirect()->back()->withErrors($validator);
 
-        // 1. Simpan Rektif User Terlebih Dahulu
+        // 1. Simpan Rektif User
         BahanProses::updateOrCreate(
             ['tanggal' => $request->tanggal_input, 'uraian' => $request->uraian],
             [
-                'rekfif' => $request->rekfif ?? 0,
+                'rekfif'     => $request->rekfif ?? 0,
                 'keterangan' => $request->keterangan
             ]
         );
 
-        // 2. TRIGGER RE-CALCULATE (Chain Reaction)
-        // Karena mengubah rektif di tahap 2 akan mengubah 'Masuk' di tahap 3, dst.
+        // 2. TRIGGER RE-CALCULATE
         $this->recalculateAndSaveFlow(Carbon::parse($request->tanggal_input));
 
         return redirect()->back()->with('success', 'Koreksi stok berhasil disimpan dan alur proses diperbarui.');
@@ -184,39 +175,35 @@ class BahanProsesController extends Controller
 
     public function destroy($id)
     {
-        $data = BahanProses::findOrFail($id);
+        // [PERBAIKAN PK] Cari berdasarkan id_bahan_proses
+        $data = BahanProses::where('id_bahan_proses', $id)->firstOrFail();
         $date = Carbon::parse($data->tanggal);
 
         // Reset rektif user jadi 0
         $data->update([
-            'rekfif' => 0,
+            'rekfif'     => 0,
             'keterangan' => null
         ]);
 
-        // Hitung ulang lagi agar saldo kembali normal (default sistem)
+        // Hitung ulang
         $this->recalculateAndSaveFlow($date);
         
         return redirect()->back()->with('success', 'Data Rektifikasi di-reset ke default sistem.');
     }
 
-    // --- Helper Functions (Tidak Berubah) ---
+    // --- Helper Functions ---
     private function getStokAkhirBokar($date) {
         try {
-            // A. Total Masuk (FILTER KODE API AGAR TIDAK DOUBLE COUNT)
-            // Kita hanya ambil komponen pembentuknya, abaikan 'total'
             $total_masuk = TransaksiApiBokar::whereDate('tanggal', '<=', $date)
-                ->whereIn('kode_api', ['petani', 'ptpn', 'inhut']) // <--- WAJIB ADA INI
+                ->whereIn('kode_api', ['petani', 'ptpn', 'inhut'])
                 ->sum('masuk_hi');
             
-            // B. Total Diolah (Pengurang Stok) -> Pakai Netto Kering
             $total_diolah = PengolahanBasah::whereDate('tanggal', '<=', $date)
                 ->sum('netto_kering');
             
-            // C. Total Rektif (Koreksi)
             $total_rektif = RektifikasiStok::whereDate('tanggal', '<=', $date)
                 ->sum('berat');
             
-            // Rumus: Masuk - Keluar + Rektif
             return max(0, $total_masuk - $total_diolah + $total_rektif);
             
         } catch (\Exception $e) { return 0; }

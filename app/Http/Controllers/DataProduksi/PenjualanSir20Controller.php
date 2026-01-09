@@ -15,26 +15,37 @@ class PenjualanSir20Controller extends Controller
     public function recalculateAndSave($tgl, $uraian, $hari_ini, $keterangan = null)
     {
         $tglCarbon = Carbon::parse($tgl);
+        
+        // 1. Ambil Data Akhir Bulan Lalu (untuk saldo awal bulan ini)
         $lastMonthDate = $tglCarbon->copy()->subMonth()->endOfMonth();
-        $dataBulanLalu = PenjualanSir20::where('uraian', $uraian)->whereDate('tanggal', $lastMonthDate)->first();
+        $dataBulanLalu = PenjualanSir20::where('uraian', $uraian)
+                                       ->whereDate('tanggal', $lastMonthDate)
+                                       ->first();
         $sd_bulan_lalu = $dataBulanLalu ? $dataBulanLalu->total_sd_hari_ini : 0;
 
+        // 2. Ambil Data Kemarin (untuk akumulasi bulan ini)
         $yesterday = $tglCarbon->copy()->subDay();
-        $dataKemarin = PenjualanSir20::where('uraian', $uraian)->whereDate('tanggal', $yesterday)->first();
+        $dataKemarin = PenjualanSir20::where('uraian', $uraian)
+                                     ->whereDate('tanggal', $yesterday)
+                                     ->first();
+                                     
+        // Jika tanggal 1, akumulasi bulan ini direset jadi 0
         $bln_ini_lalu = ($tglCarbon->day == 1) ? 0 : ($dataKemarin ? ($dataKemarin->bln_ini_lalu + $dataKemarin->hari_ini) : 0);
 
+        // 3. Hitung Total Baru
         $total_bln_ini = $bln_ini_lalu + $hari_ini;
         $total_sd_hari_ini = $sd_bulan_lalu + $total_bln_ini;
 
+        // 4. Simpan ke Database
         PenjualanSir20::updateOrCreate(
             ['tanggal' => $tglCarbon->format('Y-m-d'), 'uraian' => $uraian],
             [
-                'sd_bulan_lalu' => $sd_bulan_lalu,
-                'bln_ini_lalu' => $bln_ini_lalu,
-                'hari_ini' => $hari_ini,
-                'total_bln_ini' => $total_bln_ini,
+                'sd_bulan_lalu'     => $sd_bulan_lalu,
+                'bln_ini_lalu'      => $bln_ini_lalu,
+                'hari_ini'          => $hari_ini,
+                'total_bln_ini'     => $total_bln_ini,
                 'total_sd_hari_ini' => $total_sd_hari_ini,
-                'keterangan' => $keterangan
+                'keterangan'        => $keterangan
             ]
         );
     }
@@ -46,9 +57,13 @@ class PenjualanSir20Controller extends Controller
             : Carbon::today();
 
         $headerBulanLalu = $selectedDate->copy()->subMonth()->translatedFormat('F Y');
+        
+        // Ambil data hari ini, kemarin, dan akhir bulan lalu untuk kalkulasi tampilan
         $dataDB = PenjualanSir20::whereDate('tanggal', $selectedDate)->get()->keyBy('uraian');
+        
         $yesterday = $selectedDate->copy()->subDay();
         $dataKemarin = PenjualanSir20::whereDate('tanggal', $yesterday)->get()->keyBy('uraian');
+        
         $lastMonthDate = $selectedDate->copy()->subMonth()->endOfMonth();
         $dataBulanLalu = PenjualanSir20::whereDate('tanggal', $lastMonthDate)->get()->keyBy('uraian');
 
@@ -64,12 +79,14 @@ class PenjualanSir20Controller extends Controller
             $itemKemarin = $dataKemarin[$uraian] ?? null;
             $itemBulanLalu = $dataBulanLalu[$uraian] ?? null;
 
+            // Logika Saldo Awal (s/d Bulan Lalu)
             if ($itemToday) {
                 $sd_bulan_lalu = $itemToday->sd_bulan_lalu;
             } else {
                 $sd_bulan_lalu = $itemBulanLalu ? $itemBulanLalu->total_sd_hari_ini : 0;
             }
 
+            // Logika Akumulasi Bulan Ini (Yg Lalu)
             if ($selectedDate->day == 1) {
                 $bln_ini_lalu = 0;
             } else {
@@ -85,21 +102,21 @@ class PenjualanSir20Controller extends Controller
             $total_sd_hari_ini = $sd_bulan_lalu + $total_bln_ini;
 
             $tabelData->push((object)[
-                'id' => $itemToday->id ?? null,
-                'no' => $no,
-                'uraian' => $uraian,
-                'sd_bulan_lalu' => $sd_bulan_lalu,
-                'bln_ini_lalu' => $bln_ini_lalu,
-                'hari_ini' => $hari_ini,
-                'total_bln_ini' => $total_bln_ini,
+                'id_penjualan_sir20' => $itemToday->id_penjualan_sir20 ?? null, // 🔥 PK Baru
+                'no'                => $no,
+                'uraian'            => $uraian,
+                'sd_bulan_lalu'     => $sd_bulan_lalu,
+                'bln_ini_lalu'      => $bln_ini_lalu,
+                'hari_ini'          => $hari_ini,
+                'total_bln_ini'     => $total_bln_ini,
                 'total_sd_hari_ini' => $total_sd_hari_ini,
-                'keterangan' => $itemToday->keterangan ?? '-',
+                'keterangan'        => $itemToday->keterangan ?? '-',
             ]);
         }
 
         return view('DataProduksi.penjualan-sir20', [
-            'tabelData' => $tabelData,
-            'selected_date' => $selectedDate->format('Y-m-d'),
+            'tabelData'       => $tabelData,
+            'selected_date'   => $selectedDate->format('Y-m-d'),
             'headerBulanLalu' => $headerBulanLalu
         ]);
     }
@@ -107,34 +124,31 @@ class PenjualanSir20Controller extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'tanggal' => 'required|date',
-            'uraian' => 'required|string',
+            'tanggal'  => 'required|date',
+            'uraian'   => 'required|string',
             'hari_ini' => 'required|numeric|min:0',
         ]);
 
-        $tgl = $request->tanggal;
-        $uraian = $request->uraian;
-        $hari_ini = $request->hari_ini;
-        $keterangan = $request->keterangan;
-
-        $this->recalculateAndSave($tgl, $uraian, $hari_ini, $keterangan);
+        $this->recalculateAndSave(
+            $request->tanggal, 
+            $request->uraian, 
+            $request->hari_ini, 
+            $request->keterangan
+        );
         
-        return redirect()->route('penjualan-sir20.index', ['filter_tanggal' => Carbon::parse($tgl)->format('Y-m-d')])
+        return redirect()->route('penjualan-sir20.index', ['filter_tanggal' => Carbon::parse($request->tanggal)->format('Y-m-d')])
                          ->with('success', 'Data Penjualan berhasil disimpan.');
     }
 
-    // --- FUNGSI BARU UNTUK AJAX ---
+    // --- FUNGSI BARU UNTUK AJAX (Ambil data dari Gudang) ---
     public function getPengirimanGudang(Request $request)
     {
         $date = $request->date;
         
-        // Debugging (Cek di Laravel.log jika perlu)
-        // \Log::info('AJAX Request Date: ' . $date);
-
-        // Pastikan 'uraian' sesuai persis dengan database
+        // Ambil data pengiriman dari Tabel IV (Gudang SIR) di hari yang sama
         $gudangSir = ProduksiSir::where('uraian', 'Di Gudang SIR')
-                        ->whereDate('created_at', $date)
-                        ->first();
+                                ->whereDate('created_at', $date)
+                                ->first();
                         
         $pengiriman = $gudangSir ? $gudangSir->pengiriman : 0;
         
@@ -143,7 +157,9 @@ class PenjualanSir20Controller extends Controller
 
     public function destroy($id)
     {
-        $data = PenjualanSir20::find($id);
+        // 🔥 [PERBAIKAN] Cari menggunakan PK Baru
+        $data = PenjualanSir20::find($id); // find() otomatis cari di PK model
+        
         if ($data) {
             $data->delete();
             return back()->with('success', 'Data berhasil di-reset.');

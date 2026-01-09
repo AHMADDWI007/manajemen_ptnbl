@@ -10,15 +10,12 @@ class PenjualanSir20 extends Model
     use HasFactory;
 
     protected $table = 'penjualan_sir20';
-    
+    protected $primaryKey = 'id_penjualan_sir20';
     protected $guarded = [];
 
     protected $casts = [
         'tanggal' => 'date',
-        'sd_bulan_lalu' => 'float',
-        'bln_ini_lalu' => 'float',
-        'hari_ini' => 'float',
-        'total_bln_ini' => 'float',
-        'total_sd_hari_ini' => 'float',
+        'sd_bulan_lalu' => 'float', 'bln_ini_lalu' => 'float', 'hari_ini' => 'float',
+        'total_bln_ini' => 'float', 'total_sd_hari_ini' => 'float',
     ];
 }

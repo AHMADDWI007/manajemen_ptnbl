@@ -9,11 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('penjualan_sir20', function (Blueprint $table) {
-            $table->id();
-            $table->date('tanggal')->index(); // Kunci Pencarian Utama
+            $table->id('id_penjualan_sir20');
+            $table->date('tanggal')->index();
             $table->string('uraian');
             
-            // Kolom Data
             $table->decimal('sd_bulan_lalu', 15, 2)->default(0);
             $table->decimal('bln_ini_lalu', 15, 2)->default(0);
             $table->decimal('hari_ini', 15, 2)->default(0);

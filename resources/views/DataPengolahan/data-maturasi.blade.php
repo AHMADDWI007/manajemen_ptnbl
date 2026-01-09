@@ -166,7 +166,9 @@
                                         <td>{{ number_format($item->masuk_hi, 0, ',', '.') }}</td>
                                         
                                         {{-- QUALITY: Murni dari Hasil Uji Maturasi ($item->k3 di Controller sudah diperbaiki) --}}
-                                        <td>{{ $item->k3 > 0 ? number_format($item->k3, 2) : '-' }}</td>
+                                        <td class="text-center font-weight-bold text-dark">
+                                            {{ $item->k3_olah > 0 ? number_format($item->k3_olah, 2) : '-' }}
+                                        </td>
                                         <td>{{ $item->po > 0 ? $item->po : '-' }}</td>
                                         <td>{{ $item->pri > 0 ? $item->pri : '-' }}</td>
                                         
@@ -179,20 +181,20 @@
                                         {{-- Aksi --}}
                                         <td>
                                             <div class="dropdown">
-                                                <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $item->id }}" data-toggle="dropdown" aria-expanded="false">
+                                                <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $item->id_maturasi }}" data-toggle="dropdown" aria-expanded="false">
                                                     Aksi
                                                 </button>
-                                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $item->id }}">
+                                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $item->id_maturasi }}">
                                                     <a class="dropdown-item btn-detail" href="javascript:void(0)"
                                                        data-uraian="{{ $item->uraian }}"
                                                        data-tanggal="{{ $selected_date }}">
                                                         <i class="fas fa-eye text-info mr-2"></i> Detail
                                                     </a>
                                                     <a class="dropdown-item btn-edit" href="javascript:void(0)"
-                                                       data-id="{{ $item->id }}">
+                                                       data-id="{{ $item->id_maturasi }}">
                                                         <i class="fas fa-edit text-warning mr-2"></i> Edit
                                                     </a>
-                                                    <form action="{{ route('maturasi.reset', $item->id) }}" method="POST"
+                                                    <form action="{{ route('maturasi.reset', $item->id_maturasi) }}" method="POST"
                                                     class="reset-form" style="display:inline;">
                                                     @csrf 
                                                         <button type="submit" class="dropdown-item text-danger">
@@ -243,7 +245,9 @@
         </div>
     </div>
 
-    @include('template.footer')
+    <footer class="main-footer"> 
+        @include('template.footer') 
+    </footer>
 </div>
 
 {{-- ============================================= --}}
@@ -584,29 +588,66 @@ $(document).ready(function() {
     });
 
     $(document).on('click', '.btn-edit', function () {
+        console.log('Tombol Edit Diklik');
+
         var id = $(this).data('id');
+        
+        // 🔥 PERBAIKAN: Ambil tanggal dari input filter di atas tabel
+        var filterTanggal = $('input[name="filter_tanggal"]').val(); 
+        
         var urlGet = "{{ url('maturasi') }}/" + id + "/edit";
         var urlPost = "{{ url('maturasi') }}/" + id;
-        $.get(urlGet, function (data) {
-             let tglModal = data.updated_at ? formatTanggalModal(data.updated_at.split('T')[0]) : '';
-             $('#editTanggalInput').val(tglModal).trigger('change');
-             $('#editUraian').val(data.uraian);
-             $('#editStokAwal').val(data.stok_awal !== null ? parseFloat(data.stok_awal).toFixed(2) : '0');
-             $('#editUmur').val(data.umur !== null ? data.umur : 0);
-             $('#editTglMasuk').val(data.tgl_masuk ? formatTanggalModal(data.tgl_masuk) : '');
-             $('#editDiolah').val(data.diolah !== null ? parseFloat(data.diolah).toFixed(2) : '0');
-             $('#editMutasi').val(data.mutasi !== null ? parseFloat(data.mutasi).toFixed(2) : '0');
-             $('#editMasukHi').val(data.masuk_hi !== null ? parseFloat(data.masuk_hi).toFixed(2) : '0');
-             $('#editK3Masuk').val(data.k3_masuk ?? 0);
-             $('#editK3Olah').val(data.k3_olah ?? 0);
-             $('#editPO').val(data.po ?? '');
-             $('#editPRI').val(data.pri ?? '');
-             $('#editTglUji').val(data.tgl_uji ? formatTanggalModal(data.tgl_uji) : '');
-             $('#editAsalBokar').val(data.asal_bokar);
-             $('#formEdit').attr('action', urlPost);
-             $('#formEdit').attr('data-error-id', id);
-             $('#modalEdit').modal('show');
-         });
+
+        // Swal.fire({title: 'Memuat Data...', didOpen: () => Swal.showLoading()});
+
+        // 🔥 PERBAIKAN: Kirim parameter filter_tanggal ke Controller
+        $.ajax({
+            url: urlGet,
+            type: 'GET',
+            data: { filter_tanggal: filterTanggal }, // <-- INI KUNCINYA
+            success: function(data) {
+                Swal.close();
+                console.log('Data Edit Diterima:', data);
+
+                // --- Pengisian Form ---
+                
+                // Set Tanggal Input sesuai Filter Tanggal (dari updated_at controller)
+                $('#editTanggalInput').val(data.updated_at);
+
+                $('#editUraian').val(data.uraian);
+                
+                // Gunakan parseFloat agar angka '0.00' tidak error
+                $('#editStokAwal').val(parseFloat(data.stok_awal || 0));
+                $('#editUmur').val(data.umur || 0);
+                
+                // Tgl Masuk (sudah diformat Y-m-d di controller)
+                $('#editTglMasuk').val(data.tgl_masuk || '');
+                
+                $('#editDiolah').val(parseFloat(data.diolah || 0));
+                $('#editMutasi').val(parseFloat(data.mutasi || 0));
+                $('#editMasukHi').val(parseFloat(data.masuk_hi || 0));
+                
+                // Logic CMP (Asal Bokar)
+                let asal = data.asal_bokar;
+                if (asal && asal.includes('CMP')) {
+                    $('#editAsalBokar').val('CMP');
+                } else {
+                    $('#editAsalBokar').val(asal);
+                }
+
+                $('#editKeterangan').val(data.keterangan);
+
+                // Update Action Form
+                $('#formEdit').attr('action', urlPost);
+                $('#formEdit').attr('data-error-id', id);
+
+                $('#modalEdit').modal('show');
+            },
+            error: function(xhr) {
+                Swal.fire('Error', 'Gagal memuat data. Cek Console.', 'error');
+                console.error(xhr);
+            }
+        });
     });
 
     @if (session('success'))

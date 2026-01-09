@@ -20,16 +20,16 @@ class DatabaseSeeder extends Seeder
             MaturasiSeeder::class,
 
             // 2. Data Transaksi Harian (Bokar -> Maturasi)
-            DummyPengolahanBasahSeeder::class,
+            // DummyPengolahanBasahSeeder::class,
 
             // 3. Koreksi Data WIP (Terakhir, karena butuh data referensi)
-            PerbaikanDataSaldoSeeder::class,
+            // PerbaikanDataSaldoSeeder::class,
 
             // 4. Saldo Awal Gudang Produksi SIR
-            SaldoAwalGudangSeeder::class,
+            // SaldoAwalGudangSeeder::class,
 
             // 5. Saldo Awal Penjualan SIR20
-            PenjualanAwalSeeder::class,
+            // PenjualanAwalSeeder::class,
         ]);
     }
 }

@@ -1,39 +1,29 @@
 <?php
 
-namespace App\Http\Controllers\DataPengolahan; // [UBAH 1] Namespace Baru
+namespace App\Http\Controllers\DataPengolahan;
 
-use App\Http\Controllers\Controller; // [UBAH 2] Import Controller Induk
+use App\Http\Controllers\Controller;
 use App\Models\Maturasi;
 use App\Models\PengolahanBasah;
 use App\Models\PengolahanMaturasi;
-use App\Models\TransaksiApiBokar; // Model API
-use App\Models\RektifikasiStok;   // Model Rektif Baru
+use App\Models\TransaksiApiBokar;
+use App\Models\RektifikasiStok;
 use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class PengolahanBasahController extends Controller
 {
-    // ==========================================================
-    // FUNGSI UTAMA (INDEX, STORE, SHOW, EDIT, UPDATE, DESTROY)
-    // ==========================================================
-
     public function index(Request $request)
     {
-        // QUERY LEBIH BERSIH: Data murni produksi, tanpa filter aneh-aneh
-        $data_pengolahan = PengolahanBasah::orderBy('tanggal', 'desc')->get();
+        // 🔥 [PERBAIKAN] Menggunakan relasi 'maturasi' yang sudah didefinisikan di Model
+        $data_pengolahan = PengolahanBasah::with('maturasi')->orderBy('tanggal', 'desc')->get();
 
         $selected_date_str = $request->query('tanggal');
-        try {
-            $today = $selected_date_str ? Carbon::parse($selected_date_str) : Carbon::today();
-        } catch (Exception $e) {
-            $today = Carbon::today();
-        }
+        $today = $selected_date_str ? Carbon::parse($selected_date_str) : Carbon::today();
 
-        // Inisialisasi Default Summary
+        // Init Summary
         $summary_data = [
             'stok_awal'          => 0,
             'masuk_hi'           => 0,
@@ -45,7 +35,6 @@ class PengolahanBasahController extends Controller
         ];
 
         try {
-            // Hitung total menggunakan data dari 3 Tabel berbeda (Lokal)
             $result = $this->calculateAllRecapTotals($today);
             $all_totals = $result['total'];
 
@@ -57,11 +46,8 @@ class PengolahanBasahController extends Controller
             $summary_data['stok_akhir']         = $all_totals['stok_akhir'];
             $summary_data['jumlah_stock_bokar'] = $all_totals['jumlah_stock_bokar'];
 
-        } catch (Exception $e) {
-            // Silent error
-        }
+        } catch (Exception $e) { }
 
-        // total_data diisi 0 (karena dihitung JS di frontend untuk DataTables)
         $total_data = [
             'total_pt_netto_kering'    => 0,
             'total_ds_netto_kering'    => 0,
@@ -69,183 +55,91 @@ class PengolahanBasahController extends Controller
             'jumlah_netto_kering'      => 0,
         ];
 
-        return view('DataPengolahan.pengolahan-basah', compact(
-            'data_pengolahan',
-            'summary_data',
-            'total_data',
-            'today'
-        ));
+        return view('DataPengolahan.pengolahan-basah', compact('data_pengolahan', 'summary_data', 'total_data', 'today'));
     }
 
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'tanggal'       => 'required|date',
-            'bak_maturasi'  => 'required|string',
+            // 🔥 [PERBAIKAN] Validasi FK ke tabel 'maturasi' kolom 'id_maturasi'
+            'id_maturasi'   => 'required|exists:maturasi,id_maturasi', 
             'jenis'         => 'required|string|in:PT,DS,INHUT',
             'berat_truck'   => 'required|numeric|min:0',
             'berat_timbang' => 'required|numeric|min:' . $request->input('berat_truck', 0),
-        ], [
-            'berat_timbang.min' => 'Berat Timbang harus lebih besar dari Berat Truck.'
         ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
+        if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
 
         $data = $validator->validated();
         $netto_basah = $data['berat_timbang'] - $data['berat_truck'];
 
-        // Create Data Pengolahan Basah (Murni Produksi)
+        // 🔥 [PERBAIKAN] Pastikan field foreign key pakai 'id_maturasi' (sesuai $fillable/guarded model)
         PengolahanBasah::create(array_merge($data, [
             'netto_basah'  => $netto_basah,
             'k3'           => null,
             'netto_kering' => null,
-            'rektif'       => 0, // Pastikan 0, karena rektif punya tabel sendiri
         ]));
 
-        // Update Maturasi (Logika tetap sama)
-        $bak = $data['bak_maturasi'];
-        $jenis = strtoupper($data['jenis']);
-        $maturasi = Maturasi::where('uraian', 'LIKE', "%$bak%")->first();
+        $this->updateMaturasiTrigger($data['id_maturasi'], $data['jenis'], $data['tanggal']);
 
-        if ($maturasi) {
-            $asalSebelumnya = $maturasi->asal_bokar;
-            
-            if (!$asalSebelumnya) {
-                $asalBaru = $jenis;
-            } else {
-                if ($asalSebelumnya !== $jenis && $asalSebelumnya !== 'CMP') {
-                    $asalBaru = 'CMP';
-                } else {
-                    $asalBaru = $asalSebelumnya;
-                }
-            }
-            
-            $maturasi->update(['asal_bokar' => $asalBaru]);
-            
-            PengolahanMaturasi::create([
-                'maturasi_id' => $maturasi->id,
-                'tgl_laporan' => $data['tanggal'],
-                'masuk_hi'    => $netto_basah,
-                'diolah'      => 0,
-                'mutasi'      => 0,
-                'keterangan'  => 'Auto-import dari Pengolahan Basah (' . $jenis . ')',
-            ]);
-        }
-
-        return redirect()->route('pengolahan-basah.index')
-            ->with('success', 'Data produksi berhasil ditambahkan.');
+        return redirect()->route('pengolahan-basah.index')->with('success', 'Data produksi berhasil ditambahkan.');
     }
 
-    public function show($id)
-    {
-        $data = PengolahanBasah::find($id);
-        return response()->json($data);
+    public function show($id) 
+    { 
+        // 🔥 [PERBAIKAN] find($id) otomatis cari di PK model (id_pengolahan_basah)
+        return response()->json(PengolahanBasah::with('maturasi')->find($id)); 
     }
 
-    public function edit($id)
-    {
-        $data = PengolahanBasah::find($id);
-        return response()->json($data);
+    public function edit($id) 
+    { 
+        return response()->json(PengolahanBasah::with('maturasi')->find($id)); 
     }
-
-    public function update(Request $request, $id)
+    
+    public function update(Request $request, $id) 
     {
-        $validator = Validator::make($request->all(), [
-            'tanggal'       => 'required|date',
-            'bak_maturasi'  => 'required|string',
-            'jenis'         => 'required|string|in:PT,DS,INHUT',
-            'berat_truck'   => 'required|numeric|min:0',
-            'berat_timbang' => 'required|numeric|min:' . $request->input('berat_truck', 0),
-        ], [
-            'berat_timbang.min' => 'Berat Timbang harus lebih besar dari Berat Truck.'
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
+        $pengolahan = PengolahanBasah::find($id);
         
-        $data = $validator->validated();
-        $netto_basah = $data['berat_timbang'] - $data['berat_truck'];
+        if(!$pengolahan) return redirect()->back()->with('error', 'Data tidak ditemukan');
 
-        $pengolahan = PengolahanBasah::find($id);
-        $pengolahan->update(array_merge($data, [
-            'netto_basah' => $netto_basah,
-        ]));
-
-        return redirect()->route('pengolahan-basah.index')
-            ->with('success', 'Data produksi berhasil diperbarui.');
+        $netto_basah = $request->berat_timbang - $request->berat_truck;
+        
+        // Pastikan request mengirim 'id_maturasi' jika diedit
+        $pengolahan->update(array_merge($request->all(), ['netto_basah' => $netto_basah]));
+        
+        return redirect()->route('pengolahan-basah.index')->with('success', 'Data diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy($id) 
     {
         $pengolahan = PengolahanBasah::find($id);
-        $pengolahan->delete();
-        return redirect()->route('pengolahan-basah.index')
-            ->with('success', 'Data produksi berhasil dihapus.');
+        if($pengolahan) $pengolahan->delete();
+        
+        return redirect()->route('pengolahan-basah.index')->with('success', 'Data dihapus.');
     }
 
-    // =====================================================
-    // FUNGSI REKTIF (MENGGUNAKAN TABEL BARU)
-    // =====================================================
-
-    public function updateRektif(Request $request)
+    public function updateRektif(Request $request) 
     {
-        $validator = Validator::make($request->all(), [
-            'jenis'   => 'required|string|in:PT,DS,INHUT',
-            'tanggal' => 'required|date',
-            'rektif'  => 'required|numeric',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        $data = $validator->validated();
-
-        try {
-            // SIMPAN KE TABEL 'rektifikasi_stok'
-            RektifikasiStok::updateOrCreate(
-                [
-                    'tanggal' => $data['tanggal'],
-                    'jenis'   => $data['jenis'],
-                ],
-                [
-                    'berat'      => $data['rektif'],
-                    'keterangan' => 'Input via Modal Rektif',
-                ]
-            );
-
-            return response()->json(['success' => true, 'message' => 'Rektif berhasil diperbarui.']);
-
-        } catch (Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Gagal memperbarui database.'], 500);
-        }
+        RektifikasiStok::updateOrCreate(
+            ['tanggal' => $request->tanggal, 'jenis' => $request->jenis],
+            ['berat' => $request->rektif, 'keterangan' => 'Input via Modal Rektif']
+        );
+        return response()->json(['success' => true]);
     }
-
-    // =====================================================
-    // FUNGSI REKAP (GABUNGAN 3 TABEL)
-    // =====================================================
 
     public function rekap(Request $request)
     {
-        try {
-            $selected_date_str = $request->query('tanggal');
-            $today = $selected_date_str ? Carbon::parse($selected_date_str) : Carbon::today();
+        $selected_date_str = $request->query('tanggal');
+        $today = $selected_date_str ? Carbon::parse($selected_date_str) : Carbon::today();
+        $result = $this->calculateAllRecapTotals($today, true);
 
-            $result = $this->calculateAllRecapTotals($today, true);
-
-            return response()->json([
-                'bulan'        => $today->translatedFormat('F Y'),
-                'hari_tanggal' => $today->translatedFormat('l, d F Y'),
-                'data'         => $result['data'],
-                'total'        => $result['total']
-            ]);
-
-        } catch (Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json([
+            'bulan'        => $today->translatedFormat('F Y'),
+            'hari_tanggal' => $today->translatedFormat('l, d F Y'),
+            'data'         => $result['data'],
+            'total'        => $result['total']
+        ]);
     }
 
     private function calculateAllRecapTotals(Carbon $currentDate, $getDetails = false)
@@ -269,48 +163,47 @@ class PengolahanBasahController extends Controller
                 'stok_akhir'            => 0,
             ];
 
-            // Ambil Rektif Hari Ini dari TABEL BARU
-            $rektifRecords = RektifikasiStok::where('tanggal', $currentDate->toDateString())
-                ->get()
-                ->keyBy(function ($item) {
-                    return strtoupper($item->jenis);
-                });
+            $rektifRecords = RektifikasiStok::where('tanggal', $currentDate->toDateString())->get()->keyBy('jenis');
 
             foreach ($map as $item) {
                 $jenis = $item['jenis_db'];
-                $uraian = $item['uraian'];
                 $kode_api = $item['kode_api'];
 
                 $rektif_today = $rektifRecords->has($jenis) ? (float)$rektifRecords[$jenis]->berat : 0.00;
 
-                // 1. Hitung Stok Awal dari DB Lokal (Gabungan 3 Tabel)
                 $stok_awal = $this->calculateOptimizedNetStokAkhirT1($jenis, $currentDate, $kode_api);
 
-                // 2. Ambil Bokar Masuk Hari Ini dari DB Lokal (Tabel API)
-                $api_data_today = $this->getBokarMasukFromDB($kode_api, $currentDate);
-                $masuk_hi = $api_data_today['masuk_hi'];
-                $penerimaan_sd_kemarin = $api_data_today['masuk_sd_kemarin'];
+                $masuk_hi = (float) TransaksiApiBokar::where('kode_api', $kode_api)
+                    ->where('tanggal', $currentDate->format('Y-m-d'))
+                    ->value('masuk_hi');
 
-                // Perhitungan Turunan
-                $penerimaan_sid_hi = $penerimaan_sd_kemarin + $masuk_hi;
+                $startOfMonth = $currentDate->copy()->startOfMonth();
+                $yesterday = $currentDate->copy()->subDay();
+                
+                $penerimaan_sd_kemarin = 0;
+                if ($yesterday->gte($startOfMonth)) {
+                    $penerimaan_sd_kemarin = TransaksiApiBokar::where('kode_api', $kode_api)
+                        ->whereBetween('tanggal', [$startOfMonth->format('Y-m-d'), $yesterday->format('Y-m-d')])
+                        ->sum('masuk_hi');
+                }
+
+                $penerimaan_sid_hi  = $penerimaan_sd_kemarin + $masuk_hi;
                 $jumlah_stock_bokar = $stok_awal + $masuk_hi;
 
-                // 3. Diolah Hari Ini (Tabel Produksi - Murni)
                 $diolah_hi = PengolahanBasah::where('jenis', $jenis)
                     ->whereDate('tanggal', $currentDate)
                     ->sum('netto_kering');
 
-                // 4. Diolah S/D Hari Ini (Tabel Produksi - Murni)
                 $diolah_sdhi = PengolahanBasah::where('jenis', $jenis)
                     ->whereDate('tanggal', '<=', $currentDate)
-                    ->sum('netto_basah');
+                    ->whereDate('tanggal', '>=', $startOfMonth)
+                    ->sum('netto_kering');
 
-                // Rumus Stok Akhir
                 $stok_akhir = $stok_awal + $masuk_hi - $diolah_hi + $rektif_today;
 
                 if ($getDetails) {
                     $data[] = [
-                        'uraian'              => $uraian,
+                        'uraian'              => $item['uraian'],
                         'stok_awal'           => $stok_awal,
                         'penerimaan_sd_kemarin' => $penerimaan_sd_kemarin,
                         'masuk_hi'            => $masuk_hi,
@@ -325,7 +218,6 @@ class PengolahanBasahController extends Controller
                     ];
                 }
 
-                // Akumulasi Total
                 $total['stok_awal'] += $stok_awal;
                 $total['penerimaan_sd_kemarin'] += $penerimaan_sd_kemarin;
                 $total['masuk_hi'] += $masuk_hi;
@@ -341,54 +233,44 @@ class PengolahanBasahController extends Controller
             return ['total' => $total, 'data' => []];
         }
     }
-    
-    // =====================================================
-    // LOGIKA INTI: HITUNG STOK HISTORIS DARI 3 TABEL
-    // =====================================================
-    
+
     private function calculateOptimizedNetStokAkhirT1($jenis, $currentDate, $kodeApi)
     {
-        // Stok Awal Hari Ini = Stok Akhir Kemarin
         $yesterday = $currentDate->copy()->subDay();
 
-        // A. TOTAL MASUK (Tabel API)
         $total_masuk = TransaksiApiBokar::where('kode_api', $kodeApi)
             ->where('tanggal', '<=', $yesterday->format('Y-m-d'))
             ->sum('masuk_hi');
 
-        // B. TOTAL DIOLAH (Tabel Produksi - Murni)
         $total_diolah = PengolahanBasah::where('jenis', $jenis)
             ->where('tanggal', '<=', $yesterday->format('Y-m-d'))
             ->sum('netto_kering');
 
-        // C. TOTAL REKTIF (Tabel Rektif - Baru)
         $total_rektif = RektifikasiStok::where('jenis', $jenis)
             ->where('tanggal', '<=', $yesterday->format('Y-m-d'))
             ->sum('berat');
 
-        // Rumus Stok: Masuk - Diolah + Rektif
         $stok = $total_masuk - $total_diolah + $total_rektif;
-
         return max(0, $stok);
     }
 
-    private function getBokarMasukFromDB($kode, $tanggal)
+    private function updateMaturasiTrigger($maturasiId, $jenis, $tanggal)
     {
-        // Ambil data dari Tabel API
-        $data = TransaksiApiBokar::where('kode_api', $kode)
-            ->where('tanggal', $tanggal->format('Y-m-d'))
-            ->first();
-
-        if ($data) {
-            return [
-                'masuk_hi' => (float) $data->masuk_hi,
-                'masuk_sd_kemarin' => (float) $data->masuk_sd_kemarin
-            ];
+        // 🔥 [PERBAIKAN] find($maturasiId) mencari di kolom id_maturasi
+        $maturasi = Maturasi::find($maturasiId);
+        
+        if ($maturasi) {
+            $asalBaru = strtoupper($jenis);
+            if ($maturasi->asal_bokar && $maturasi->asal_bokar !== $asalBaru && $maturasi->asal_bokar !== 'CMP') {
+                $asalBaru = 'CMP';
+            }
+            $maturasi->update(['asal_bokar' => $asalBaru]);
+            
+            // 🔥 [PERBAIKAN] FK 'maturasi_id' jadi 'id_maturasi' di PengolahanMaturasi
+            PengolahanMaturasi::firstOrCreate(
+                ['id_maturasi' => $maturasiId, 'tgl_laporan' => $tanggal],
+                ['masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0, 'keterangan' => 'Fisik Bokar Masuk']
+            );
         }
-
-        return [
-            'masuk_hi' => 0,
-            'masuk_sd_kemarin' => 0
-        ];
     }
 }

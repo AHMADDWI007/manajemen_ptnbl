@@ -6,15 +6,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PengolahanMaturasi extends Model
+class HasilUjiLabMaturasi extends Model
 {
     use HasFactory;
-    protected $table = 'pengolahan_maturasi';
-    protected $primaryKey = 'id_pengolahan_maturasi';
+    protected $table = 'hasil_uji_lab_maturasi';
+    protected $primaryKey = 'id_hasil_uji_lab_maturasi';
     protected $guarded = [];
-    protected $casts = ['tgl_laporan' => 'date'];
+    protected $casts = ['tanggal' => 'date'];
 
-    public function maturasi(): BelongsTo 
+    public function maturasi(): BelongsTo
     {
         return $this->belongsTo(Maturasi::class, 'id_maturasi');
     }
