@@ -848,7 +848,7 @@
         // --- A. PERSIAPAN DATA DROPDOWN ---
         var optionsMaturasi = '<option value="">- Pilih Ruang -</option>';
         @foreach($bak_aktif as $bak)
-            optionsMaturasi += `<option value="{{ $bak->uraian }}" data-berat="{{ $bak->stok_akhir }}" data-umur="{{ $bak->umur_real }}">{{ $bak->uraian }} (Stok: {{ number_format($bak->stok_akhir, 0, ",", ".") }})</option>`;
+            optionsMaturasi += `<option value="{{ $bak->uraian }}" data-berat="{{ (float)$bak->stok_akhir }}" data-umur="{{ $bak->umur_real }}">{{ $bak->uraian }} (Stok: {{ number_format($bak->stok_akhir, 0, ",", ".") }})</option>`;
         @endforeach
 
         // --- B. LOGIKA ISI BERAT & UMUR OTOMATIS ---
@@ -856,8 +856,20 @@
             var selectedOption = $(this).find(':selected');
             var row = $(this).closest('tr');
             if(selectedOption.data('berat') !== undefined) {
-                row.find('.input-berat').val(selectedOption.data('berat'));
+                // 1. Ambil data berat
+                var beratRaw = selectedOption.data('berat');
+                
+                // 2. Pastikan jadi angka (Float). 
+                // Trik: String() untuk jaga-jaga, replace koma jadi titik, lalu parseFloat.
+                var beratBersih = parseFloat(String(beratRaw).replace(',', '.'));
+
+                // 3. Masukkan ke input. (Otomatis jadi 2970 atau 2970.5 sesuai aslinya)
+                row.find('.input-berat').val(beratBersih);
+                
+                // Isi Umur
                 row.find('.input-umur').val(selectedOption.data('umur'));
+                
+                // Hitung total
                 calculateTotals();
             } else {
                 row.find('.input-berat').val(''); row.find('.input-umur').val(''); calculateTotals();

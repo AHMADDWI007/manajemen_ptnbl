@@ -290,18 +290,22 @@ class MaturasiController extends Controller
     }
 
     // --- FUNGSI STORE ---
+    // =========================================================================
+    // 🔥 PERBAIKAN LOGIKA STORE (SIMPAN MANUAL MUTASI)
+    // =========================================================================
     public function store(Request $request): RedirectResponse
     {
         $clean = fn($v) => $v ? str_replace(',', '.', str_replace('.', '', $v)) : 0;
+        
+        // Bersihkan input sebelum validasi
         $request->merge([
-            'diolah' => $clean($request->input('diolah')),
             'mutasi' => $clean($request->input('mutasi')),
+            // 'diolah' diabaikan karena readonly/auto
         ]);
 
         $validator = Validator::make($request->all(), [
-            'uraian' => 'required|string|exists:maturasi,uraian', // Tabel maturasi
+            'uraian' => 'required|string|exists:maturasi,uraian',
             'tanggal_input_harian' => 'required|date',
-            'diolah' => 'nullable|numeric|min:0',
             'mutasi' => 'nullable|numeric|min:0',
             'keterangan' => 'nullable|string|max:255',
         ]);
@@ -314,31 +318,44 @@ class MaturasiController extends Controller
         $tglInput = Carbon::parse($data['tanggal_input_harian']);
         $maturasi = Maturasi::where('uraian', $data['uraian'])->firstOrFail();
 
-        PengolahanMaturasi::create([
-            'id_maturasi' => $maturasi->id_maturasi,
-            'tgl_laporan' => $tglInput,
-            'diolah' => $data['diolah'],
-            'mutasi' => $data['mutasi'],
-            'masuk_hi' => 0,
-            'keterangan' => $data['keterangan'] ?? 'Input Manual'
-        ]);
+        // 1. Ambil Data Lama (Agar nilai 'Diolah' dari Produksi TIDAK HILANG)
+        $existingLog = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
+                        ->whereDate('tgl_laporan', $tglInput)
+                        ->first();
+        
+        $diolahExisting = $existingLog ? $existingLog->diolah : 0;
 
+        // 2. Simpan Data (Update/Create)
+        PengolahanMaturasi::updateOrCreate(
+            [
+                'id_maturasi' => $maturasi->id_maturasi,
+                'tgl_laporan' => $tglInput,
+            ],
+            [
+                'diolah'     => $diolahExisting, // 🔥 TETAPKAN NILAI LAMA
+                'mutasi'     => $request->input('mutasi'),
+                'keterangan' => $data['keterangan'] ?? 'Input Mutasi Manual'
+                // masuk_hi tidak disentuh, biarkan apa adanya (default db 0)
+            ]
+        );
+
+        // 3. Update Master Stok (Snapshot)
         $snap = $this->hitungSnapshot($maturasi, $tglInput);
         
         $maturasi->update([
-            'stok_awal' => $snap['stok_awal'],
-            'diolah' => $snap['diolah'],
-            'mutasi' => $snap['mutasi'],
-            'masuk_hi' => $snap['masuk_hi'],
+            'stok_awal'  => $snap['stok_awal'],
+            'diolah'     => $snap['diolah'],
+            'mutasi'     => $snap['mutasi'],
+            'masuk_hi'   => $snap['masuk_hi'],
             'stok_akhir' => $snap['stok_akhir'],
-            'tgl_masuk' => $snap['tgl_masuk'],
-            'umur' => $snap['umur'],
+            'tgl_masuk'  => $snap['tgl_masuk'],
+            'umur'       => $snap['umur'],
             'updated_at' => $tglInput 
         ]);
 
         return redirect()->route('maturasi.index', [
             'filter_tanggal' => $tglInput->format('Y-m-d')
-        ])->with('success', 'Data berhasil disimpan.');
+        ])->with('success', 'Data Mutasi berhasil disimpan. (Diolah tetap sesuai Produksi)');
     }
     
     // --- FUNGSI RESET ---

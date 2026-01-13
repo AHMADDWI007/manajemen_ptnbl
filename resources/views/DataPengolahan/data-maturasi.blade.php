@@ -291,7 +291,9 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Diolah (Kg)</label>
-                            <input type="number" name="diolah" id="diolah" class="form-control form-control-sm" value="0" step="0.01" min="0">
+                            {{-- 🔥 PERUBAHAN: Set Readonly, Value 0, Background Abu --}}
+                            <input type="number" name="diolah" id="diolah" class="form-control form-control-sm" value="0" readonly style="background-color: #e9ecef;">
+                            <small class="text-danger">*Diisi otomatis dari Input Produksi</small>
                         </div>
                          <div class="col-md-6 mb-3">
                             <label>Mutasi (Kg)</label>
@@ -365,7 +367,9 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Diolah (Kg)</label>
-                            <input type="number" name="diolah" id="editDiolah" class="form-control form-control-sm" step="0.01">
+                            {{-- 🔥 PERUBAHAN: Set Readonly, Background Abu --}}
+                            <input type="number" name="diolah" id="editDiolah" class="form-control form-control-sm" readonly style="background-color: #e9ecef;">
+                            <small class="text-danger">*Diisi otomatis dari Input Produksi</small>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Mutasi (Kg)</label>
