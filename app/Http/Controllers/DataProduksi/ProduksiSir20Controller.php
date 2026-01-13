@@ -175,4 +175,118 @@ class ProduksiSir20Controller extends Controller
         $string = str_replace(',', '.', $string);
         return (float) $string;
     }
+
+    // ... method store sebelumnya ...
+
+    // 🔥 TAMBAHAN: FUNGSI UPDATE UNTUK MENYIMPAN HASIL EDIT
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'tanggal_produksi' => 'required|date',
+            'shift_kerja'      => 'required',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // 1. Ambil Data Lama
+            // 🔥 [PERBAIKAN PK] Pastikan findOrFail mencari berdasarkan id_produksi_sir20
+            $produksi = ProduksiSir20::findOrFail($id);
+
+            // 2. Update Header Produksi
+            $produksi->update([
+                'tanggal_produksi'      => $request->tanggal_produksi,
+                'shift_kerja'           => $request->shift_kerja,
+                
+                'jam_start_dryer'       => $request->jam_start_dryer,
+                'jumlah_trolly_masuk'   => $this->cleanNumber($request->trolly_masuk),
+                'jumlah_trolly_keluar'  => $this->cleanNumber($request->trolly_keluar),
+                'jam_stop_dryer'        => $request->jam_stop_dryer,
+                'jumlah_jam_dryer'      => $this->cleanNumber($request->jam_jalan_dryer),
+
+                'jumlah_bales_dipress'  => $this->cleanNumber($request->jumlah_bales),
+                'kg_yang_dipress'       => $this->cleanNumber($request->kg_press),
+                'capacity_per_jam'      => $this->cleanNumber($request->input('capacity_per_jam', 0)),
+                'jam_kerja'             => $this->cleanNumber($request->jam_kerja),
+                'produktivitas'         => $this->cleanNumber($request->input('produktivitas', 0)),
+
+                'kg_cake'               => $this->cleanNumber($request->kg_sir20),
+                'bales_terkontaminasi'  => $this->cleanNumber($request->bales_kontamin),
+                'berat_kontaminan'      => $this->cleanNumber($request->berat_kontaminan),
+                'jam_operasional_genset'=> $this->cleanNumber($request->jam_genset),
+                'pemakaian_listrik_pln' => $this->cleanNumber($request->pln_kwh),
+
+                'jumlah_pallet'         => $this->cleanNumber($request->jml_pallet),
+                'total_nomor'           => $this->cleanNumber($request->total_nomor),
+                'mc_val'                => $this->cleanNumber($request->mc_val),
+                'nomor_start'           => $request->nomor_start,
+                'nomor_end'             => $request->nomor_end,
+                'total_nomor_akhir'     => $this->cleanNumber($request->total_nomor_akhir),
+            ]);
+
+            // 3. Update Remahan (Hapus Lama, Insert Baru)
+            // Cara paling aman untuk update one-to-many dinamis adalah delete all -> insert all
+            RemahanSir20::where('id_produksi_sir20', $id)->delete();
+
+            if ($request->has('maturasi')) {
+                foreach ($request->maturasi as $item) {
+                    if (!empty($item['ruang']) || !empty($item['berat'])) {
+                        RemahanSir20::create([
+                            'id_produksi_sir20' => $id, 
+                            'ruang_maturasi'    => $item['ruang'],
+                            'berat'             => $this->cleanNumber($item['berat']),
+                            'umur'              => $this->cleanNumber($item['umur']),
+                        ]);
+                    }
+                }
+            }
+
+            // 4. Update Aktual Temperature (Hapus Lama, Insert Baru)
+            AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
+            
+            $tempData = [
+                ['jenis' => 'Burner 1',   'start' => $request->temp_b1_start, 'end' => $request->temp_b1_end],
+                ['jenis' => 'Burner 2',   'start' => $request->temp_b2_start, 'end' => $request->temp_b2_end],
+                ['jenis' => 'Cycle Time', 'start' => $request->cycle_start,   'end' => $request->cycle_end],
+            ];
+
+            foreach ($tempData as $temp) {
+                if ($temp['start'] || $temp['end']) {
+                    AktualTemperatureSir20::create([
+                        'id_produksi_sir20' => $id,
+                        'jenis'             => $temp['jenis'],
+                        'nilai_start'       => $this->cleanNumber($temp['start']),
+                        'nilai_end'         => $this->cleanNumber($temp['end']),
+                    ]);
+                }
+            }
+
+            // 5. Update Bahan Bakar (Hapus Lama, Insert Baru)
+            BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
+
+            $bbData = [
+                ['nama' => 'Solar',     'jumlah' => $request->bb_solar],
+                ['nama' => 'Batu Bara', 'jumlah' => $request->bb_batubara],
+                ['nama' => 'Cangkang',  'jumlah' => $request->bb_cangkang],
+            ];
+
+            foreach ($bbData as $bb) {
+                $cleanJumlah = $this->cleanNumber($bb['jumlah']);
+                if ($cleanJumlah > 0) {
+                    BahanBakarSir20::create([
+                        'id_produksi_sir20' => $id,
+                        'bahan_bakar'       => $bb['nama'],
+                        'digunakan'         => $cleanJumlah,
+                    ]);
+                }
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Data Produksi Berhasil Diperbarui!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal Update: ' . $e->getMessage());
+        }
+    }
 }

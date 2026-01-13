@@ -484,13 +484,34 @@ $(document).ready(function() {
     function formatNumber(num, precision = 0) { if (num === null || typeof num === 'undefined' || num === '') return '0'; let parsedNum = parseFloat(String(num).replace(/[^0-9,.-]+/g,"").replace(',','.')); if (isNaN(parsedNum)) return '0'; return parsedNum.toLocaleString('id-ID', { minimumFractionDigits: precision, maximumFractionDigits: precision }); }
     function formatTanggalModal(dateStr) { if (!dateStr) return ''; try { if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; let dateObj = new Date(dateStr); if (isNaN(dateObj.getTime())) return ''; let year = dateObj.getFullYear(); let month = ('0' + (dateObj.getMonth() + 1)).slice(-2); let day = ('0' + dateObj.getDate()).slice(-2); return `${year}-${month}-${day}`; } catch(e) { return ''; } }
     
+    // --- FUNGSI PARSE ANGKA INDONESIA KE FLOAT JS ---
+    function parseIndoNumber(str) {
+        if (!str) return 0;
+        // Hapus semua titik (pemisah ribuan)
+        let cleanStr = str.toString().replace(/\./g, '');
+        // Ganti koma (pemisah desimal) dengan titik
+        cleanStr = cleanStr.replace(',', '.');
+        return parseFloat(cleanStr) || 0;
+    }
+
+    // --- 2. LOGIKA HITUNG STOK AKHIR DI MODAL (Update: Tanpa Koma) ---
     function calculateStokAkhirDisplay() {
-        let stok_awal = parseFloat($('#stok_awal').val().replace(/[^0-9,.-]+/g,"").replace(',','.')) || 0;
+        // Ambil nilai stok awal & masuk (yang biasanya readonly/auto)
+        let stok_awal = parseIndoNumber($('#stok_awal').val());
+        let masuk_hi  = parseIndoNumber($('#masuk_hi').val());
+        
+        // Ambil inputan user (Diolah & Mutasi)
+        // Input type="number" nilainya polos (cth: 3351), tidak perlu parseIndoNumber
         let diolah = parseFloat($('#diolah').val()) || 0;
         let mutasi = parseFloat($('#mutasi').val()) || 0;
-        let masuk_hi = parseFloat($('#masuk_hi').val().replace(/[^0-9,.-]+/g,"").replace(',','.')) || 0;
-        let stok_akhir = stok_awal - diolah - mutasi + masuk_hi;
-        $('#stok_akhir_display').val(formatNumber(stok_akhir, 2));
+
+        // RUMUS: Stok Awal + Masuk - (Diolah + Mutasi)
+        let stok_akhir = (stok_awal + masuk_hi) - (diolah + mutasi);
+        
+        // Tampilkan hasil tanpa koma (Desimal 0)
+        $('#stok_akhir_display').val(
+            stok_akhir.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        );
     }
 
     function updateKeterangan(prefix = '') {
@@ -514,19 +535,44 @@ $(document).ready(function() {
     function fetchPreviousData() {
         const selectedUraian = $('#uraian').val();
         const selectedDate = $('#tanggal_input_tambah').val();
+        
         if (selectedUraian && selectedDate) {
             $.ajax({
-                url: "{{ route('maturasi.getPreviousData') }}", type: 'GET',
+                url: "{{ route('maturasi.getPreviousData') }}", 
+                type: 'GET',
                 data: { uraian: selectedUraian, tanggal_filter: selectedDate },
                 dataType: 'json',
                 success: function(data) {
-                    $('#stok_awal').val(formatNumber(data.stok_awal));
+                    // 1. Isi Data Angka (Yang sudah ada)
+                    $('#stok_awal').val(formatNumber(data.stok_awal, 2));
                     $('#umur').val(data.umur !== null ? data.umur : 0);
-                    $('#masuk_hi').val(formatNumber(data.netto_kering_hi));
+                    $('#masuk_hi').val(formatNumber(data.netto_kering_hi || data.masuk_hi, 2));
+                    
+                    // 2. 🔥 TAMBAHKAN INI: Update Dropdown Asal Bokar
+                    let asal = data.asal_bokar;
+                    
+                    // Cek logika: Jika string mengandung "CMP" (misal "CMP (PT, DS)"), set ke "CMP"
+                    if (asal && asal.includes('CMP')) {
+                        $('#asal_bokar').val('CMP');
+                    } 
+                    // Jika datanya pas (misal "PT", "INHUT"), set langsung
+                    else if (asal && (asal === 'PT' || asal === 'INHUT' || asal === 'Petani')) {
+                        $('#asal_bokar').val(asal);
+                    } 
+                    // Jika kosong atau tidak dikenali, bisa default ke Petani atau biarkan
+                    else {
+                        $('#asal_bokar').val('Petani'); 
+                    }
+
+                    // 3. Hitung ulang stok akhir
                     calculateStokAkhirDisplay();
                 },
                 error: function() {
-                    $('#stok_awal').val('0,00'); $('#umur').val(0); $('#masuk_hi').val('0,00');
+                    // Reset jika error
+                    $('#stok_awal').val('0,00'); 
+                    $('#umur').val(0); 
+                    $('#masuk_hi').val('0,00');
+                    $('#asal_bokar').val('Petani'); // Reset asal bokar juga
                     calculateStokAkhirDisplay();
                 }
             });
