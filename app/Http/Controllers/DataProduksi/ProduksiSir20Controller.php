@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\DataProduksi;
 
-use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use App\Models\Maturasi;
 use App\Models\RemahanSir20;
+use Illuminate\Http\Request;
 use App\Models\ProduksiSir20;
 use App\Models\BahanBakarSir20;
-use App\Models\AktualTemperatureSir20;
-use Illuminate\Http\Request;
+use App\Models\PengolahanMaturasi;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Http\Controllers\Controller;
+use App\Models\AktualTemperatureSir20;
 
 class ProduksiSir20Controller extends Controller
 {
@@ -22,12 +23,33 @@ class ProduksiSir20Controller extends Controller
                              ->orderBy('uraian', 'asc')
                              ->get();
 
-        $hari_ini = Carbon::today();
+        $hari_ini = Carbon::today()->startOfDay();
 
         foreach ($bak_aktif as $bak) {
-            if ($bak->tgl_masuk) {
-                $tgl_masuk = Carbon::parse($bak->tgl_masuk);
-                $bak->umur_real = $tgl_masuk->diffInDays($hari_ini);
+            // --- LOGIKA HITUNG UMUR YANG LEBIH CERDAS (MIRIP MATURASI CONTROLLER) ---
+            
+            // 1. Cek apakah ada log masuk (masuk_hi > 0) sebelum atau sama dengan hari ini?
+            // Kita cari tanggal terakhir stok masuk ke bak ini
+            $lastLog = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                ->where('masuk_hi', '>', 0)
+                ->whereDate('tgl_laporan', '<=', $hari_ini)
+                ->orderBy('tgl_laporan', 'desc')
+                ->first();
+
+            $tgl_acuan = null;
+
+            if ($lastLog) {
+                // Jika ada history masuk, pakai tanggal history itu
+                $tgl_acuan = Carbon::parse($lastLog->tgl_laporan)->startOfDay();
+            } elseif (!empty($bak->tgl_masuk)) {
+                // Fallback ke master jika log tidak ketemu (jarang terjadi jika data bersih)
+                $tgl_acuan = Carbon::parse($bak->tgl_masuk)->startOfDay();
+            }
+
+            // 2. Hitung Umur
+            if ($tgl_acuan) {
+                // Selisih hari dari Tgl Masuk Terakhir s/d Hari Ini
+                $bak->umur_real = abs($tgl_acuan->diffInDays($hari_ini));
             } else {
                 $bak->umur_real = 0;
             }

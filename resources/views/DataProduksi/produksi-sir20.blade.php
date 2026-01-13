@@ -287,7 +287,7 @@
                             </div>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4">Jam Jalan Dryer</label>
-                                <div class="col-5"><input type="number" name="jam_jalan_dryer" id="inputJamJalan" class="form-control form-control-sm calc-trigger" step="0.1"></div>
+                                <div class="col-5"><input type="text" name="jam_jalan_dryer" id="inputJamJalan" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Jam</div>
                             </div>
                             
@@ -577,21 +577,35 @@
 
         // --- D. LOGIKA HITUNGAN ---
         function calculateTotals() {
+            // 1. Hitung Total Remahan
             var totalRemahan = 0;
-            $('.input-berat').each(function() { totalRemahan += parseFloat($(this).val()) || 0; });
-            $('#bigTotalRemahan').text(totalRemahan.toLocaleString('id-ID'));
+            $('.input-berat').each(function() { 
+                var val = parseFloat($(this).val()) || 0;
+                totalRemahan += val; 
+            });
+            // Math.ceil() untuk pembulatan ke atas, toLocaleString untuk format ribuan
+            $('#bigTotalRemahan').text(Math.ceil(totalRemahan).toLocaleString('id-ID'));
 
+            // 2. Hitung Kg Press (Bales x 35)
             var bales = parseFloat($('#inputBales').val()) || 0;
-            var kgPress = bales * 35; // Standar 35 Kg
-            $('#outKgPress').val(kgPress);
-            $('#bigTotalProduksi').text(kgPress.toLocaleString('id-ID'));
+            var kgPress = Math.ceil(bales * 35); // Bulatkan hasil kali ke atas
+            
+            $('#outKgPress').val(kgPress); // Input form nilai asli (bulat)
+            $('#bigTotalProduksi').text(kgPress.toLocaleString('id-ID')); // Teks besar format ribuan
 
+            // 3. Hitung Capacity & Produktivitas
             var jamJalan = parseFloat($('#inputJamJalan').val()) || 0;
             var jamKerja = parseFloat($('#inputJamKerja').val()) || 0;
             
-            $('#outCapacity').val(jamJalan > 0 ? (kgPress / jamJalan).toFixed(2) : 0);
-            $('#outProductivity').val(jamKerja > 0 ? (kgPress / jamKerja).toFixed(2) : 0);
+            // Rumus: Kg / Jam -> Bulatkan ke atas (Math.ceil)
+            var capacity = jamJalan > 0 ? Math.ceil(kgPress / jamJalan) : 0;
+            var productivity = jamKerja > 0 ? Math.ceil(kgPress / jamKerja) : 0;
 
+            $('#outCapacity').val(capacity);
+            $('#outProductivity').val(productivity);
+
+            // 4. Hitung Rata-rata Bahan Bakar
+            // (Tetap gunakan desimal 4 digit agar presisi untuk rasio bahan bakar)
             var solar = parseFloat($('#inputSolar').val()) || 0;
             var batubara = parseFloat($('#inputBatubara').val()) || 0;
             var cangkang = parseFloat($('#inputCangkang').val()) || 0;
@@ -721,6 +735,35 @@
                     Swal.fire('Gagal', msg, 'error');
                 }
             });
+        });
+
+        // --- TAMBAHAN: LOGIKA JAM JALAN OTOMATIS (Start s/d Stop) ---
+        $('input[name="jam_start_dryer"], input[name="jam_stop_dryer"]').on('change', function() {
+            var start = $('input[name="jam_start_dryer"]').val(); // Ambil Jam Start
+            var stop = $('input[name="jam_stop_dryer"]').val();   // Ambil Jam Stop
+
+            if (start && stop) {
+                // Kita pakai tanggal dummy yang sama untuk membandingkan jam
+                var dateStart = new Date("01/01/2000 " + start);
+                var dateStop = new Date("01/01/2000 " + stop);
+
+                // Logika: Jika Stop lebih kecil dari Start (misal Start 23:00, Stop 01:00 pagi)
+                // Maka Stop dianggap besok harinya (tambah 1 hari)
+                if (dateStop < dateStart) {
+                    dateStop.setDate(dateStop.getDate() + 1);
+                }
+
+                var diffMs = dateStop - dateStart; // Selisih dalam milidetik
+                // Rumus: milidetik / 1000 / 60 / 60 = Jam
+                var diffHrs = diffMs / 1000 / 60 / 60; 
+
+                // Isi ke kolom Jam Jalan (Gunakan toFixed(2) agar ada desimal misal 2.5 Jam)
+                // Desimal penting agar perhitungan Capacity (Kg/Jam) akurat.
+                $('#inputJamJalan').val(diffHrs.toFixed(2)); 
+                
+                // Panggil hitung ulang agar Capacity & Produktivitas terupdate
+                calculateTotals(); 
+            }
         });
 
     });

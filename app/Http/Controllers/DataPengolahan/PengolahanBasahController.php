@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\DataPengolahan;
 
-use App\Http\Controllers\Controller;
-use App\Models\Maturasi;
-use App\Models\PengolahanBasah;
-use App\Models\PengolahanMaturasi;
-use App\Models\TransaksiApiBokar;
-use App\Models\RektifikasiStok;
-use Carbon\Carbon;
 use Exception;
+use Carbon\Carbon;
+use App\Models\Maturasi;
 use Illuminate\Http\Request;
+use App\Models\PengolahanBasah;
+use App\Models\RektifikasiStok;
+use App\Models\TransaksiApiBokar;
+use App\Models\PengolahanMaturasi;
+use App\Http\Controllers\Controller;
+use App\Models\HasilUjiLabBokarDiolah;
 use Illuminate\Support\Facades\Validator;
 
 class PengolahanBasahController extends Controller
@@ -103,12 +104,33 @@ class PengolahanBasahController extends Controller
         
         if(!$pengolahan) return redirect()->back()->with('error', 'Data tidak ditemukan');
 
+        // Validasi input agar aman (terutama id_maturasi dan jenis)
+        $request->validate([
+            'id_maturasi' => 'required|exists:maturasi,id_maturasi',
+            'jenis'       => 'required|string|in:PT,DS,INHUT',
+        ]);
+
         $netto_basah = $request->berat_timbang - $request->berat_truck;
         
-        // Pastikan request mengirim 'id_maturasi' jika diedit
+        // 1. UPDATE DATA UTAMA (PENGOLAHAN BASAH)
         $pengolahan->update(array_merge($request->all(), ['netto_basah' => $netto_basah]));
         
-        return redirect()->route('pengolahan-basah.index')->with('success', 'Data diperbarui.');
+        // 2. 🔥 [PERBAIKAN PENTING] SINKRONISASI KE TABEL LAB (Jika Sudah Ada)
+        // Jika jenis diubah di sini, maka di tabel hasil uji juga harus berubah
+        // agar logika 'getDetailedAsalBokarString' di MaturasiController nanti tidak bingung.
+        HasilUjiLabBokarDiolah::where('id_pengolahan_basah', $id)
+            ->update([
+                'jenis'       => $request->jenis,
+                'id_maturasi' => $request->id_maturasi, // Update juga jika pindah bak
+                'netto_basah' => $netto_basah
+                // Netto kering & K3 biarkan tetap (atau hitung ulang jika perlu)
+            ]);
+
+        // 3. 🔥 [PERBAIKAN UTAMA] TRIGGER UPDATE STATUS BAK MATURASI
+        // Panggil fungsi trigger agar kolom 'asal_bokar' di tabel Maturasi berubah
+        $this->updateMaturasiTrigger($request->id_maturasi, $request->jenis, $request->tanggal);
+        
+        return redirect()->route('pengolahan-basah.index')->with('success', 'Data diperbarui dan status Bak disesuaikan.');
     }
 
     public function destroy($id) 
