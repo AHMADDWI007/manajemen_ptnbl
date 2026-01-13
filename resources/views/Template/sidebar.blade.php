@@ -24,6 +24,7 @@
         <nav class="mt-2">
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
 
+
                 <li class="nav-item">
                     <a href="{{ url('/beranda') }}" class="nav-link {{ request()->is('beranda') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-tachometer-alt"></i>
@@ -85,7 +86,7 @@
 
                 {{-- Data Pengolahan --}}
                 @php
-                    $isPengolahanOpen = request()->is('pengolahan_basah*', 'maturasi*', 'produksi*');
+                    $isPengolahanOpen = request()->is('pengolahan_basah*', 'maturasi*', 'produksi');
                 @endphp
                 <li id="menu-pengolahan" class="nav-item has-treeview {{ $isPengolahanOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isPengolahanOpen ? 'active' : '' }}">
@@ -97,7 +98,7 @@
                     </a>
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
-                            <a href="{{ url('/pengolahan_basah') }}" class="nav-link {{ request()->is('bokar*') ? 'active' : '' }}">
+                            <a href="{{ url('/pengolahan_basah') }}" class="nav-link {{ request()->is('pengolahan_basah*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Pengolahan Basah</p>
                             </a>
@@ -109,7 +110,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ url('/produksi') }}" class="nav-link {{ request()->is('produksi*') ? 'active' : '' }}">
+                            <a href="{{ url('/produksi') }}" class="nav-link {{ request()->is('produksi') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Bahan Dalam Proses</p>
                             </a>
@@ -120,7 +121,7 @@
                 {{-- Data Produksi --}}
                 @php
                     // Perbaiki pengecekan request is untuk Data Produksi
-                    $isProduksiOpen = request()->is('produksi_sir20*', 'penjualan_sir20*'); 
+                    $isProduksiOpen = request()->is('data-sir*', 'penjualan_sir20*', 'produksi-sir-baru*'); 
                 @endphp
                 <li id="menu-produksi" class="nav-item has-treeview {{ $isProduksiOpen ? 'menu-open' : '' }}">
                     <a href="#" class="nav-link {{ $isProduksiOpen ? 'active' : '' }}">
@@ -132,7 +133,14 @@
                     </a>
                      <ul class="nav nav-treeview">
                         <li class="nav-item">
-                            <a href="{{ url('/produksi_sir20') }}" class="nav-link {{ request()->is('produksi_sir20*') ? 'active' : '' }}">
+                            {{-- Mengarah ke route 'produksi-sir.index' --}}
+                            <a href="{{ route('data-sir.index') }}" class="nav-link {{ request()->is('data-sir*') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Data Sir 20</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('produksi-sir-baru.index') }}" class="nav-link {{ request()->is('produksi-sir-baru*') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Produksi SIR 20</p>
                             </a>

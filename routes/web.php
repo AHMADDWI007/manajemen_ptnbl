@@ -5,8 +5,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\{
     LoginController, UserController, MaturasiController,
     BahanProsesController, HasilUjiLabBokarController, HasilUjiMaturasiController,
-    HasilUjiSir20Controller, HasilUjiTroliController, ProduksiSir20Controller,
-    PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController
+    HasilUjiSir20Controller, HasilUjiTroliController,
+    PenjualanSir20Controller, LaporanHarianController, HasilUjiBokarDiolahController, PengolahanBasahController, DataSirController, ProduksiSirBaruController
 };
 
 // Redirect root ke beranda jika login, atau ke login jika belum
@@ -43,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/maturasi/{maturasi}/reset', [MaturasiController::class, 'reset'])->name('maturasi.reset');
     Route::resource('produksi', BahanProsesController::class);
     Route::resource('bahan-proses', BahanProsesController::class);
+    
 
      // Data Laboratorium
     Route::resource('hasil_uji_lab_bokar', HasilUjiLabBokarController::class);
@@ -52,9 +53,17 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('hasil_uji_sir_20', HasilUjiSir20Controller::class);
 
     // Data Produksi
+    Route::get('/pengolahan_basah/rekap', [PengolahanBasahController::class, 'rekap'])->name('pengolahan_basah.rekap');
+
     Route::resource('pengolahan_basah', PengolahanBasahController::class);
-    Route::resource('produksi_sir20', ProduksiSir20Controller::class);
+    Route::resource('produksi-sir-baru', ProduksiSirBaruController::class);
     Route::resource('penjualan_sir20', PenjualanSir20Controller::class);
+
+    // Data Produksi
+    Route::get('/pengolahan_basah/rekap', [PengolahanBasahController::class, 'rekap'])->name('pengolahan_basah.rekap');
+    // Route baru untuk menyimpan nilai rektif harian
+    Route::post('/pengolahan_basah/update_rektif', [PengolahanBasahController::class, 'updateRektif'])->name('pengolahan_basah.updateRektif');
+
 
     
 
@@ -65,3 +74,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::resource('users', UserController::class);
     Route::get('/data_pengguna', [UserController::class, 'index'])->name('data_pengguna');
+
+  
+
+Route::resource('data-sir', DataSirController::class);
+Route::get('data-sir/get-json/{id}', [DataSirController::class, 'getJson']);
+Route::get('/data-sir/get-production-today', [DataSirController::class, 'getProductionToday'])->name('data-sir.getProductionToday');

@@ -26,6 +26,7 @@ class PengolahanBasah extends Model
         'netto_basah',
         'k3',
         'netto_kering',
+        'rektif',
     ];
 
     /**
@@ -39,5 +40,6 @@ class PengolahanBasah extends Model
         'netto_basah' => 'double',
         'k3' => 'double',
         'netto_kering' => 'double',
+        'rektif'=> 'double',
     ];
 }

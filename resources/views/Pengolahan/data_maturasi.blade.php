@@ -72,104 +72,176 @@
                         </div>
                         <hr>
 
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped text-center align-middle" id="dataTable">
-                                <thead class="bg-light">
-                                <tr>
-                                    <th>Uraian</th>
-                                    {{-- Tgl Update Terakhir dihilangkan dari tabel sesuai permintaan --}}
-                                    <th>Stok Awal (Kg)</th>
-                                    <th>Tgl Masuk Stok</th>
-                                    <th>Umur</th>
-                                    <th>Diolah (Kg)</th>
-                                    <th>Mutasi (Kg)</th>
-                                    <th>Masuk HI (Kg)</th>
-                                    <th>K3 Masuk</th>
-                                    <th>K3 Olah</th>
-                                    <th>PO</th>
-                                    <th>PRI</th>
-                                    <th>Tgl Uji</th>
-                                    <th>Stok Akhir (Kg)</th>
-                                    <th>Asal Bokar</th>
-                                    <th>Keterangan</th>
-                                    <th>Aksi</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @foreach ($data_maturasi as $item)
-                                    <tr>
-                                        <td>{{ $item->uraian }}</td>
-                                        {{-- kolom Tgl Update Terakhir sengaja dihapus dari baris tabel --}}
-                                        <td>{{ number_format($item->stok_awal, 0, ',', '.') }}</td>
-                                        <td>
-                                            @if($item->tgl_masuk)
-                                                {{-- tampilkan tanggal masuk jika ada --}}
-                                                @if($item->tgl_masuk instanceof \Carbon\Carbon)
-                                                    {{ $item->tgl_masuk->format('d-m-Y') }}
-                                                @else
-                                                    {{-- if stored as string --}}
-                                                    {{ \Carbon\Carbon::parse($item->tgl_masuk)->format('d-m-Y') }}
-                                                @endif
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        <td>{{ $item->umur ?? 0 }} hari</td>
-                                        <td>{{ number_format($item->diolah, 0, ',', '.') }}</td>
-                                        <td>{{ number_format($item->mutasi, 0, ',', '.') }}</td>
-                                        <td>{{ number_format($item->masuk_hi, 0, ',', '.') }}</td>
-                                        {{-- kolom baru --}}
-                                        <td>{{ number_format($item->k3_masuk ?? 0, 0, ',', '.') }}</td>
-                                        <td>{{ number_format($item->k3_olah ?? 0, 0, ',', '.') }}</td>
-                                        <td>{{ $item->po ?? '0' }}</td>
-                                        <td>{{ $item->pri ?? '0' }}</td>
-                                        <td>
-                                            @if($item->tgl_uji)
-                                            {{ \Carbon\Carbon::parse($item->tgl_uji)->format('d-m-Y') }}
-                                            @else
-                                            -
-                                            @endif
-                                        </td>
-                                        <td>{{ number_format($item->stok_akhir, 0, ',', '.') }}</td>
-                                        <td>{{ $item->asal_bokar ?? '-' }}</td>
-                                        <td>{{ $item->keterangan ?? '-' }}</td>
-<td class="text-center">
-    <div class="dropdown">
-        <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $item->id }}" data-toggle="dropdown" aria-expanded="false">
-            Aksi
-        </button>
-        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $item->id }}">
-            <a class="dropdown-item btn-detail" href="javascript:void(0)"
-               data-uraian="{{ $item->uraian }}"
-               data-tanggal="{{ $selected_date }}">
-                <i class="fas fa-eye text-info mr-2"></i> Detail
-            </a>
-            <a class="dropdown-item btn-edit" href="javascript:void(0)"
-               data-id="{{ $item->id }}">
-                <i class="fas fa-edit text-warning mr-2"></i> Edit
-            </a>
-            <form action="{{ route('maturasi.reset', $item->id) }}" method="POST"
-            class="reset-form" style="display:inline;">
-            @csrf 
-                <button type="submit" class="dropdown-item text-danger">
-                <i class="fas fa-undo mr-2"></i> Reset
-                 </button>
-            </form>
-        </div>
-    </div>
-</td>
+                     <div class="table-responsive">
+    <table class="table table-bordered table-striped text-center align-middle" id="dataTable">
+        <thead class="bg-light">
+            <tr>
+                <th>Uraian</th>
+                <th>Stok Awal (Kg)</th>
+                <th>Tgl Masuk Stok</th>
+                <th>Umur</th>
+                <th>Diolah (Kg)</th>
+                <th>Mutasi (Kg)</th>
+                <th>Masuk HI (Kg)</th>
+                <th>K3 Masuk</th>
+                <th>K3 Olah</th>
+                <th>PO</th>
+                <th>PRI</th>
+                <th>Tgl Uji</th>
+                <th>Stok Akhir (Kg)</th>
+                <th>Asal Bokar</th>
+                <th>Keterangan</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($data_maturasi as $item)
+                <tr>
+                    <td>{{ $item->uraian }}</td>
+                    <td>{{ number_format($item->stok_awal, 0, ',', '.') }}</td>
+                    <td>
+                        @if ($item->tgl_masuk)
+                            @if ($item->tgl_masuk instanceof \Carbon\Carbon)
+                                {{ $item->tgl_masuk->format('d-m-Y') }}
+                            @else
+                                {{ \Carbon\Carbon::parse($item->tgl_masuk)->format('d-m-Y') }}
+                            @endif
+                        @else
+                            -
+                        @endif
+                    </td>
+                    <td>{{ $item->umur ?? 0 }} hari</td>
+                    <td>{{ number_format($item->diolah, 0, ',', '.') }}</td>
+                    <td>{{ number_format($item->mutasi, 0, ',', '.') }}</td>
+                    <td>{{ number_format($item->masuk_hi, 0, ',', '.') }}</td>
+                    <td>{{ number_format($item->k3_masuk ?? 0, 0, ',', '.') }}</td>
+                    <td>{{ number_format($item->k3_olah ?? 0, 0, ',', '.') }}</td>
+                    <td>{{ $item->po ?? '0' }}</td>
+                    <td>{{ $item->pri ?? '0' }}</td>
+                    <td>
+                        @if ($item->tgl_uji)
+                            {{ \Carbon\Carbon::parse($item->tgl_uji)->format('d-m-Y') }}
+                        @else
+                            -
+                        @endif
+                    </td>
+                    <td>{{ number_format($item->stok_akhir, 0, ',', '.') }}</td>
+                    <td>{{ $item->asal_bokar ?? '-' }}</td>
+                    <td>{{ $item->keterangan ?? '-' }}</td>
+                    <td class="text-center">
+                        <div class="dropdown">
+                            <button class="btn btn-success btn-sm dropdown-toggle" type="button"
+                                id="dropdownMenu{{ $item->id }}" data-toggle="dropdown" aria-expanded="false">
+                                Aksi
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-right"
+                                aria-labelledby="dropdownMenu{{ $item->id }}">
+                                <a class="dropdown-item btn-detail" href="javascript:void(0)"
+                                    data-uraian="{{ $item->uraian }}" data-tanggal="{{ $selected_date }}">
+                                    <i class="fas fa-eye text-info mr-2"></i> Detail
+                                </a>
+                                <a class="dropdown-item btn-edit" href="javascript:void(0)"
+                                    data-id="{{ $item->id }}">
+                                    <i class="fas fa-edit text-warning mr-2"></i> Edit
+                                </a>
+                                <form action="{{ route('maturasi.reset', $item->id) }}" method="POST"
+                                    class="reset-form" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="fas fa-undo mr-2"></i> Reset
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
 
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
+        {{-- ========================================== --}}
+        {{-- BAGIAN FOOTER (TOTAL & SUMMARY SESUAI GAMBAR) --}}
+        {{-- ========================================== --}}
+        @php
+            // 1. Hitung Total Kolom (Data Hari Ini)
+            $sum_stok_awal = $data_maturasi->sum('stok_awal');
+            $sum_diolah = $data_maturasi->sum('diolah');
+            $sum_mutasi = $data_maturasi->sum('mutasi');
+            $sum_masuk_hi = $data_maturasi->sum('masuk_hi');
+            $sum_stok_akhir = $data_maturasi->sum('stok_akhir');
+
+            // 2. Logika Summary "Maturasi Diolah"
+            // $total_diolah_sd_kemarin dikirim dari Controller (Total akumulasi < tanggal terpilih)
+            $sd_kemarin = $total_diolah_sd_kemarin ?? 0; 
+            
+            // Hari ini = Total kolom 'diolah' yang tampil
+            $hari_ini = $sum_diolah;
+
+            // s/d Hari ini = Akumulasi kemarin + Hari ini
+            $sd_hari_ini = $sd_kemarin + $hari_ini;
+        @endphp
+
+        <tfoot class="font-weight-bold" style="border-top: 2px solid #000;">
+            {{-- Baris 1: Jumlah Total per Kolom --}}
+            <tr style="background-color: #f2f2f2;">
+                <td class="text-left">Jumlah</td>
+                <td>{{ number_format($sum_stok_awal, 0, ',', '.') }}</td>
+                <td></td> {{-- Tgl Masuk --}}
+                <td></td> {{-- Umur --}}
+                <td>{{ number_format($sum_diolah, 0, ',', '.') }}</td>
+                <td>{{ number_format($sum_mutasi, 0, ',', '.') }}</td>
+                <td>{{ number_format($sum_masuk_hi, 0, ',', '.') }}</td>
+                {{-- Kosongkan kolom tengah (K3 s/d Tgl Uji) --}}
+                <td></td><td></td><td></td><td></td><td></td>
+                <td>{{ number_format($sum_stok_akhir, 0, ',', '.') }}</td>
+                <td colspan="3"></td> {{-- Sisa kolom kosong --}}
+            </tr>
+
+            {{-- Baris 2: Maturasi Diolah (Layout Khusus) --}}
+            <tr style="border-top: 1px solid #dee2e6;">
+                {{-- Label "Maturasi Diolah" (Gabung 4 Kolom Pertama) --}}
+                <td colspan="4" class="text-center font-weight-bold align-middle" style="background-color: #e9ecef;">
+                    Maturasi Diolah
+                </td>
+
+                {{-- Bagian s/d Kemarin (Gabung Kolom Diolah & Mutasi) --}}
+                <td colspan="2" class="p-0">
+                    <div class="d-flex h-100">
+                        <div class="flex-fill border-right p-2 d-flex align-items-center justify-content-center bg-light" style="font-size: 0.85rem;">
+                            s/d Kemarin
+                        </div>
+                        <div class="flex-fill p-2 d-flex align-items-center justify-content-center text-white" style="background-color: #558b2f;">
+                            {{ number_format($sd_kemarin, 0, ',', '.') }}
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                </td>
 
+                {{-- Bagian Hari ini (Gabung Kolom Masuk HI & K3 Masuk) --}}
+                <td colspan="2" class="p-0">
+                    <div class="d-flex h-100">
+                        <div class="flex-fill border-right p-2 d-flex align-items-center justify-content-center bg-light" style="font-size: 0.85rem;">
+                            Hari ini
+                        </div>
+                        <div class="flex-fill p-2 d-flex align-items-center justify-content-center">
+                            {{ number_format($hari_ini, 0, ',', '.') }}
+                        </div>
+                    </div>
+                </td>
+
+                {{-- Bagian s/d Hari Ini (Sisa Kolom sampai akhir) --}}
+                <td colspan="8" class="p-0">
+                    <div class="d-flex h-100 justify-content-start">
+                        <div class="border-right p-2 d-flex align-items-center justify-content-center bg-light" style="width: 120px; font-size: 0.85rem;">
+                            s/d Hari ini
+                        </div>
+                        <div class="p-2 d-flex align-items-center pl-3">
+                            {{ number_format($sd_hari_ini, 0, ',', '.') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
     @include('template.footer')
 </div>
 
@@ -224,38 +296,10 @@
                             <label>Masuk Hari Ini (Kg)</label>
                             <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm" value="0,00" readonly>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label>K3 Masuk</label>
-                            <input type="number" name="k3_masuk" id="editK3Masuk" class="form-control form-control-sm" step="0.01">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                            <label>K3 Olah</label>
-                            <input type="number" name="k3_olah" id="editK3Olah" class="form-control form-control-sm" step="0.01">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                            <label>PO</label>
-                            <input type="text" name="po" id="editPO" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                            <label>PRI</label>
-                            <input type="text" name="pri" id="editPRI" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                            <label>Tanggal Uji</label>
-                            <input type="date" name="tgl_uji" id="editTglUji" class="form-control form-control-sm">
-                            </div>
+                
 
 
                          {{-- PERBAIKAN: Input Asal Bokar menjadi Dropdown --}}
-                         <div class="col-md-6 mb-3">
-                            <label>Asal Bokar</label>
-                            <select name="asal_bokar" id="asal_bokar" class="form-control form-control-sm">
-                                <option value="INHUT">INHUT</option>
-                                <option value="PT">PT</option>
-                                <option value="CMP">CMP</option>
-                                <option value="Petani" selected>Petani</option>
-                            </select>
-                        </div>
 
                         <hr class="col-12 my-2">
                         <div class="col-md-6 mb-3">
@@ -389,7 +433,7 @@
   BERHENTI! File 'template.script' kemungkinan besar memuat jQuery dan Bootstrap.
   Untuk menghindari duplikat, kita nonaktifkan baris ini.
 --}}
-{{-- @include('template.script') --}} 
+ @include('template.script')  
 
 {{-- 
   PERBAIKAN: 
@@ -397,7 +441,7 @@
   dan dalam urutan yang benar.
 --}}
 
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -570,7 +614,7 @@ $(document).ready(function() {
                 $('#detailMasukHi').text(formatNumber(data.netto_kering_hi));
                 $('#detailK3Masuk').text(formatNumber(data.k3_masuk));
                 $('#detailK3Olah').text(formatNumber(data.k3_olah));
-                $('#detailPO').text(data.po ?? '-');
+                $('#detailPO').text(formatNumber(data.po));
                 $('#detailPRI').text(data.pri ?? '-');
                 $('#detailTglUji').text(data.tgl_uji ? formatTanggal(data.tgl_uji) : '-');
                 $('#detailStokAkhir').text(formatNumber(data.stok_akhir));
