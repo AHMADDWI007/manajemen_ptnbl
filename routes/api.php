@@ -117,6 +117,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // (Controller: MaturasiApiController)
     // ================================================================
     
+    Route::get('/maturasi/all', [MaturasiApiController::class, 'getAll']);
+
     // [TABEL MATURASI] Mengambil data status maturasi
     Route::get('/pengolahan-maturasi', [MaturasiApiController::class, 'index']);
 
@@ -140,5 +142,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // [PENJUALAN SIR]
     Route::get('penjualan-sir20', [PenjualanSirApiController::class, 'index']);
     Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);
+    Route::get('penjualan-sir20/cek-gudang', [PenjualanSirApiController::class, 'getPengirimanGudang']);
 });
 // ✅ AKHIR GROUP MIDDLEWARE

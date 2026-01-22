@@ -34,7 +34,8 @@ class HasilUjiLabBokarApiController extends Controller
     }
     
     public function show($id) {
-        return response()->json(['success' => true, 'data' => HasilUjiLabBokar::findOrFail($id)]);
+        $data = HasilUjiLabBokar::where('id_hasil_uji_lab_bokar', $id)->firstOrFail();
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     public function update(Request $request, $id) {
@@ -42,7 +43,8 @@ class HasilUjiLabBokarApiController extends Controller
         $validated = $request->validate([
             'tanggal'   => 'required|date',
             'suplier'   => 'required|string',
-            'no_sampel' => 'required|string|unique:hasil_uji_lab_bokar,no_sampel,'.$id,
+            // 🔥 PERBAIKAN: Sebutkan nama kolom PK di parameter ke-3 unique
+            'no_sampel' => 'required|string|unique:hasil_uji_lab_bokar,no_sampel,' . $id . ',id_hasil_uji_lab_bokar',
             'k3'        => 'required|numeric',
             'dirt'      => 'required|numeric',
             'ask'       => 'required|numeric',
@@ -55,7 +57,8 @@ class HasilUjiLabBokarApiController extends Controller
     }
 
     public function destroy($id) {
-        HasilUjiLabBokar::findOrFail($id)->delete();
+        $data = HasilUjiLabBokar::where('id_hasil_uji_lab_bokar', $id)->firstOrFail();
+        $data->delete();
         return response()->json(['success' => true, 'message' => 'Dihapus']);
     }
 }
