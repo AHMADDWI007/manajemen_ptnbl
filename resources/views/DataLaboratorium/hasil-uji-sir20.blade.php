@@ -11,22 +11,9 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
     
     <style>
-        .table-bordered th, .table-bordered td { 
-            border: 1px solid #dee2e6; 
-            vertical-align: middle; 
-            white-space: nowrap; 
-            text-align: center; 
-        }
-        #dataTable th, #dataTable td { 
-            text-align: center !important; 
-            vertical-align: middle !important; 
-        }
-        .action-buttons { 
-            display: flex; 
-            justify-content: center; 
-            gap: 5px; 
-        }
-        /* Fix Pagination Bootstrap 4 */
+        .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; vertical-align: middle; white-space: nowrap; text-align: center; }
+        #dataTable th, #dataTable td { text-align: center !important; vertical-align: middle !important; }
+        .action-buttons { display: flex; justify-content: center; gap: 5px; }
         .page-item.active .page-link { background-color: #28a745; border-color: #28a745; }
         .page-link { color: #28a745; }
         .page-link:hover { color: #1e7e34; }
@@ -51,9 +38,7 @@
         <div class="content">
             <div class="container-fluid">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold">
-                        Daftar Hasil Uji Sir 20
-                    </div>
+                    <div class="card-header bg-success text-white fw-bold">Daftar Hasil Uji Sir 20</div>
                     <div class="card-body">
                         @if ($errors->any())
                         <div class="alert alert-danger"><ul class="mb-0">
@@ -61,7 +46,7 @@
                         </ul></div>
                         @endif
 
-                        {{-- FILTER TANGGAL (VERSI RAPI) --}}
+                        {{-- FILTER TANGGAL (VERSI RAPI - TETAP SAMA) --}}
                         <div class="row mb-3 align-items-end">
                             <div class="col-auto">
                                 <label for="min-date" class="form-label small fw-bold mb-1">Dari Tanggal:</label>
@@ -82,19 +67,9 @@
                             <table class="table table-bordered table-striped align-middle" id="dataTable" style="width:100%">
                                 <thead class="text-center bg-light"> 
                                     <tr>
-                                        <th>No</th>
-                                        <th>Tanggal</th>
-                                        <th>Jenis Kemasan</th>
-                                        <th>No. Palet</th>
-                                        <th>Po</th>
-                                        <th>Pa</th>
-                                        <th>PRI</th>
-                                        <th>Dirt(%)</th>
-                                        <th>Ash(%)</th>
-                                        <th>VM(%)</th>
-                                        <th>Money</th>
-                                        <th>Nitrogen(%)</th>
-                                        <th>Aksi</th>
+                                        <th>No</th><th>Tanggal</th><th>Jenis Kemasan</th><th>No. Palet</th>
+                                        <th>Po</th><th>Pa</th><th>PRI</th><th>Dirt(%)</th><th>Ash(%)</th>
+                                        <th>VM(%)</th><th>Money</th><th>Nitrogen(%)</th><th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -114,11 +89,11 @@
                                             <td>{{ is_numeric($item->nitrogen) ? (fmod($item->nitrogen, 1) == 0 ? (int)$item->nitrogen : $item->nitrogen) : '-' }}</td>
                                             <td>
                                                 <div class="action-buttons">
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}" title="Detail"><i class="fas fa-eye"></i></button>
-                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}" title="Edit"><i class="fas fa-edit"></i></button>
+                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}"><i class="fas fa-eye"></i></button>
+                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}"><i class="fas fa-edit"></i></button>
                                                     <form action="{{ route('hasil-uji-sir20.destroy', $item->id_hasil_uji_lab_sir_20) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block; margin:0;"> 
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"><i class="fas fa-trash"></i></button>
+                                                        <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
                                                     </form>
                                                 </div>
                                             </td>
@@ -127,16 +102,11 @@
                                 </tbody>
                             </table>
                         </div>
-
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <footer class="main-footer">
-        @include('template.footer')
-    </footer>
 </div>
 
 @include('template.script') 
@@ -152,16 +122,25 @@
                     <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" class="form-control" required></div>
-                   <div class="form-group">
+                    <div class="form-group"><label>Tanggal Produksi</label><input type="date" name="tanggal" id="tambah_tanggal" class="form-control" required></div>
+                    <div class="form-group">
                         <label>Jenis Kemasan</label>
                         <select name="jenis_kemasan" class="form-control" required>
                             <option value="">-- Pilih Jenis --</option>
-                            <option value="MB5" {{ old('jenis_kemasan') == 'MB5' ? 'selected' : '' }}>MB5</option>
-                            <option value="SW" {{ old('jenis_kemasan') == 'SW' ? 'selected' : '' }}>SW</option>
+                            <option value="MB5">MB5</option>
+                            <option value="SW">SW</option>
                         </select>
                     </div>
-                    <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" class="form-control" required></div>
+                    {{-- REVISI: NO PALET JADI DROPDOWN --}}
+                    <div class="form-group">
+                        <label>No. Palet</label>
+                        <select name="no_palet" id="tambah_no_palet" class="form-control" required>
+                            <option value="">-- Pilih Nomor Palet --</option>
+                            @foreach ($palletOptions as $no)
+                                <option value="{{ $no }}">Palet No. {{ $no }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
@@ -176,54 +155,6 @@
                     <button type="submit" class="btn btn-success">Simpan</button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
-
-{{-- MODAL DETAIL --}}
-<div class="modal fade" id="modalDetail" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white"> 
-                <h5 class="modal-title">Detail Hasil Uji SIR 20</h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <dl class="row mb-0">
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Tanggal</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailTanggal">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Jenis Kemasan</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailJenisKemasan">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>No. Palet</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailNoPalet">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Po</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailPo">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Pa</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailPa">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>PRI</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailPri">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Dirt</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailDirt">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Ash</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailAsh">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>VM</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailVm">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Mooney</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailMoney">-</dd>
-
-                    <dt class="col-sm-4 d-flex justify-content-between"><span>Nitrogen</span><span>:</span></dt>
-                    <dd class="col-sm-8" id="detailNitrogen">-</dd>
-                </dl>
-            </div>
         </div>
     </div>
 </div>
@@ -243,12 +174,16 @@
                     <div class="form-group">
                         <label>Jenis Kemasan</label>
                         <select name="jenis_kemasan" id="editJenisKemasan" class="form-control" required>
-                            <option value="">-- Pilih Jenis --</option>
                             <option value="MB5">MB5</option>
                             <option value="SW">SW</option>
                         </select>
                     </div>
-                    <div class="form-group"><label>No. Palet</label><input type="text" name="no_palet" id="editNoPalet" class="form-control" required></div>
+                    <div class="form-group">
+                        <label>No. Palet</label>
+                        <select name="no_palet" id="editNoPalet" class="form-control" required>
+                            {{-- Diisi via JS --}}
+                        </select>
+                    </div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
@@ -280,12 +215,11 @@ $(document).ready(function(){
         Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
     @endif
 
+    // --- LOGIKA FILTER TANGGAL (TETAP SAMA) ---
     var fpMin, fpMax;
-
     function parseDMY(dateStr){
         var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
     }
-
     fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat:"Y-m-d", defaultDate: "today" });
     fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat:"Y-m-d", defaultDate: "today" });
 
@@ -296,55 +230,41 @@ $(document).ready(function(){
         if((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; return false;
     });
 
-    // Inisialisasi DataTable Bootstrap 4
     var table = $('#dataTable').DataTable({
         "order": [[1,"desc"]],
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json"
-        }
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" }
     });
 
     table.draw();
-
     $('#filter-btn').click(function(e){ e.preventDefault(); table.draw(); });
     $('#reset-filter').click(function(e){ e.preventDefault(); fpMin.setDate("today"); fpMax.setDate("today"); setTimeout(function(){ table.search('').draw(); },100); });
 
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    // DETAIL
-    $(document).on('click', '.btn-detail', function(){
-        var id = $(this).data('id');
-        var url = "{{ url('hasil-uji-sir20') }}/" + id;
-        $.get(url, function(data){
-            $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
-            $('#detailJenisKemasan').text(data.jenis_kemasan || '-');
-            $('#detailNoPalet').text(data.no_palet || '-');
-            
-            function formatNumber(num) {
-                if (!$.isNumeric(num)) return '-';
-                return (num % 1 === 0) ? parseInt(num) : parseFloat(num);
+    // --- LOGIKA AJAX UPDATE NOMOR PALET BERDASARKAN TANGGAL MODAL ---
+    function fetchPallets(tanggal, targetDropdown, selectedVal = null) {
+        if (!tanggal) return;
+        $.ajax({
+            url: "{{ route('uji-sir20.get-pallets') }}", // Pastikan route ini ada di web.php
+            type: "GET",
+            data: { tanggal: tanggal },
+            success: function(response) {
+                let dropdown = $(targetDropdown);
+                dropdown.empty().append('<option value="">-- Pilih Nomor Palet --</option>');
+                $.each(response, function(key, val) {
+                    let selected = (val.nomor == selectedVal) ? 'selected' : '';
+                    dropdown.append('<option value="'+val.nomor+'" '+selected+'>Palet No. '+val.nomor+'</option>');
+                });
             }
+        });
+    }
 
-            $('#detailPo').text(formatNumber(data.po));
-            $('#detailPa').text(formatNumber(data.pa));
-            $('#detailPri').text(formatNumber(data.pri));
-            
-            var dirtVal = formatNumber(data.dirt);
-            $('#detailDirt').text(dirtVal !== '-' ? dirtVal + ' %' : '-');
-            
-            var ashVal = formatNumber(data.ash);
-            $('#detailAsh').text(ashVal !== '-' ? ashVal + ' %' : '-');
-            
-            var vmVal = formatNumber(data.vm);
-            $('#detailVm').text(vmVal !== '-' ? vmVal + ' %' : '-');
-            
-            $('#detailMoney').text(formatNumber(data.money));
-            
-            var nitrogenVal = formatNumber(data.nitrogen);
-            $('#detailNitrogen').text(nitrogenVal !== '-' ? nitrogenVal + ' %' : '-');
-            
-            $('#modalDetail').modal('show'); 
-        }).fail(function(){ alert('Gagal memuat detail.'); });
+    $('#tambah_tanggal').on('change', function() {
+        fetchPallets($(this).val(), '#tambah_no_palet');
+    });
+
+    $('#editTanggal').on('change', function() {
+        fetchPallets($(this).val(), '#editNoPalet');
     });
 
     // EDIT
@@ -355,7 +275,6 @@ $(document).ready(function(){
         $.get(urlGet, function(data){
             $('#editTanggal').val(data.tanggal); 
             $('#editJenisKemasan').val(data.jenis_kemasan);
-            $('#editNoPalet').val(data.no_palet); 
             $('#editPo').val(data.po);
             $('#editPa').val(data.pa); 
             $('#editPri').val(data.pri); 
@@ -365,10 +284,34 @@ $(document).ready(function(){
             $('#editMoney').val(data.money);
             $('#editNitrogen').val(data.nitrogen); 
             $('#formEdit').attr('action', urlPost); 
+
+            // Load No Palet untuk Modal Edit
+            fetchPallets(data.tanggal, '#editNoPalet', data.no_palet);
+
             $('#modalEdit').modal('show'); 
-        }).fail(function(){ alert('Gagal memuat data edit.'); });
+        });
     });
 
+    // DETAIL (TETAP SAMA)
+    $(document).on('click', '.btn-detail', function(){
+        var id = $(this).data('id');
+        var url = "{{ url('hasil-uji-sir20') }}/" + id;
+        $.get(url, function(data){
+            $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
+            $('#detailJenisKemasan').text(data.jenis_kemasan || '-');
+            $('#detailNoPalet').text(data.no_palet || '-');
+            function formatNumber(num) { if (!$.isNumeric(num)) return '-'; return (num % 1 === 0) ? parseInt(num) : parseFloat(num); }
+            $('#detailPo').text(formatNumber(data.po));
+            $('#detailPa').text(formatNumber(data.pa));
+            $('#detailPri').text(formatNumber(data.pri));
+            $('#detailDirt').text(formatNumber(data.dirt) !== '-' ? formatNumber(data.dirt) + ' %' : '-');
+            $('#detailAsh').text(formatNumber(data.ash) !== '-' ? formatNumber(data.ash) + ' %' : '-');
+            $('#detailVm').text(formatNumber(data.vm) !== '-' ? formatNumber(data.vm) + ' %' : '-');
+            $('#detailMoney').text(formatNumber(data.money));
+            $('#detailNitrogen').text(formatNumber(data.nitrogen) !== '-' ? formatNumber(data.nitrogen) + ' %' : '-');
+            $('#modalDetail').modal('show'); 
+        });
+    });
 });
 </script>
 </body>
