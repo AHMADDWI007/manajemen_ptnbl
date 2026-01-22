@@ -2,19 +2,31 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
-use App\Http\Controllers\Controller;
-use App\Models\HasilUjiLabSIR20; // 🔥 [PERBAIKAN 1] Gunakan Model Baru
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use App\Models\ProduksiSir20;
 use Illuminate\Validation\Rule;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Validator;
+use App\Models\HasilUjiLabSIR20; // 🔥 [PERBAIKAN 1] Gunakan Model Baru
 
 class HasilUjiSIR20Controller extends Controller
 {
-    public function index()
-    {
-        $data_sir_20 = HasilUjiLabSIR20::orderBy('tanggal', 'desc')->get();
-        return view('DataLaboratorium.hasil-uji-sir20', compact('data_sir_20'));
+  public function index()
+{
+    $data_sir_20 = HasilUjiLabSIR20::orderBy('tanggal', 'desc')->get();
+
+    // Ambil data produksi terakhir sebagai default dropdown
+    $latestProd = \App\Models\ProduksiSir20::latest('tanggal_produksi')->first();
+    
+    $palletOptions = [];
+    if ($latestProd) {
+        for ($i = (int)$latestProd->nomor_start; $i <= (int)$latestProd->nomor_end; $i++) {
+            $palletOptions[] = $i;
+        }
     }
+
+    return view('DataLaboratorium.hasil-uji-sir20', compact('data_sir_20', 'palletOptions'));
+}
 
     public function store(Request $request)
     {
@@ -122,5 +134,40 @@ class HasilUjiSIR20Controller extends Controller
 
         return redirect()->route('hasil-uji-sir20.index')
                          ->with('error', 'Data gagal dihapus atau tidak ditemukan.');
+    }
+    public function getAvailablePallets(Request $request)
+    {
+        $tanggal = $request->tanggal;
+
+        // 1. Cari data produksi di tanggal tersebut
+        $produksi = ProduksiSir20::whereDate('tanggal_produksi', $tanggal)->get();
+
+        if ($produksi->isEmpty()) {
+            return response()->json(['message' => 'Tidak ada produksi di tanggal ini'], 404);
+        }
+
+        $daftarPalet = [];
+
+        foreach ($produksi as $prod) {
+            $start = (int) $prod->nomor_start;
+            $end = (int) $prod->nomor_end;
+
+            // 2. Loop untuk menghasilkan angka dari start sampai end (misal 1 s/d 15)
+            for ($i = $start; $i <= $end; $i++) {
+                // 3. (Opsional) Cek apakah nomor palet ini sudah pernah diuji?
+                $sudahDiuji = HasilUjiLabSIR20::where('no_palet', $i)
+                    ->whereDate('tanggal', $tanggal)
+                    ->exists();
+
+                if (!$sudahDiuji) {
+                    $daftarPalet[] = [
+                        'nomor' => $i,
+                        'label' => 'Palet No. ' . $i
+                    ];
+                }
+            }
+        }
+
+        return response()->json($daftarPalet);
     }
 }

@@ -8,19 +8,45 @@
         .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; vertical-align: middle; padding: 6px 12px; }
         .header-white th { text-align: center; font-weight: bold; background-color: #ffffff; color: #343a40; }
         .header-green th { text-align: center; font-weight: bold; background-color: #28a745; color: white; }
-        
         .bg-highlight { background-color: #d4edda; color: #155724; } 
-        
-        .card-header { font-weight: bold; } /* Hapus uppercase global */
-        .judul-tabel { text-transform: uppercase; } /* Uppercase khusus judul */
-        
+        .card-header { font-weight: bold; }
+        .judul-tabel { text-transform: uppercase; }
         .row-jumlah { font-weight: bold; background-color: #f8f9fa; }
+        .stok-info { background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 10px; border-radius: 5px; }
+
+        /* Style untuk Grid Nomor Palet */
+        .pallet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+            gap: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid #ced4da;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #fdfdfd;
+        }
+        .pallet-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 13px;
+            margin-bottom: 0;
+        }
+        .pallet-item:hover { border-color: #28a745; background: #f0f0f0; }
+        .pallet-item input { margin-right: 6px; cursor: pointer; }
+        .pallet-item.selected { background: #d4edda !important; border-color: #28a745 !important; color: #155724 !important; font-weight: bold; }
     </style>
 </head>
 
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
-
     @include('template.navbar')
     @include('template.sidebar')
 
@@ -38,21 +64,13 @@
             <div class="container-fluid">
                 
                 @if(session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        {{ session('success') }}
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    </div>
+                    <script>Swal.fire({ icon: 'success', title: 'Berhasil!', text: '{{ session('success') }}', timer: 2000, showConfirmButton: false });</script>
                 @endif
 
-                {{-- TABEL PENJUALAN --}}
+                {{-- 1. TABEL RINGKASAN (TABEL V) --}}
                 <div class="card shadow-sm mb-4">
-                    
-                    {{-- HEADER HIJAU --}}
                     <div class="card-header bg-success d-flex align-items-center">
-                        {{-- Judul tetap Uppercase --}}
-                        <h3 class="card-title font-weight-bold text-white mb-0 judul-tabel">V. TELAH DIJUAL (KG SIR-20)</h3>
-                        
-                        {{-- Filter Tanggal (Normal Case) --}}
+                        <h3 class="card-title font-weight-bold text-white mb-0 judul-tabel">V. TELAH DIJUAL (KG SIR-20) - RINGKASAN</h3>
                         <form action="{{ route('penjualan-sir20.index') }}" method="GET" class="form-inline ml-auto">
                             <label for="filter_tanggal" class="mr-2 text-white font-weight-normal">Tanggal:</label>
                             <input type="date" name="filter_tanggal" id="filter_tanggal" 
@@ -65,7 +83,7 @@
 
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped mb-0">
+                            <table class="table table-bordered table-striped mb-0 text-center">
                                 <thead class="header-white">
                                     <tr>
                                         <th rowspan="2" width="5%">V.</th>
@@ -76,7 +94,6 @@
                                         <th rowspan="2">Total Bulan Ini</th>
                                         <th rowspan="2">Total Penjualan<br>s/d Hari ini</th>
                                         <th rowspan="2">Keterangan</th>
-                                        <th rowspan="2" width="5%">Aksi</th>
                                     </tr>
                                     <tr>
                                         <th class="bg-highlight">Yg lalu</th>
@@ -84,58 +101,78 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($tabelData as $item)
+                                    @foreach ($tabelSummary as $item)
                                         <tr>
                                             <td></td>
-                                            <td class="text-center font-weight-bold">{{ $item->no }}</td>
-                                            <td class="font-weight-bold">{{ $item->uraian }}</td>
-                                            <td class="text-center">{{ number_format($item->sd_bulan_lalu, 0, ',', '.') }}</td>
-                                            <td class="text-center bg-highlight">{{ number_format($item->bln_ini_lalu, 0, ',', '.') }}</td>
-                                            <td class="text-center font-weight-bold ">{{ number_format($item->hari_ini, 0, ',', '.') }}</td>
-                                            <td class="text-center font-weight-bold">{{ number_format($item->total_bln_ini, 0, ',', '.') }}</td>
-                                            <td class="text-center font-weight-bold">{{ number_format($item->total_sd_hari_ini, 0, ',', '.') }}</td>
-                                            <td class="text-center">{{ $item->keterangan }}</td>
-                                            <td class="text-center">
-                                                <div class="btn-group">
-                                                    <button type="button" class="btn btn-success btn-sm dropdown-toggle font-weight-bold" data-toggle="dropdown">
-                                                        Aksi
-                                                    </button>
-                                                    <div class="dropdown-menu dropdown-menu-right">
-                                                        <a class="dropdown-item btn-edit" href="javascript:void(0)" 
-                                                           data-uraian="{{ $item->uraian }}"
-                                                           data-hari_ini="{{ $item->hari_ini }}"
-                                                           data-ket="{{ $item->keterangan }}"
-                                                           data-id="{{ $item->id_penjualan_sir20 }}"> {{-- 🔥 UBAH INI --}}
-                                                            <i class="fas fa-edit text-warning mr-2"></i> Input/Edit
-                                                        </a>
-                                                        <div class="dropdown-divider"></div>
-                                                        @if($item->id_penjualan_sir20)
-                                                            <form action="{{ route('penjualan-sir20.destroy', $item->id_penjualan_sir20) }}" method="POST" onsubmit="return confirm('Reset data ini?');">
-                                                                @csrf @method('DELETE')
-                                                                <button type="submit" class="dropdown-item text-danger">
-                                                                    <i class="fas fa-undo mr-2"></i> Reset
-                                                                </button>
-                                                            </form>
-                                                        @else
-                                                            <a class="dropdown-item disabled"><i class="fas fa-undo mr-2"></i> Reset</a>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
+                                            <td class="font-weight-bold">{{ $item->no }}</td>
+                                            <td class="text-left font-weight-bold">{{ $item->uraian }}</td>
+                                            <td>{{ number_format($item->sd_bulan_lalu, 0, ',', '.') }}</td>
+                                            <td class="bg-highlight">{{ number_format($item->bln_ini_lalu, 0, ',', '.') }}</td>
+                                            <td class="font-weight-bold">{{ number_format($item->hari_ini, 0, ',', '.') }}</td>
+                                            <td class="font-weight-bold">{{ number_format($item->total_bln_ini, 0, ',', '.') }}</td>
+                                            <td class="font-weight-bold">{{ number_format($item->total_sd_hari_ini, 0, ',', '.') }}</td>
+                                            <td>{{ $item->keterangan }}</td>
                                         </tr>
                                     @endforeach
                                     <tr class="row-jumlah">
-                                        <td></td>
-                                        <td></td>
-                                        <td class="text-center">JUMLAH 5.1 - 5.2</td>
-                                        <td class="text-center">{{ number_format($tabelData->sum('sd_bulan_lalu'), 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($tabelData->sum('bln_ini_lalu'), 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($tabelData->sum('hari_ini'), 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($tabelData->sum('total_bln_ini'), 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($tabelData->sum('total_sd_hari_ini'), 0, ',', '.') }}</td>
-                                        <td class="text-center">-</td>
-                                        <td></td>
+                                        <td colspan="3" class="text-uppercase">Total Ringkasan</td>
+                                        <td>{{ number_format($tabelSummary->sum('sd_bulan_lalu'), 0, ',', '.') }}</td>
+                                        <td>{{ number_format($tabelSummary->sum('bln_ini_lalu'), 0, ',', '.') }}</td>
+                                        <td>{{ number_format($tabelSummary->sum('hari_ini'), 0, ',', '.') }}</td>
+                                        <td>{{ number_format($tabelSummary->sum('total_bln_ini'), 0, ',', '.') }}</td>
+                                        <td>{{ number_format($tabelSummary->sum('total_sd_hari_ini'), 0, ',', '.') }}</td>
+                                        <td>-</td>
                                     </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 2. TABEL RIWAYAT PENJUALAN --}}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success d-flex align-items-center">
+                        <h3 class="card-title font-weight-bold mb-0 judul-tabel">Riwayat Penjualan Per Kontrak</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped mb-0 text-center">
+                                <thead class="header-white bg-light">
+                                    <tr>
+                                        <th width="5%">No.</th>
+                                        <th width="15%">Tgl Penjualan</th>
+                                        <th>No. Kontrak</th>
+                                        <th>Jumlah Penjualan (Kg)</th>
+                                        <th width="10%">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($riwayatKontrak as $index => $kontrak)
+                                    <tr>
+                                        <td>{{ $index + 1 }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}</td>
+                                        <td>{{ $kontrak->no_kontrak }}</td>
+                                        <td class="font-weight-bold text-success">{{ number_format($kontrak->hari_ini, 2, ',', '.') }} Kg</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-info btn-xs btn-detail" 
+                                                    data-no_kontrak="{{ $kontrak->no_kontrak }}" data-no_invoice="{{ $kontrak->no_invoice }}"
+                                                    data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}" data-uraian="{{ $kontrak->uraian }}"
+                                                    data-pallet="{{ $kontrak->pallet }}" data-hari_ini="{{ number_format($kontrak->hari_ini, 2, ',', '.') }}"
+                                                    data-no_palet_list="{{ $kontrak->no_palet_list }}"
+                                                    data-harga="{{ number_format($kontrak->harga, 0, ',', '.') }}" data-keterangan="{{ $kontrak->keterangan }}">
+                                                    <i class="fas fa-eye"></i> Detail
+                                                </button>
+                                                <form action="{{ route('penjualan-sir20.destroy', $kontrak->id_penjualan_sir20) }}" method="POST" onsubmit="return confirm('Hapus riwayat kontrak ini?');" style="display:inline;">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger btn-xs ml-1"><i class="fas fa-trash"></i></button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="5" class="text-center text-muted py-3">Belum ada data kontrak tersimpan.</td></tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>
@@ -147,115 +184,247 @@
     </div>
     <footer class="main-footer">@include('template.footer')</footer>
 </div>
-
-{{-- MODAL INPUT PENJUALAN --}}
+{{-- 1. MODAL INPUT PENJUALAN --}}
 <div class="modal fade" id="modalInput" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <form action="{{ route('penjualan-sir20.store') }}" method="POST">
+        <div class="modal-content border-success">
+            <form action="{{ route('penjualan-sir20.store') }}" method="POST" id="formPenjualan">
                 @csrf
-                <input type="hidden" name="tanggal" value="{{ $selected_date }}">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Input Penjualan SIR 20</h5>
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title font-weight-bold">Input Data Penjualan Baru</h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-info">
-                        **Catatan:** Angka Penjualan Hari Ini (Kg) akan otomatis terisi dari kolom **Pengiriman** di halaman Data Gudang. Hanya gunakan form ini jika ingin menimpa data Penjualan secara manual.
+                    
+                    {{-- INFO STOK GUDANG (DIAMBIL DARI PROD_SIR) --}}
+                    <div class="stok-info mb-3">
+                        <small class="font-weight-bold"><i class="fas fa-warehouse"></i> STOK MUTU PRIMA TERSEDIA (GUDANG):</small>
+                        <h5 class="mb-0 font-weight-bold text-success" id="txtStokTersedia">0 <span style="font-size: 14px;">Pallet</span></h5>
                     </div>
+
                     <div class="form-group mb-3">
-                        <label>Uraian</label>
-                        <select name="uraian" id="inputUraian" class="form-control font-weight-bold">
+                        <label class="font-weight-bold">Jenis SIR</label>
+                        <select name="uraian" id="inputUraian" class="form-control" required>
                             <option value="SIR20 PTNBL">SIR20 PTNBL</option>
                             <option value="SIR20 PTPN4">SIR20 PTPN4</option>
                         </select>
                     </div>
-                    <div class="form-group mb-3">
-                        <label>Penjualan Hari Ini (Kg)</label>
-                        <input type="number" step="0.01" name="hari_ini" id="inputHariIni" class="form-control" required placeholder="0">
-                        <small class="text-muted">Masukkan jumlah penjualan untuk tanggal {{ \Carbon\Carbon::parse($selected_date)->format('d-m-Y') }}</small>
+
+                    <div class="row">
+                        <div class="col-6"><label>No. Kontrak</label><input type="text" name="no_kontrak" class="form-control" required></div>
+                        <div class="col-6"><label>No. Invoice</label><input type="text" name="no_invoice" class="form-control" required></div>
                     </div>
+
+                    <div class="form-group mt-3 mb-3">
+                        <label>Tanggal Penjualan</label>
+                        <input type="date" name="tanggal" id="inputTanggal" class="form-control" value="{{ $selected_date }}" required>
+                    </div>
+
+                    <hr>
+
+                    {{-- FITUR PILIH PALET BERDASARKAN HASIL LAB --}}
                     <div class="form-group mb-3">
-                        <label>Keterangan</label>
-                        <input type="text" name="keterangan" id="inputKeterangan" class="form-control" placeholder="-">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="font-weight-bold mb-0 text-primary"><i class="fas fa-microscope"></i> Pilih Nomor Palet (Mutu Prima di Lab)</label>
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="checkAllPallet">
+                                <label class="custom-control-label small" for="checkAllPallet" style="cursor:pointer;">Pilih Semua</label>
+                            </div>
+                        </div>
+                        <div id="palletGrid" class="pallet-grid">
+                            <span class="text-muted small">Memuat daftar palet dari lab...</span>
+                        </div>
+                        <small class="text-muted">*Hanya menampilkan palet yang sudah diuji Lab dengan PRI &ge; 40.</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6">
+                            <label>Jumlah Pallet</label>
+                            <input type="number" name="pallet" id="inputPallet" class="form-control bg-light font-weight-bold" readonly required value="0">
+                        </div>
+                        <div class="col-6">
+                            <label>Total Berat (Kg)</label>
+                            <input type="number" step="0.01" name="hari_ini" id="inputHariIni" class="form-control bg-light font-weight-bold text-success" readonly required value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label>Harga Penjualan (Rp/Kg)</label>
+                        <input type="number" name="harga" class="form-control" required placeholder="0">
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Simpan Data</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success shadow-sm" id="btnSimpan" disabled>Simpan Penjualan</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-@include('template.script')
+{{-- 2. MODAL DETAIL PENJUALAN (TAMBAHAN BARU) --}}
+<div class="modal fade" id="modalDetail" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-info">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title font-weight-bold"><i class="fas fa-info-circle mr-2"></i> Rincian Penjualan Kontrak</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table table-striped mb-0">
+                    <tr>
+                        <th width="45%" class="pl-3">No. Kontrak</th>
+                        <td id="detNoKontrak"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">No. Invoice</th>
+                        <td id="detNoInvoice"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Tanggal Penjualan</th>
+                        <td id="detTanggal"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Jenis SIR</th>
+                        <td id="detUraian"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Jumlah Pallet</th>
+                        <td id="detPallet" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Nomor Pallet</th>
+                        <td id="detNoPaletList" class="text-primary font-weight-bold" style="word-break: break-all;"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Total Berat Bersih</th>
+                        <td id="detKg" class="font-weight-bold text-success"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Harga Penjualan</th>
+                        <td id="detHarga"></td>
+                    </tr>
+                    <tr>
+                        <th class="pl-3">Keterangan</th>
+                        <td id="detKeterangan"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-<script>
-    @if(session('success')) Swal.fire({ icon: 'success', title: 'BERHASIL!', text: '{{ session('success') }}', showConfirmButton: false, timer: 2000 }); @endif
-    @if(session('error')) Swal.fire({ icon: 'error', title: 'GAGAL!', text: '{{ session('error') }}', showConfirmButton: true }); @endif
+    @include('template.script')
 
+  <script>
     $(document).ready(function () {
-        
-        // 1. Tombol Input Baru (Header)
-        $('#btnInputBaru').click(function() {
-            var tanggal = '{{ $selected_date }}'; // Tanggal dari PHP
-            
-            // Reset Form
-            $('#inputUraian').val('SIR20 PTNBL');
-            $('#inputHariIni').val(''); 
-            $('#inputKeterangan').val('');
-            
-            // Buka Modal Dulu
-            $('#modalInput').modal('show');
+        // Setup CSRF untuk AJAX
+        $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-            // Debug: Cek apakah request dikirim (Bisa dihapus nanti)
-            console.log('Mencari data pengiriman untuk tanggal: ' + tanggal);
+        // ==========================================
+        // 1. LOGIKA PILIHAN PALET (DARI LAB)
+        // ==========================================
+        function fetchPalletFromLab() {
+            var date = $('#inputTanggal').val();
+            var grid = $('#palletGrid');
+            if(!date) return;
 
-            // AJAX Request
+            grid.html('<span class="text-muted small"><i class="fas fa-spinner fa-spin"></i> Mengecek Lab...</span>');
+            $('#checkAllPallet').prop('checked', false);
+
             $.ajax({
-                url: "{{ route('penjualan-sir20.getPengiriman') }}", // Panggil via Name Route biar aman
-                type: "GET", 
-                data: { date: tanggal },
+                url: "{{ route('penjualan-sir20.getAvailableStock') }}",
+                type: "GET",
+                data: { date: date },
                 success: function(response) {
-                    console.log('Respon Server:', response); // Cek di Console Browser (F12)
-                    
-                    if(response.pengiriman > 0) {
-                        // Jika ada data, isi form
-                        $('#inputHariIni').val(response.pengiriman);
-                        
-                        // Opsional: Beri notifikasi kecil (Toast)
-                        const Toast = Swal.mixin({
-                            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
+                    grid.empty();
+                    if (response.list_pallet && response.list_pallet.length > 0) {
+                        $.each(response.list_pallet, function(i, val) {
+                            grid.append(`
+                                <label class="pallet-item">
+                                    <input type="checkbox" name="selected_pallets[]" class="pallet-check" value="${val}">
+                                    <span>#${val}</span>
+                                </label>
+                            `);
                         });
-                        Toast.fire({
-                            icon: 'success',
-                            title: 'Data Pengiriman Gudang ditemukan: ' + response.pengiriman + ' Kg'
-                        });
+                        $('#txtStokTersedia').html(response.count + " <span style='font-size: 14px;'>Pallet Siap Jual</span>");
                     } else {
-                        console.log('Tidak ada data pengiriman atau 0');
+                        grid.html('<span class="text-danger small">Belum ada palet yang Lulus Uji Lab (PRI >= 40).</span>');
+                        $('#txtStokTersedia').html("0 <span style='font-size: 14px;'>Pallet</span>");
                     }
+                    updateCalculation();
                 },
-                error: function(xhr) { 
-                    console.log('Error AJAX:', xhr.responseText);
-                    // Jika error 404, berarti route salah urutan.
-                    // Jika error 500, berarti controller bermasalah.
+                error: function(xhr) {
+                    grid.html('<span class="text-danger small">Gagal memuat data palet.</span>');
                 }
             });
+        }
+
+        function updateCalculation() {
+            var selected = $('.pallet-check:checked');
+            var count = selected.length;
+            var totalKg = count * 1260; 
+
+            $('#inputPallet').val(count);
+            $('#inputHariIni').val(totalKg);
+
+            $('.pallet-item').removeClass('selected');
+            selected.closest('.pallet-item').addClass('selected');
+
+            $('#btnSimpan').prop('disabled', count === 0);
+        }
+
+        // Event Handlers untuk Input
+        $(document).on('change', '.pallet-check', updateCalculation);
+        $('#checkAllPallet').on('change', function() {
+            $('.pallet-check').prop('checked', $(this).prop('checked'));
+            updateCalculation();
         });
+        $('#inputTanggal').change(fetchPalletFromLab);
 
-        // 2. Tombol Edit (Di Tabel)
-        $('.btn-edit').click(function() {
-            var uraian = $(this).data('uraian');
-            var hariIni = $(this).data('hari_ini');
-            var ket = $(this).data('ket');
-
-            $('#inputUraian').val(uraian);
-            $('#inputHariIni').val(hariIni);
-            $('#inputKeterangan').val(ket);
-            
+        $('#btnInputBaru').click(function() {
+            $('#formPenjualan')[0].reset();
+            $('#inputTanggal').val('{{ $selected_date }}');
             $('#modalInput').modal('show');
+            setTimeout(fetchPalletFromLab, 300);
         });
 
+        // ==========================================
+        // 2. LOGIKA TOMBOL DETAIL (PERBAIKAN ANDA)
+        // ==========================================
+        $('.btn-detail').click(function() {
+            // Mengambil data dari atribut data- di tombol
+            var no_kontrak = $(this).data('no_kontrak');
+            var no_invoice = $(this).data('no_invoice');
+            var tanggal    = $(this).data('tanggal');
+            var uraian     = $(this).data('uraian');
+            var pallet     = $(this).data('pallet');
+            var no_palet_list = $(this).data('no_palet_list');
+            var hari_ini   = $(this).data('hari_ini');
+            var harga      = $(this).data('harga');
+            var keterangan = $(this).data('keterangan');
+
+            // Mengisi konten modal detail
+            $('#detNoKontrak').text(no_kontrak);
+            $('#detNoInvoice').text(no_invoice);
+            $('#detTanggal').text(tanggal);
+            $('#detUraian').text(uraian);
+            $('#detPallet').text(pallet + " Pallet");
+            $('#detNoPaletList').text(no_palet_list ? no_palet_list : '-');
+            $('#detKg').text(hari_ini + " Kg");
+            $('#detHarga').text("Rp " + harga);
+            $('#detKeterangan').text(keterangan || '-');
+
+            // Menampilkan Modal Detail
+            $('#modalDetail').modal('show');
+        });
+
+        // Notifikasi SweetAlert
+        @if(session('success')) Swal.fire({ icon: 'success', title: 'BERHASIL!', text: '{{ session('success') }}', showConfirmButton: false, timer: 2000 }); @endif
+        @if(session('error')) Swal.fire({ icon: 'error', title: 'GAGAL!', text: '{{ session('error') }}' }); @endif
     });
 </script>
 </body>

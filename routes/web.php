@@ -87,6 +87,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('hasil-uji-bokar-diolah', HasilUjiBokarDiolahController::class);
     Route::resource('hasil-uji-maturasi', HasilUjiMaturasiController::class);
     Route::resource('hasil-uji-troli', HasilUjiTroliController::class);
+    Route::get('/get-available-pallets', [HasilUjiSIR20Controller::class, 'getAvailablePallets'])->name('uji-sir20.get-pallets');
     Route::resource('hasil-uji-sir20', HasilUjiSir20Controller::class);
 
 
@@ -103,10 +104,10 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('produksi-sir20', ProduksiSir20Controller::class);
 
     // 3. Penjualan
+     Route::get('/penjualan-sir20/get-available-stock', [PenjualanSir20Controller::class, 'getAvailableStock'])->name('penjualan-sir20.getAvailableStock');
     Route::get('/penjualan-sir20/get-pengiriman', [PenjualanSir20Controller::class, 'getPengirimanGudang'])->name('penjualan-sir20.getPengiriman');
     Route::resource('penjualan-sir20', PenjualanSir20Controller::class)->parameters(['penjualan-sir20' => 'id']);
-
-
+   
     // ====================================================
     // ⚪ LAIN - LAIN
     // ====================================================
