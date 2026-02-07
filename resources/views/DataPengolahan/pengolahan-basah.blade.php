@@ -157,43 +157,104 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {{-- Loop data dari $data_pengolahan (Controller) --}}
-                                    @forelse ($data_pengolahan as $item)
+                                    @forelse ($data_pengolahan as $groupKey => $group)
+                                        @php
+                                            $head = $group->first(); 
+                                            $jumlah_pecahan = $group->count();
+                                            
+                                            // Hitung Total
+                                            $total_truck   = $group->sum('berat_truck');
+                                            $total_timbang = $group->sum('berat_timbang');
+                                            $total_netto   = $group->sum('netto_basah');
+                                            $total_kering  = $group->sum('netto_kering');
+                                            
+                                            // List Jenis
+                                            $list_jenis = $group->pluck('jenis')->unique()->implode(', ');
+                                        @endphp
+
                                         <tr>
                                             <td>{{ $loop->iteration }}</td>
-                                            <td>{{ $item->tanggal ? \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') : '-' }}</td>
+                                            <td>{{ \Carbon\Carbon::parse($head->tanggal)->format('d-m-Y') }}</td>
+                                            <td>{{ $head->maturasi->uraian ?? 'Bak Terhapus' }}</td>
                                             
-                                            {{-- 🔥 PERBAIKAN: Gunakan Relasi Maturasi untuk menampilkan Nama Bak --}}
-                                            <td>{{ $item->maturasi->uraian ?? 'Bak Terhapus' }}</td>
-                                            
-                                            <td>{{ $item->jenis ?? '-' }}</td>
-                                            <td>{{ number_format($item->berat_truck, 0) }}</td>
-                                            <td>{{ number_format($item->berat_timbang, 0) }}</td>
-                                            <td>{{ number_format($item->netto_basah, 0) }}</td>
-                                            <td>{{ is_numeric($item->k3) ? number_format($item->k3, 2) : '-' }}</td>
-                                            <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 0) : '-' }}</td>
+                                            {{-- KOLOM JENIS --}}
+                                            <td>
+                                                @if($jumlah_pecahan > 1)
+                                                    <span class="badge badge-info">Multi: {{ $list_jenis }}</span>
+                                                @else
+                                                    @if($head->jenis == 'PENDING')
+                                                        <span class="badge badge-warning text-dark"><i class="fas fa-exclamation-circle"></i> {{ $head->jenis }} (Cek)</span>
+                                                    @else
+                                                        {{ $head->jenis }}
+                                                    @endif
+                                                @endif
+                                            </td>
+
+                                            {{-- Berat Truck --}}
+                                            <td>{{ number_format(ceil($total_truck), 0, ',', '.') }}</td>
+
+                                            {{-- Berat Timbang --}}
+                                            <td>{{ number_format(ceil($total_timbang), 0, ',', '.') }}</td>
+
+                                            {{-- Netto Basah (Hapus text-success jika mau, tambah ceil) --}}
+                                            <td class="font-weight-bold">{{ number_format(ceil($total_netto), 0, ',', '.') }}</td>
+
+                                            {{-- K3 (Persen biarkan ada koma karena butuh presisi) --}}
+                                            <td>{{ $head->k3 ? number_format($head->k3, 2).'%' : '-' }}</td>
+
+                                            {{-- Netto Kering (Hijau) --}}
+                                            <td class="font-weight-bold text-success">{{ $total_kering > 0 ? number_format(ceil($total_kering), 0, ',', '.') : '-' }}</td>
+
                                             <td>
                                                 <div class="action-buttons">
-                                                    {{-- Tombol Aksi: Detail, Edit, Hapus --}}
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_pengolahan_basah }}" title="Detail"> <i class="fas fa-eye"></i> </button>
                                                     
-                                                    {{-- 🔥 PERBAIKAN: Kirim maturasi-id agar modal edit bisa auto-select --}}
-                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" 
-                                                        data-id="{{ $item->id_pengolahan_basah }}" 
-                                                        data-maturasi-id="{{ $item->id_maturasi }}" 
-                                                        title="Edit"> 
-                                                        <i class="fas fa-edit"></i> 
+                                                    <textarea class="d-none group-data-json">{{ $group->toJson() }}</textarea>
+                                                    
+                                                    <button type="button" class="btn btn-info btn-sm btn-detail-group" 
+                                                        data-bak="{{ $head->maturasi->uraian ?? '-' }}"
+                                                        title="Lihat Rincian"> 
+                                                        <i class="fas fa-eye"></i> 
                                                     </button>
 
-                                                    <form action="{{ route('pengolahan-basah.destroy', $item->id_pengolahan_basah) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
-                                                        @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
-                                                    </form>
+                                                    @if($jumlah_pecahan == 1)
+                                                        {{-- TOMBOL SINGLE (Biarkan seperti semula) --}}
+                                                        <button type="button" class="btn btn-primary btn-sm btn-pecah" 
+                                                            data-id="{{ $head->id_pengolahan_basah }}" 
+                                                            {{-- 🔥 PERUBAHAN DISINI: Ambil data $total_kering, bukan netto_basah --}}
+                                                            data-netto="{{ number_format(ceil($total_kering), 0, '.', '') }}"
+                                                            title="Pecah Data"> 
+                                                            <i class="fas fa-project-diagram"></i> 
+                                                        </button>
+
+                                                        <button type="button" class="btn btn-warning btn-sm btn-edit" 
+                                                            data-id="{{ $head->id_pengolahan_basah }}" 
+                                                            data-maturasi-id="{{ $head->id_maturasi }}" 
+                                                            title="Edit"> 
+                                                            <i class="fas fa-edit"></i> 
+                                                        </button>
+
+                                                        <form action="{{ route('pengolahan-basah.destroy', $head->id_pengolahan_basah) }}" method="POST" class="form-hapus-single" style="display:inline;">
+                                                            @csrf @method('DELETE')
+                                                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                                        </form>
+
+                                                    @else
+                                                        {{-- 🔥 TOMBOL HAPUS GROUP (DENGAN CLASS KHUSUS UNTUK ALERT) --}}
+                                                        <form action="{{ route('pengolahan-basah.destroy-group') }}" method="POST" class="form-hapus-group" style="display:inline;">
+                                                            @csrf 
+                                                            @method('DELETE')
+                                                            <input type="hidden" name="group_ids" value="{{ json_encode($group->pluck('id_pengolahan_basah')) }}">
+                                                            
+                                                            <button type="submit" class="btn btn-danger btn-sm" title="Hapus Seluruh Group">
+                                                                <i class="fas fa-trash-alt"></i> Hapus Group
+                                                            </button>
+                                                        </form>
+                                                    @endif
                                                 </div>
                                             </td>
                                         </tr>
                                     @empty
-                                        {{-- Kosong dibiarkan agar DataTables handle --}}
+                                        <tr><td colspan="10" class="text-center text-muted">Belum ada data.</td></tr>
                                     @endforelse
                                 </tbody>
                                 {{-- ✅ PERBAIKAN KRITIS: Sembunyikan TFOOT jika data kosong untuk mencegah DataTables error --}}
@@ -231,123 +292,151 @@
 
 {{-- MODAL TAMBAH --}}
 <div class="modal fade" id="modalTambah" tabindex="-1" role="dialog">
-     <div class="modal-dialog" role="document">
-         <div class="modal-content">
-             <form action="{{ route('pengolahan-basah.store') }}" method="POST">
-                 @csrf
-                 <div class="modal-header bg-success text-white">
-                     <h5 class="modal-title fw-bold">Tambah Pengolahan Basah</h5>
-                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-                 </div>
-                 <div class="modal-body">
-                     <div class="form-group">
-                         <label>Tanggal</label>
-                         <input type="date" name="tanggal" class="form-control" value="{{ old('tanggal', date('Y-m-d')) }}" required>
-                     </div>
-                     <div class="form-group">
-                         <label>Berat Truck (Kg)</label>
-                         <input type="number" name="berat_truck" id="add_berat_truck" class="form-control" step="0.01" value="{{ old('berat_truck') }}" required>
-                     </div>
-                     <div class="form-group">
-                         <label>Berat Timbang (Kg)</label>
-                         <input type="number" name="berat_timbang" id="add_berat_timbang" class="form-control" step="0.01" value="{{ old('berat_timbang') }}" required>
-                     </div>
-                     <hr>
-                     <div class="form-group">
-                         <label>Netto Basah (Kg)</label>
-                         <input type="number" id="add_netto_basah" class="form-control" step="0.01" readonly style="background-color: #e9ecef;">
-                     </div>
-                      <div class="form-group">
-                         <label>Jenis</label>
-                         <select name="jenis" class="form-control" required>
-                             <option value="">-- Pilih Jenis --</option>
-                             <option value="PT" {{ old('jenis') == 'PT' ? 'selected' : '' }}>PT</option>
-                             <option value="DS" {{ old('jenis') == 'DS' ? 'selected' : '' }}>DS</option>
-                             <option value="INHUT" {{ old('jenis') == 'INHUT' ? 'selected' : '' }}>INHUT</option>
-                         </select>
-                      </div>
-                      <div class="form-group">
-                         <label>Bak Maturasi</label>
-                         <select name="id_maturasi" class="form-control" required>
-                             <option value="">-- Pilih Bak --</option>
-                             {{-- Loop data Bak dari Model Maturasi --}}
-                             @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
-                                {{-- Value pakai id_maturasi --}}
-                                <option value="{{ $bak->id_maturasi }}">
-                                    {{ $bak->uraian }}
-                                </option>
-                            @endforeach
-                         </select>
-                      </div>
-                 </div>
-                 <div class="modal-footer">
-                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                     <button type="submit" class="btn btn-success">Simpan</button>
-                 </div>
-             </form>
-         </div>
-     </div>
+    <div class="modal-dialog modal-lg" role="document"> <div class="modal-content">
+            <form action="{{ route('pengolahan-basah.store') }}" method="POST" id="formTambahSplit">
+                @csrf
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">Tambah Pengolahan Basah (Multi Jenis)</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Tanggal</label>
+                                <input type="date" name="tanggal" class="form-control" value="{{ old('tanggal', date('Y-m-d')) }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Bak Maturasi</label>
+                                <select name="id_maturasi" class="form-control" required>
+                                    <option value="">-- Pilih Bak --</option>
+                                    @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
+                                        <option value="{{ $bak->id_maturasi }}">{{ $bak->uraian }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6 bg-light p-2 border rounded">
+                            <label class="fw-bold">Data Timbangan Utama</label>
+                            <div class="form-group">
+                                <label>Berat Truck (Kg)</label>
+                                <input type="number" name="berat_truck" id="add_berat_truck" class="form-control" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Berat Timbang (Kg)</label>
+                                <input type="number" name="berat_timbang" id="add_berat_timbang" class="form-control" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Total Netto Basah (Kg)</label>
+                                <input type="number" id="add_netto_basah" class="form-control font-weight-bold text-success" readonly style="background-color: #e9ecef; font-size: 1.2em;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    
+                    <h6 class="fw-bold text-primary"><i class="fas fa-sitemap"></i> Rincian Pembagian Netto (Isi sesuai muatan)</h6>
+                    <div class="alert alert-warning py-1" style="font-size: 0.9rem;">
+                        Total rincian di bawah harus sama dengan <b>Total Netto Basah</b>.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>PT (Kg)</label>
+                                <input type="number" name="split_pt" class="form-control split-input" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>DS (Kg)</label>
+                                <input type="number" name="split_ds" class="form-control split-input" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>INHUT (Kg)</label>
+                                <input type="number" name="split_inhut" class="form-control split-input" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2 p-2 rounded" id="status_split_container" style="background-color: #f8f9fa;">
+                        <strong>Total Rincian: <span id="total_split_display">0</span> Kg</strong>
+                        <strong id="sisa_split_display" class="text-danger">Selisih: 0 Kg</strong>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success" id="btnSimpanSplit" disabled>Simpan Data</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 {{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog">
-     <div class="modal-dialog" role="document">
-         <div class="modal-content">
-             <form id="formEdit" method="POST">
-                 @csrf
-                 @method('PUT')
-                 <div class="modal-header bg-success text-white">
-                     <h5 class="modal-title">Edit Pengolahan Basah</h5>
-                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-                 </div>
-                 <div class="modal-body">
-                     <div class="form-group">
-                         <label>Tanggal</label>
-                         <input type="date" name="tanggal" id="editTanggal" class="form-control" required>
-                     </div>
-                     <div class="form-group">
-                         <label>Bak Maturasi</label>
-                         {{-- 🔥 UPDATE: Name jadi id_maturasi --}}
-                         <select name="id_maturasi" id="editBakMaturasi" class="form-control" required>
-                             <option value="">-- Pilih Bak --</option>
-                             @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
-                                {{-- Value pakai id_maturasi --}}
-                                <option value="{{ $bak->id_maturasi }}">
-                                    {{ $bak->uraian }}
-                                </option>
-                            @endforeach
-                         </select>
-                     </div>
-                     <div class="form-group">
-                         <label>Jenis</label>
-                         <select name="jenis" id="editJenis" class="form-control" required>
-                             <option value="">-- Pilih Jenis --</option>
-                             <option value="PT">PT</option>
-                             <option value="DS">DS</option>
-                             <option value="INHUT">INHUT</option>
-                         </select>
-                     </div>
-                      <div class="form-group">
-                         <label>Berat Truck (Kg)</label>
-                         <input type="number" name="berat_truck" id="editBeratTruck" class="form-control" step="0.01" required>
-                      </div>
-                      <div class="form-group">
-                         <label>Berat Timbang (Kg)</label>
-                         <input type="number" name="berat_timbang" id="editBeratTimbang" class="form-control" step="0.01" required>
-                      </div>
-                      <hr>
-                      <div class="form-group">
-                         <label>Netto Basah (Kg)</label>
-                         <input type="number" id="editNettoBasah" class="form-control" step="0.01" readonly style="background-color: #e9ecef;">
-                      </div>
-                 </div>
-                 <div class="modal-footer">
-                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                     <button type="submit" class="btn btn-success">Simpan Perubahan</button>
-                 </div>
-             </form>
-         </div>
-     </div>
+    <div class="modal-dialog modal-lg" role="document"> <div class="modal-content">
+            <form id="formEdit" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">Edit Pengolahan Basah</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Tanggal</label>
+                                <input type="date" name="tanggal" id="editTanggal" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Bak Maturasi</label>
+                                <select name="id_maturasi" id="editBakMaturasi" class="form-control" required>
+                                    <option value="">-- Pilih Bak --</option>
+                                    @foreach (\App\Models\Maturasi::orderBy('id_maturasi')->get() as $bak)
+                                        <option value="{{ $bak->id_maturasi }}">{{ $bak->uraian }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Jenis</label>
+                                <select name="jenis" id="editJenis" class="form-control" required>
+                                    <option value="">-- Pilih Jenis --</option>
+                                    <option value="PT">PT</option>
+                                    <option value="DS">DS</option>
+                                    <option value="INHUT">INHUT</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 bg-light p-2 border rounded">
+                            <label class="fw-bold text-primary">Data Timbangan</label>
+                            <div class="form-group">
+                                <label>Berat Truck (Kg)</label>
+                                <input type="number" name="berat_truck" id="editBeratTruck" class="form-control" step="0.01" placeholder="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Berat Timbang (Kg)</label>
+                                <input type="number" name="berat_timbang" id="editBeratTimbang" class="form-control" step="0.01" placeholder="0" required>
+                            </div>
+                            <hr>
+                            <div class="form-group">
+                                <label>Netto Basah (Kg)</label>
+                                <input type="number" id="editNettoBasah" class="form-control font-weight-bold text-success" step="0.01" readonly style="background-color: #e9ecef; font-size: 1.2em;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 {{-- MODAL DETAIL --}}
@@ -501,6 +590,125 @@
      </div>
 </div>
 
+{{-- MODAL PECAH DATA (SPLIT) --}}
+<div class="modal fade" id="modalPecah" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form action="{{ route('pengolahan-basah.pecahStore') }}" method="POST" id="formPecah">
+                @csrf
+                <input type="hidden" name="id_asal" id="pecahIdAsal">
+                
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-project-diagram"></i> Pecah Data Timbangan</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="alert alert-info py-2" style="font-size: 0.9rem;">
+                        <i class="fas fa-info-circle"></i> Data asli (Total) akan <strong>dihapus</strong> dan digantikan dengan rincian di bawah ini.
+                    </div>
+
+                    <div class="form-group text-center bg-light p-2 border rounded mb-3">
+                        <label class="mb-0 text-muted">Target Total Netto Kering</label>
+                        <div class="font-weight-bold text-dark" style="font-size: 1.5rem;">
+                            <span id="pecahNettoAsalDisplay">0</span> Kg
+                        </div>
+                        <input type="hidden" id="pecahNettoAsal">
+                    </div>
+                    
+                    <h6 class="fw-bold border-bottom pb-2">Rincian Pembagian Baru:</h6>
+
+                    <div class="row">
+                        <div class="col-4">
+                            <div class="form-group">
+                                <label class="small font-weight-bold">PT (Kg)</label>
+                                <input type="number" name="split_pt" class="form-control input-pecah" placeholder="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="form-group">
+                                <label class="small font-weight-bold">DS (Kg)</label>
+                                <input type="number" name="split_ds" class="form-control input-pecah" placeholder="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="form-group">
+                                <label class="small font-weight-bold">INHUT (Kg)</label>
+                                <input type="number" name="split_inhut" class="form-control input-pecah" placeholder="0" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2 p-2 rounded" style="background-color: #f8f9fa;">
+                        <span class="small font-weight-bold">Total Terbagi: <span id="pecahTotalDisplay">0</span></span>
+                        <span id="pecahSisaDisplay" class="small font-weight-bold text-danger">Kurang: 0</span>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btnSimpanPecah" disabled>
+                        <i class="fas fa-save"></i> Simpan Pecahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- MODAL DETAIL GROUP (TABEL RINCIAN PECAHAN) --}}
+{{-- MODAL DETAIL GROUP (TABEL RINCIAN + TOTAL) --}}
+<div class="modal fade" id="modalDetailGroup" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="fas fa-list-alt"></i> Rincian Data Pecahan (Grouping)</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                {{-- Info Header Bak --}}
+                <div class="callout callout-info py-2 mb-3 bg-light">
+                    <h6 class="mb-0"><strong>Bak Maturasi:</strong> <span id="detailGroupBak" class="text-primary font-weight-bold" style="font-size: 1.1em;"></span></h6>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover text-center align-middle">
+                        <thead class="bg-light text-dark font-weight-bold">
+                            <tr>
+                                <th style="width: 15%;">Jenis</th>
+                                <th>Berat Truk (Kg)</th>
+                                <th>Berat Timbang (Kg)</th>
+                                <th>Netto Basah (Kg)</th>
+                                <th style="width: 10%;">K3 (%)</th>
+                                <th>Netto Kering (Kg)</th>
+                                <th style="width: 10%;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailGroupBody">
+                            {{-- Data akan diisi oleh JavaScript --}}
+                        </tbody>
+                        {{-- 🔥 INI TAMBAHANNYA: FOOTER TOTAL --}}
+                        <tfoot class="bg-light font-weight-bold">
+                            <tr>
+                                <td class="text-center">TOTAL</td>
+                                <td id="sumTruk">0</td>
+                                <td id="sumTimbang">0</td>
+                                <td id="sumNetto">0</td>
+                                <td>-</td>
+                                <td id="sumKering" class="text-success" style="font-size: 1.1em;">0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary fw-bold" data-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- 
 ======================================================================
 SKRIP-SKRIP JAVASCRIPT
@@ -515,6 +723,59 @@ SKRIP-SKRIP JAVASCRIPT
 <script>
 // Menjalankan kode setelah semua elemen halaman selesai dimuat
 $(document).ready(function() {
+
+    // -----------------------------------------------------------------
+    // 🔥 SWEETALERT UNTUK HAPUS GROUP (BANYAK DATA)
+    // -----------------------------------------------------------------
+    $(document).on('submit', '.form-hapus-group', function(e) {
+        e.preventDefault(); // Tahan dulu, jangan submit formnya
+        var form = this;
+
+        Swal.fire({
+            title: 'HAPUS GROUP?',
+            text: "Anda akan menghapus SELURUH pecahan data (PT, DS, dll) di baris ini. Data yang dihapus tidak bisa dikembalikan!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Hapus Semua!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Jika user klik Ya, baru submit form secara manual
+                Swal.fire({
+                    title: 'Menghapus...',
+                    text: 'Mohon tunggu sebentar.',
+                    allowOutsideClick: false,
+                    // didOpen: () => { Swal.showLoading(); }
+                });
+                form.submit();
+            }
+        });
+    });
+
+    // -----------------------------------------------------------------
+    // 🔥 SWEETALERT UNTUK HAPUS SINGLE (SATU DATA)
+    // -----------------------------------------------------------------
+    $(document).on('submit', '.form-hapus-single', function(e) {
+        e.preventDefault();
+        var form = this;
+
+        Swal.fire({
+            title: 'Hapus Data?',
+            text: "Data ini akan dihapus permanen.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    });
     
     // 1. NOTIFIKASI SUKSES (dari Session)
     @if (session('success'))
@@ -565,37 +826,47 @@ $(document).ready(function() {
             "footerCallback": function (row, data, start, end, display) {
                 var api = this.api();
                 
-                // Fungsi helper untuk menghitung total berdasarkan jenis
-                var totalByJenis = function (jenis) {
+                // 1. Siapkan variabel penampung
+                var totalDS = 0;
+                var totalPT = 0;
+                var totalINHUT = 0;
+                var grandTotal = 0;
+
+                // 2. Loop semua baris yang TAMPIL (setelah difilter)
+                api.rows({ search: 'applied' }).nodes().each(function(row, index) {
                     
-                    // 🚀 PERBAIKAN: Gunakan map() untuk membersihkan dan mengonversi string ke angka
-                    var dataNettoKering = api.rows({ filter: 'applied' }).data()
-                        .filter(function(row) {
-                            return row[3] && row[3].trim() === jenis; 
-                        })
-                        .map(function(row) {
-                            // 💥 KONVERSI KRITIS: Ambil nilai Netto Kering (indeks 8)
-                            var nettoKeringStr = row[8] || '0';
-                            var numericValue = nettoKeringStr.toString().replace(/[^0-9]/g, ''); 
-                            return parseInt(numericValue) || 0; 
-                        }).toArray();
+                    // 3. Ambil data JSON tersembunyi dari baris tersebut
+                    var jsonVal = $(row).find('.group-data-json').val();
+                    
+                    if (jsonVal) {
+                        var groupData = JSON.parse(jsonVal);
+                        
+                        // 4. Loop data pecahan di dalam JSON (PT, DS, INHUT)
+                        groupData.forEach(function(item) {
+                            // Pastikan ambil Netto Kering, ubah ke Float, jika null jadi 0
+                            var berat = Math.ceil(parseFloat(item.netto_kering) || 0);
+                            var jenis = (item.jenis || '').toUpperCase().trim();
 
-                    return dataNettoKering.reduce(function (a, b) {
-                        return a + b;
-                    }, 0);
-                };
+                            // 5. Kelompokkan penjumlahan
+                            if (jenis === 'DS') {
+                                totalDS += berat;
+                            } else if (jenis === 'PT') {
+                                totalPT += berat;
+                            } else if (jenis === 'INHUT') {
+                                totalINHUT += berat;
+                            }
+                            
+                            // Total Keseluruhan
+                            grandTotal += berat;
+                        });
+                    }
+                });
 
-                // Hitung total per Jenis
-                var totalDs = totalByJenis('DS');
-                var totalPt = totalByJenis('PT');
-                var totalInhut = totalByJenis('INHUT');
-                var totalSemua = totalDs + totalPt + totalInhut;
-
-                // Update display footer dengan presisi 0
-                $('#total_ds_netto_kering_display').html(formatNumber(totalDs, 0));
-                $('#total_pt_netto_kering_display').html(formatNumber(totalPt, 0));
-                $('#total_inhut_netto_kering_display').html(formatNumber(totalInhut, 0));
-                $('#jumlah_netto_kering_display').html(formatNumber(totalSemua, 0));
+                // 6. Tampilkan Hasil dengan Format Ribuan Indonesia
+                $('#total_ds_netto_kering_display').html(totalDS.toLocaleString('id-ID'));
+                $('#total_pt_netto_kering_display').html(totalPT.toLocaleString('id-ID'));
+                $('#total_inhut_netto_kering_display').html(totalINHUT.toLocaleString('id-ID'));
+                $('#jumlah_netto_kering_display').html(grandTotal.toLocaleString('id-ID'));
             }
         });
         table.draw();
@@ -657,20 +928,76 @@ $(document).ready(function() {
     }
 
     // 8. LOGIKA PERHITUNGAN OTOMATIS (Modal Tambah & Edit)
-    function hitungNettoTambah() {
+    function hitungSplit() {
+        // 1. Hitung Netto Utama
         var truck = parseFloat($('#add_berat_truck').val()) || 0;
         var timbang = parseFloat($('#add_berat_timbang').val()) || 0;
-        var netto_basah = timbang > truck ? timbang - truck : 0;
-        $('#add_netto_basah').val(netto_basah.toFixed(2));
+        var netto_total = 0;
+
+        if (timbang > truck) {
+            netto_total = timbang - truck;
+        }
+        
+        // Tampilkan Netto Total
+        $('#add_netto_basah').val(netto_total.toFixed(2));
+
+        // 2. Ambil nilai pecahan
+        var pt = parseFloat($('input[name="split_pt"]').val()) || 0;
+        var ds = parseFloat($('input[name="split_ds"]').val()) || 0;
+        var inhut = parseFloat($('input[name="split_inhut"]').val()) || 0;
+
+        // 3. Hitung Selisih
+        var total_rincian = pt + ds + inhut;
+        var selisih = netto_total - total_rincian;
+
+        // 4. Update Tampilan Status
+        $('#total_split_display').text(total_rincian.toLocaleString('id-ID'));
+        
+        var sisaElem = $('#sisa_split_display');
+        var btnSimpan = $('#btnSimpanSplit');
+
+        if (netto_total > 0) {
+            // KONDISI A: Input Utuh (User tidak mengisi pecahan sama sekali)
+            if (total_rincian === 0) {
+                sisaElem.removeClass('text-danger text-success').addClass('text-warning')
+                    .html('<i class="fas fa-info-circle"></i> Simpan Utuh (Belum Dipecah)');
+                btnSimpan.prop('disabled', false); // BOLEH SIMPAN
+            } 
+            // KONDISI B: Input Pecahan (User mengisi pecahan dan PAS)
+            else if (Math.abs(selisih) < 0.01) {
+                sisaElem.removeClass('text-danger text-warning').addClass('text-success')
+                    .html('<i class="fas fa-check-circle"></i> Pas / Balance');
+                btnSimpan.prop('disabled', false); // BOLEH SIMPAN
+            } 
+            // KONDISI C: Input Pecahan (User mengisi tapi BELUM PAS)
+            else {
+                sisaElem.removeClass('text-success text-warning').addClass('text-danger')
+                    .text('Selisih: ' + selisih.toFixed(2) + ' Kg');
+                btnSimpan.prop('disabled', true); // TIDAK BOLEH SIMPAN
+            }
+        } else {
+            // Belum input berat truk/timbang
+            sisaElem.text('Menunggu Input Berat...');
+            btnSimpan.prop('disabled', true);
+        }
     }
-    $('#add_berat_truck, #add_berat_timbang').on('input', hitungNettoTambah);
+
+    // Pasang Event Listener
+    $('#add_berat_truck, #add_berat_timbang, .split-input').on('input keyup change', hitungSplit);
 
     function hitungNettoEdit() {
         var truck = parseFloat($('#editBeratTruck').val()) || 0;
         var timbang = parseFloat($('#editBeratTimbang').val()) || 0;
-        var netto_basah = timbang > truck ? timbang - truck : 0;
+        var netto_basah = 0;
+        
+        if (timbang > truck) {
+            netto_basah = timbang - truck;
+        }
+        
         $('#editNettoBasah').val(netto_basah.toFixed(2));
     }
+    
+    // Trigger saat mengetik di modal edit
     $(document).on('input', '#editBeratTruck, #editBeratTimbang', hitungNettoEdit);
 
     // 9. AJAX UNTUK MODAL (Detail & Edit)
@@ -698,23 +1025,37 @@ $(document).ready(function() {
 
     $(document).on('click','.btn-edit',function(){
         var id = $(this).data('id');
-        var maturasiId = $(this).data('maturasi-id'); // 🔥 AMBIL ID DARI TOMBOL
+        var maturasiId = $(this).data('maturasi-id');
+        
+        // 🔥 PERBAIKAN UTAMA DI SINI:
+        // Tutup dulu modal detail group biar tidak tabrakan/gelap
+        $('#modalDetailGroup').modal('hide'); 
+        
+        // Setup URL
         var urlGet = "{{ url('pengolahan-basah') }}/" + id + "/edit";
         var urlPost = "{{ url('pengolahan-basah') }}/" + id;
         
+        // Ambil Data via AJAX
         $.get(urlGet, function(data){
+            // Isi form di Modal Edit
             $('#editTanggal').val(data.tanggal);
-            
-            // 🔥 SET DROPDOWN PAKE ID, BUKAN TEXT
             $('#editBakMaturasi').val(maturasiId); 
-            
             $('#editJenis').val(data.jenis);
             $('#editBeratTruck').val(data.berat_truck);
             $('#editBeratTimbang').val(data.berat_timbang);
+            
+            // Panggil fungsi hitung netto (agar field readonly terisi)
             hitungNettoEdit();
             
+            // Set action form
             $('#formEdit').attr('action', urlPost);
-            $('#modalEdit').modal('show');
+            
+            // 🔥 Trik Kecil: Beri jeda sedikit (200ms) sebelum membuka modal edit
+            // Ini supaya animasi tutup modal sebelumnya selesai dulu
+            setTimeout(function() {
+                $('#modalEdit').modal('show');
+            }, 200);
+            
         }).fail(function(){ 
             alert('Gagal memuat data edit.'); 
         });
@@ -852,23 +1193,199 @@ $(document).ready(function() {
     
     $('#btnSyncApi').click(function(e) {
         e.preventDefault();
+
+        // 1. Ambil tanggal dari input filter
+        var selectedDate = $('#filter_tanggal_summary').val(); 
+
+        // Validasi sederhana (opsional)
+        var pesan = selectedDate ? 'Melakukan sinkronisasi data tanggal ' + selectedDate : 'Melakukan sinkronisasi data hari ini';
+
         Swal.fire({
             title: 'Menarik Data...',
-            text: 'Mohon tunggu...',
+            text: pesan,
             didOpen: () => { Swal.showLoading() }
         });
+
         $.ajax({
-            url: "/sync-bokar-manual", 
+            url: "/sync-bokar-manual",
             type: "POST",
-            data: { _token: $('meta[name="csrf-token"]').attr('content') },
+            data: { 
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                tanggal: selectedDate // 2. Kirim tanggal ke server
+            },
             success: function(response) {
-                Swal.fire('Berhasil!', 'Halaman akan direfresh', 'success')
+                Swal.fire('Berhasil!', response.message, 'success')
                 .then(() => { location.reload(); });
             },
             error: function(xhr) {
-                Swal.fire('Gagal', 'Cek Console Browser untuk detail', 'error');
+                var errorMsg = 'Gagal sinkronisasi';
+                if(xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                Swal.fire('Gagal', errorMsg, 'error');
             }
         });
+    });
+
+    // 1. Buka Modal saat tombol diklik
+    $(document).on('click', '.btn-pecah', function() {
+        var id = $(this).data('id');
+        
+        // Ambil data netto (yang sudah kita format bersih di PHP tadi)
+        var rawNetto = $(this).attr('data-netto'); 
+        
+        // Konversi ke Float lalu Bulatkan ke Atas
+        var netto = Math.ceil(parseFloat(rawNetto));
+
+        // Cek di Console (Tekan F12) untuk memastikan angka masuk
+        console.log("ID Data:", id);
+        console.log("Netto Asli:", rawNetto);
+        console.log("Target Bulat:", netto);
+
+        $('#pecahIdAsal').val(id);
+        $('#pecahNettoAsal').val(netto); // Simpan ke hidden input
+        $('#pecahNettoAsalDisplay').text(netto.toLocaleString('id-ID')); // Tampilkan
+        
+        // Reset inputan form
+        $('.input-pecah').val(''); 
+        $('#pecahTotalDisplay').text('0');
+        
+        // Set status awal
+        $('#pecahSisaDisplay').removeClass('text-success').addClass('text-danger').text('Kurang: ' + netto.toLocaleString('id-ID') + ' Kg');
+        $('#btnSimpanPecah').prop('disabled', true); // Matikan tombol dulu
+
+        $('#modalPecah').modal('show');
+    });
+
+    // 2. Hitung Realtime (DENGAN SELECTOR SPESIFIK #modalPecah)
+    $(document).on('input keyup', '#modalPecah .input-pecah', function() {
+        // Ambil target dari hidden input & PAKSA BULAT KE ATAS (Safety)
+        var rawTarget = $('#pecahNettoAsal').val();
+        var target = Math.ceil(parseFloat(rawTarget) || 0);
+        
+        // Jaga-jaga jika target NaN atau 0
+        if (isNaN(target) || target <= 0) {
+            console.error("Target Netto Error/Nol");
+            $('#btnSimpanPecah').prop('disabled', true);
+            return;
+        }
+        
+        // Ambil inputan user
+        var pt = parseFloat($('#modalPecah input[name="split_pt"]').val()) || 0;
+        var ds = parseFloat($('#modalPecah input[name="split_ds"]').val()) || 0;
+        var inhut = parseFloat($('#modalPecah input[name="split_inhut"]').val()) || 0;
+
+        var total = pt + ds + inhut;
+        var selisih = target - total;
+
+        // Tampilkan Total
+        $('#pecahTotalDisplay').text(total.toLocaleString('id-ID'));
+
+        var sisaLabel = $('#pecahSisaDisplay');
+        var btn = $('#btnSimpanPecah');
+
+        // Debugging di Console (Tekan F12 untuk cek)
+        // console.log("Target:", target, "Total Input:", total, "Selisih:", selisih);
+
+        // Toleransi selisih 0.1 Kg
+        if (Math.abs(selisih) < 0.1) {
+            sisaLabel.removeClass('text-danger').addClass('text-success').html('<i class="fas fa-check-circle"></i> Pas / Balance');
+            btn.prop('disabled', false); // 🔥 AKTIFKAN TOMBOL
+            btn.removeClass('btn-secondary').addClass('btn-primary'); // Ubah warna jadi biru
+        } else {
+            if(selisih > 0) {
+                sisaLabel.removeClass('text-success').addClass('text-danger').text('Kurang: ' + selisih.toLocaleString('id-ID'));
+            } else {
+                sisaLabel.removeClass('text-success').addClass('text-danger').text('Kelebihan: ' + Math.abs(selisih).toLocaleString('id-ID'));
+            }
+            btn.prop('disabled', true); // MATIKAN TOMBOL
+        }
+    });
+
+    // --- LOGIKA DETAIL GROUP (Melihat Rincian Pecahan) ---
+    $(document).on('click', '.btn-detail-group', function() {
+        var btn = $(this);
+        var bakName = btn.data('bak');
+        
+        // Ambil data JSON
+        var jsonString = btn.siblings('.group-data-json').val();
+        var groupData = JSON.parse(jsonString);
+
+        $('#detailGroupBak').text(bakName);
+        var tbody = $('#detailGroupBody');
+        tbody.empty(); 
+
+        var totalTruk = 0;
+        var totalTimbang = 0;
+        var totalNetto = 0;
+        var totalKering = 0;
+
+        // Loop data pecahan
+        $.each(groupData, function(index, item) {
+            // 🔥 UBAH DI SINI: Pakai Math.ceil() untuk bulatkan ke atas
+            var valTruk = Math.ceil(parseFloat(item.berat_truck) || 0);
+            var valTimbang = Math.ceil(parseFloat(item.berat_timbang) || 0);
+            var valNetto = Math.ceil(parseFloat(item.netto_basah) || 0);
+            var valKering = Math.ceil(parseFloat(item.netto_kering) || 0);
+
+            totalTruk += valTruk;
+            totalTimbang += valTimbang;
+            totalNetto += valNetto;
+            totalKering += valKering;
+
+            var k3 = item.k3 ? parseFloat(item.k3).toFixed(2) + '%' : '-';
+            var displayKering = (valKering > 0) ? valKering.toLocaleString('id-ID') : '-';
+
+            // 1. Tombol Edit (Ukuran SM, Margin 1)
+            var btnEdit = `
+                <button type="button" class="btn btn-warning btn-sm btn-edit mx-1" 
+                    data-id="${item.id_pengolahan_basah}" 
+                    data-maturasi-id="${item.id_maturasi}" 
+                    title="Edit Data Ini">
+                    <i class="fas fa-edit"></i>
+                </button>
+            `;
+
+            // 2. Tombol Hapus (Ukuran SM, Margin 1)
+            var deleteUrl = "{{ url('pengolahan-basah') }}/" + item.id_pengolahan_basah;
+            var csrf = $('meta[name="csrf-token"]').attr('content');
+            var btnDelete = `
+                <form action="${deleteUrl}" method="POST" onsubmit="return confirm('Yakin hapus pecahan ini?');" style="display:inline;">
+                    <input type="hidden" name="_token" value="${csrf}">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn btn-danger btn-sm mx-1" title="Hapus Data Ini">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            `;
+
+            // Masukkan ke Tabel
+            tbody.append(`
+                <tr>
+                    <td class="font-weight-bold">${item.jenis}</td>
+                    <td>${valTruk.toLocaleString('id-ID')}</td>
+                    <td>${valTimbang.toLocaleString('id-ID')}</td>
+                    <td class="font-weight-bold">${valNetto.toLocaleString('id-ID')}</td>
+                    <td>${k3}</td>
+                    <td class="text-success font-weight-bold">${displayKering}</td>
+                    <td>
+                        <div class="d-flex justify-content-center align-items-center">
+                            ${btnEdit} ${btnDelete}
+                        </div>
+                    </td>
+                </tr>
+            `);
+        });
+
+        // Isi Footer Total
+        // 🔥 ISI FOOTER DENGAN TOTAL YANG SUDAH DIBULATKAN
+        $('#sumTruk').text(totalTruk.toLocaleString('id-ID'));
+        $('#sumTimbang').text(totalTimbang.toLocaleString('id-ID'));
+        $('#sumNetto').text(totalNetto.toLocaleString('id-ID'));
+        $('#sumKering').text(totalKering > 0 ? totalKering.toLocaleString('id-ID') : '-');
+
+        // Tampilkan Modal
+        $('#modalDetailGroup').modal('show');
     });
 });
 </script>

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PenjualanSirApiController;
 use App\Http\Controllers\Api\TimbangBokarApiController;
 use App\Http\Controllers\Api\HasilUjiSir20ApiController;
 use App\Http\Controllers\Api\HasilUjiTroliApiController;
+use App\Http\Controllers\Api\ProduksiSir20ApiController;
 use App\Http\Controllers\Api\HasilUjiLabBokarApiController;
 use App\Http\Controllers\Api\HasilUjiMaturasiApiController;
 use App\Http\Controllers\Api\HasilUjiBokarOlahApiController;
@@ -53,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/uji-troli/{id}', [HasilUjiTroliApiController::class, 'destroy']);
 
     // --- Rute Uji SIR 20 ---
+    Route::get('/uji-sir20/available-pallets', [HasilUjiSir20ApiController::class, 'getAvailablePallets']);
     Route::post('/uji-sir20', [HasilUjiSir20ApiController::class, 'store'])->name('api.uji-sir20.store');
     Route::get('/hasil-uji-lab-sir20', [HasilUjiSir20ApiController::class, 'index']);
     Route::get('/uji-sir20/{id}', [HasilUjiSir20ApiController::class, 'show']);
@@ -140,8 +142,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('gudang-sir', [GudangSirApiController::class, 'store']);
 
     // [PENJUALAN SIR]
+    Route::get('penjualan-sir20/available-stock', [PenjualanSirApiController::class, 'getAvailableStock']);
     Route::get('penjualan-sir20', [PenjualanSirApiController::class, 'index']);
     Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);
     Route::get('penjualan-sir20/cek-gudang', [PenjualanSirApiController::class, 'getPengirimanGudang']);
+
+    // ==========================================
+    // [PRODUKSI SIR 20] - MODUL BARU
+    // ==========================================
+    
+    // 1. Ambil List Data (History di Android)
+    Route::get('/produksi-sir20', [ProduksiSir20ApiController::class, 'index']);
+
+    // 2. Simpan Data Baru (Header + 3 Child Table + Potong Stok Maturasi)
+    Route::post('/produksi-sir20', [ProduksiSir20ApiController::class, 'store']);
+
+    // 3. Update Data (Header + Reset Child + Potong Ulang Stok)
+    Route::put('/produksi-sir20/{id}', [ProduksiSir20ApiController::class, 'update']);
+
+    // 4. Hapus Data (Hapus + Kembalikan Stok Maturasi)
+    Route::delete('/produksi-sir20/{id}', [ProduksiSir20ApiController::class, 'destroy']);
+    
+    // 5. Tambahan: Ambil Nomor Batch Terakhir (Untuk Auto Number di Android)
+    Route::get('/produksi-sir20/last-number', [ProduksiSir20ApiController::class, 'getLastNumber']);
 });
 // ✅ AKHIR GROUP MIDDLEWARE

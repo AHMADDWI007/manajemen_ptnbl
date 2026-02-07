@@ -84,51 +84,17 @@
                                         <td class="text-center font-weight-bold">{{ number_format($item->saldo_akhir, 2, ',', '.') }}</td>
                                         <td class="text-center">-</td>
                                         <td class="text-center">
-                                            {{-- TOMBOL AKSI DROPDOWN --}}
-                                            <div class="btn-group">
-                                                <button type="button" class="btn btn-success btn-sm dropdown-toggle font-weight-bold" data-toggle="dropdown">
-                                                    Aksi
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-right">
-                                                    {{-- DETAIL --}}
-                                                    @if($item->id_produksi_sir)
-                                                        <a class="dropdown-item" href="javascript:void(0)"
-                                                           onclick="bukaDetailIV(this)"
-                                                           data-uraian="{{ $item->uraian }}"
-                                                           data-masuk="{{ number_format($item->masuk, 2, ',', '.') }}"
-                                                           data-pengiriman="{{ number_format($item->pengiriman, 2, ',', '.') }}"
-                                                           data-ket="{{ $item->keterangan }}">
-                                                            <i class="fas fa-eye text-info mr-2"></i> Detail
-                                                        </a>
-                                                    @else
-                                                        <a class="dropdown-item disabled"><i class="fas fa-eye mr-2"></i> Detail</a>
-                                                    @endif
-
-                                                    {{-- EDIT --}}
-                                                    <a class="dropdown-item btn-edit-iv" href="javascript:void(0)"
-                                                       data-uraian="{{ $item->uraian }}"
-                                                       data-masuk="{{ $item->masuk }}"
-                                                       data-ket="{{ $item->keterangan }}" 
-                                                       data-id="{{ $item->id_produksi_sir }}">
-                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id_produksi_sir ? 'Edit' : 'Edit' }}
-                                                    </a>
-
-                                                    <div class="dropdown-divider"></div>
-
-                                                    {{-- RESET --}}
-                                                    @if($item->id_produksi_sir)
-                                                        <form action="{{ route('data-sir.destroy', $item->id_produksi_sir) }}" method="POST" class="form-reset">
-                                                            @csrf @method('DELETE')
-                                                            <button type="button" class="dropdown-item text-danger btn-reset">
-                                                                <i class="fas fa-undo mr-2"></i> Reset
-                                                            </button>
-                                                        </form>
-                                                    @else
-                                                        <a class="dropdown-item disabled"><i class="fas fa-undo mr-2"></i> Reset</a>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </td>
+                                        {{-- Jika ada stok, tampilkan tombol Pindah --}}
+                                        @if($item->saldo_akhir > 0)
+                                            <button class="btn btn-sm btn-warning font-weight-bold btn-mutasi" 
+                                                    data-id="{{ $item->id_lokasi }}" 
+                                                    data-nama="{{ $item->uraian }}">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                        @else
+                                            <span class="badge badge-secondary">Kosong</span>
+                                        @endif
+                                    </td>
                                     </tr>
                                 @endforeach
                                 <tr class="row-jumlah">
@@ -164,7 +130,6 @@
                                         <th>Kg</th>
                                         <th>Pallet</th>
                                         <th>Keterangan</th>
-                                        <th width="5%">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -175,60 +140,12 @@
                                         <td class="text-center">{{ number_format($item->kg, 2, ',', '.') }}</td>
                                         <td class="text-center">{{ number_format($item->pallet, 0, ',', '.') }}</td>
                                         <td class="text-center">{{ $item->keterangan }}</td>
-                                        <td class="text-center">
-                                            {{-- TOMBOL AKSI DROPDOWN --}}
-                                            <div class="btn-group">
-                                                <button type="button" class="btn btn-success btn-sm dropdown-toggle font-weight-bold" data-toggle="dropdown">
-                                                    Aksi
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-right">
-                                                    {{-- DETAIL --}}
-                                                    @if($item->id_produksi_sir)
-                                                        <a class="dropdown-item" href="javascript:void(0)" 
-                                                           onclick="bukaDetailVI(this)"
-                                                           data-uraian="{{ $item->uraian }}"
-                                                           data-kg="{{ number_format($item->kg, 2, ',', '.') }}"
-                                                           data-pallet="{{ $item->pallet }}"
-                                                           data-ket="{{ $item->keterangan }}">
-                                                            <i class="fas fa-eye text-info mr-2"></i> Detail
-                                                        </a>
-                                                    @else
-                                                        <a class="dropdown-item disabled"><i class="fas fa-eye mr-2"></i> Detail</a>
-                                                    @endif
-
-                                                    {{-- EDIT --}}
-                                                    <a class="dropdown-item btn-edit-vi" href="javascript:void(0)"
-                                                       data-uraian="{{ $item->uraian }}" 
-                                                       data-kg="{{ $item->kg }}"
-                                                       data-pallet="{{ $item->pallet }}"
-                                                       data-ket="{{ $item->keterangan }}"
-                                                       data-id="{{ $item->id_produksi_sir }}">
-                                                        <i class="fas fa-edit text-warning mr-2"></i> {{ $item->id_produksi_sir ? 'Edit' : 'Input' }}
-                                                    </a>
-
-                                                    <div class="dropdown-divider"></div>
-
-                                                    {{-- RESET --}}
-                                                    @if($item->id_produksi_sir)
-                                                        <form action="{{ route('data-sir.destroy', $item->id_produksi_sir) }}" method="POST" class="form-reset">
-                                                            @csrf @method('DELETE')
-                                                            <button type="button" class="dropdown-item text-danger btn-reset">
-                                                                <i class="fas fa-undo mr-2"></i> Reset
-                                                            </button>
-                                                        </form>
-                                                    @else
-                                                        <a class="dropdown-item disabled"><i class="fas fa-undo mr-2"></i> Reset</a>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </td>
                                     </tr>
                                 @endforeach
                                 <tr class="row-jumlah">
                                     <td colspan="2" class="text-center">Total</td>
                                     <td class="text-center">{{ number_format($tabelVI->sum('kg'), 2, ',', '.') }}</td>
                                     <td class="text-center">{{ number_format($tabelVI->sum('pallet'), 0, ',', '.') }}</td>
-                                    <td></td>
                                     <td></td>
                                 </tr>
                                 </tbody>
@@ -244,18 +161,17 @@
 </div>
 
 {{-- MODAL INPUT DATA --}}
-{{-- MODAL INPUT DATA --}}
 <div class="modal fade" id="modalInputData" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <form action="{{ route('data-sir.store') }}" method="POST">
                 @csrf
                 <input type="hidden" name="tanggal" value="{{ $selected_date }}">
+                {{-- Input hidden ini penting untuk logic controller baru --}}
                 <input type="hidden" name="id" id="editId">
-                <input type="hidden" name="pengiriman" value="0">
 
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="modalTitle">Input Data Gudang & Mutu</h5>
+                    <h5 class="modal-title" id="modalTitle">Generate Pallet Harian</h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -264,7 +180,7 @@
                     <div class="alert alert-light border">
                         <div class="row text-center">
                             <div class="col-6 border-right">
-                                <label class="mb-0 text-muted">Total Pallet</label>
+                                <label class="mb-0 text-muted">Total Pallet (Stok)</label>
                                 <h4 class="font-weight-bold mb-0 text-dark" id="lblTotalPallet">0</h4>
                             </div>
                             <div class="col-6">
@@ -272,55 +188,56 @@
                                 <h4 class="font-weight-bold mb-0 text-dark" id="lblTotalKg">0</h4>
                             </div>
                         </div>
-                        <input type="hidden" name="masuk" id="inputMasuk">
                     </div>
 
-                    {{-- 2. PILIH GUDANG --}}
+                    {{-- 2. PILIH GUDANG TUJUAN AWAL --}}
                     <div class="form-group mb-3" id="groupGudang">
-                        <label>Pilih Gudang / Lokasi</label>
+                        <label>Simpan ke Lokasi Awal:</label>
                         <select name="uraian" id="inputUraian" class="form-control font-weight-bold" required>
                             <option value="Di Gudang SIR">Di Gudang SIR</option>
                             <option value="Di Areal Press Bale">Di Areal Press Bale</option>
                             <option value="Di Gudang TOH 1">Di Gudang TOH 1</option>
                             <option value="Di Gudang TOH 2">Di Gudang TOH 2</option>
                         </select>
+                        <small class="text-muted">*Semua pallet hari ini akan masuk ke lokasi ini dulu.</small>
                     </div>
 
                     <hr>
-                    {{-- 3. RINCIAN MUTU (INPUT PALLET -> AUTO KG) --}}
-                    <label class="text-success font-weight-bold mb-3">Rincian Mutu (Isi Pallet):</label>
+                    {{-- 3. RINCIAN MUTU (Input Jumlah Pallet Cacat jika ada) --}}
+                    <label class="text-success font-weight-bold mb-3">Input Mutu Cacat (Jika Ada):</label>
+                    <p class="text-muted small">Masukkan jumlah pallet yang statusnya <b>BUKAN</b> Prima. Sisanya otomatis dianggap Prima.</p>
                     
-                    {{-- Mutu Prima --}}
+                    {{-- Mutu Prima (Readonly / Sisa) --}}
                     <div class="form-group row mb-2">
-                        <label class="col-sm-4 col-form-label font-weight-bold text-success">Mutu Prima</label>
+                        <label class="col-sm-4 col-form-label font-weight-bold text-success">Mutu Prima (Sisa)</label>
                         <div class="col-sm-3">
-                            <input type="number" name="pallet_mutu_prima" id="pal_mutu_prima" class="form-control text-center font-weight-bold bg-light" readonly placeholder="Pallet">
+                            <input type="number" name="pallet_mutu_prima" id="pal_mutu_prima" class="form-control text-center font-weight-bold bg-light" readonly placeholder="Auto">
                         </div>
                         <div class="col-sm-5">
                             <div class="input-group">
-                                <input type="number" step="0.01" name="mutu_prima" id="kg_mutu_prima" class="form-control text-right font-weight-bold bg-light" readonly placeholder="Kg">
-                                <div class="input-group-append"><span class="input-group-text">Kg</span></div>
-                            </div>
-                        </div>
-                    </div>
-                    {{-- PO / PRI Low (SEKARANG READONLY) --}}
-                    <div class="form-group row mb-2">
-                        <label class="col-sm-4 col-form-label"><small>PO / PRI Low </small></label>
-                        <div class="col-sm-3">
-                            <input type="number" name="pallet_po_pri" id="pal_po_pri" class="form-control text-center bg-light" readonly placeholder="Auto">
-                        </div>
-                        <div class="col-sm-5">
-                            <div class="input-group">
-                                <input type="number" step="0.01" name="po_pri" id="kg_po_pri" class="form-control text-right bg-light" readonly placeholder="Otomatis">
+                                <input type="number" step="0.01" name="mutu_prima" id="kg_mutu_prima" class="form-control text-right font-weight-bold bg-light" readonly>
                                 <div class="input-group-append"><span class="input-group-text">Kg</span></div>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Loop Inputan Grade Cacat --}}
+                    {{-- PO / PRI Low (Readonly from Lab) --}}
+                    <div class="form-group row mb-2">
+                        <label class="col-sm-4 col-form-label"><small>PO / PRI Low (Lab)</small></label>
+                        <div class="col-sm-3">
+                            <input type="number" name="pallet_po_pri" id="pal_po_pri" class="form-control text-center bg-light" readonly>
+                        </div>
+                        <div class="col-sm-5">
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="po_pri" id="kg_po_pri" class="form-control text-right bg-light" readonly>
+                                <div class="input-group-append"><span class="input-group-text">Kg</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Inputan Cacat Lainnya --}}
                     @php
                         $fields = [
-                           
                             ['label' => 'WhiteSpot (WS)', 'id' => 'ws'],
                             ['label' => 'Kontaminasi', 'id' => 'kontaminasi'],
                             ['label' => 'Repacking', 'id' => 'repacking']
@@ -335,28 +252,140 @@
                         </div>
                         <div class="col-sm-5">
                             <div class="input-group">
-                                <input type="number" step="0.01" name="{{ $f['id'] }}" id="kg_{{ $f['id'] }}" class="form-control text-right bg-white" readonly placeholder="Otomatis">
+                                <input type="number" step="0.01" name="{{ $f['id'] }}" id="kg_{{ $f['id'] }}" class="form-control text-right bg-white" readonly>
                                 <div class="input-group-append"><span class="input-group-text">Kg</span></div>
                             </div>
                         </div>
                     </div>
                     @endforeach
 
-                    <hr>
+                </div>
+                <div class="modal-footer"> <button type="submit" class="btn btn-primary">Generate & Simpan</button> </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalMutasi" tabindex="-1" data-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            {{-- Form ID diberi nama agar bisa dimanipulasi JS --}}
+            <form method="POST" id="formActionPallet">
+                @csrf
+                
+                {{-- Container Input Hidden (ID Pallet & Mutu Baru akan masuk sini via JS) --}}
+                <div id="hiddenInputsContainer"></div>
+
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title font-weight-bold text-dark">
+                        <i class="fas fa-edit mr-2"></i>
+                        <span id="modalTitleText">Kelola Pallet (Mutu & Lokasi)</span>
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                
+                <div class="modal-body">
+                    {{-- HEADER INFO --}}
+                    <div class="alert alert-info d-flex justify-content-between align-items-center py-2 px-3 mb-3">
+                        <span class="font-weight-bold">
+                            <i class="fas fa-warehouse mr-1"></i> Lokasi: <span id="lblSumber" class="text-uppercase font-weight-bold">...</span>
+                        </span>
+                        <div class="text-right">
+                            <span class="badge badge-light p-2 mr-1 border text-dark">Pallet: <b id="lblStokPallet">0</b></span>
+                            <span class="badge badge-light p-2 border text-dark">Berat: <b id="lblStokBerat">0</b> Kg</span>
+                        </div>
+                    </div>
+
+                    {{-- ======================== STEP 1: PILIH & EDIT MUTU ======================== --}}
+                    <div id="step1-content">
+                        <h6 class="font-weight-bold text-dark mb-2">
+                            <i class="fas fa-list-ul mr-1 text-primary"></i> Pilih Pallet:
+                        </h6>
+                        
+                        <div class="table-responsive border rounded mb-3" style="max-height: 350px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered table-hover mb-0">
+                                <thead class="thead-light sticky-top">
+                                    <tr>
+                                        <th width="5%" class="text-center"><input type="checkbox" id="checkAll"></th>
+                                        <th>No Pallet</th>
+                                        <th width="45%">Kondisi Mutu (Bisa Diedit)</th>
+                                        <th class="text-right">Berat (Kg)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="listPalletMutasi">
+                                    <tr><td colspan="4" class="text-center py-3 text-muted">Sedang memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="small text-muted mb-0"><i class="fas fa-info-circle"></i> Centang pallet, lalu ubah Mutu di dropdown jika perlu.</p>
+                    </div>
+
+                    {{-- ======================== STEP 2: PILIH TUJUAN (PINDAH) ======================== --}}
+                    <div id="step2-content" style="display: none;">
+                        <div class="alert alert-warning text-center mb-4 border-warning">
+                            <h6 class="font-weight-bold mb-1 text-dark">Anda akan memindahkan:</h6>
+                            <h3 class="mb-0 font-weight-bold text-dark"><span id="lblCountSelected">0</span> Pallet</h3>
+                            <small class="text-dark">Total Berat: <span id="lblWeightSelected">0</span> Kg</small>
+                        </div>
+
+                        <div class="card bg-light border-0">
+                            <div class="card-body py-3 px-3">
+                                <h6 class="font-weight-bold text-dark mb-3 border-bottom pb-2">Tujuan Perpindahan</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-0">
+                                            <label class="small font-weight-bold text-muted">Tanggal Pindah</label>
+                                            <input type="date" name="tanggal_pindah" id="inputTanggalPindah" class="form-control font-weight-bold" value="{{ $selected_date }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-0">
+                                            <label class="small font-weight-bold text-muted">Pindah Ke Gudang/Lokasi</label>
+                                            <select name="id_lokasi_tujuan" id="inputLokasiTujuan" class="form-control font-weight-bold border-warning">
+                                                <option value="">-- Pilih Lokasi Tujuan --</option>
+                                                @foreach($lokasiList as $loc)
+                                                    <option value="{{ $loc->id_lokasi }}">{{ $loc->nama }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {{-- FOOTER DENGAN 2 OPSI --}}
+                <div class="modal-footer bg-light d-flex justify-content-between">
                     
-                    {{-- KETERANGAN --}}
-                    <div class="form-group mb-3"> 
-                        <label>Keterangan</label> 
-                        <select id="selectKeterangan" class="form-control mb-2 font-weight-bold">
-                            <option value="PTNBL">PTNBL</option>
-                            <option value="PTPN4">PTPN4</option>
-                            <option value="Custom">Custom (Isi Manual)</option>
-                        </select>
-                        <input type="text" name="keterangan" id="inputKeterangan" class="form-control" placeholder="Isi keterangan manual..." style="display:none;"> 
+                    {{-- [KIRI] Tombol Batal / Kembali --}}
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btnCloseModal">Tutup</button>
+                        <button type="button" class="btn btn-secondary" id="btnPrevStep" style="display: none;">
+                            <i class="fas fa-arrow-left mr-1"></i> Kembali
+                        </button>
+                    </div>
+
+                    {{-- [KANAN] Tombol Aksi --}}
+                    <div id="actionButtonsStep1">
+                        {{-- AKSI 1: SIMPAN MUTU SAJA --}}
+                        <button type="button" class="btn btn-success font-weight-bold mr-2" id="btnSaveMutuOnly">
+                            <i class="fas fa-save mr-1"></i> Simpan Mutu Saja
+                        </button>
+                        {{-- AKSI 2: LANJUT PINDAH --}}
+                        <button type="button" class="btn btn-primary font-weight-bold" id="btnNextStep">
+                            Pindah Lokasi <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+
+                    <div id="actionButtonsStep2" style="display: none;">
+                        {{-- AKSI 3: KONFIRMASI PINDAH --}}
+                        <button type="submit" class="btn btn-warning font-weight-bold px-4" id="btnSubmitPindah">
+                            <i class="fas fa-dolly-flatbed mr-1"></i> Konfirmasi Pindah
+                        </button>
                     </div>
 
                 </div>
-                <div class="modal-footer"> <button type="submit" class="btn btn-primary">Simpan Data</button> </div>
             </form>
         </div>
     </div>
@@ -369,138 +398,271 @@
     @if(session('success')) Swal.fire({ icon: 'success', title: 'BERHASIL!', text: '{{ session('success') }}', showConfirmButton: false, timer: 2000 }); @endif
     @if(session('error')) Swal.fire({ icon: 'error', title: 'GAGAL!', text: '{{ session('error') }}', showConfirmButton: true }); @endif
 
-
-
     var globalTotalPallet = 0;
-const KG_PER_PALLET = 1260;
+    var globalTotalKg = 0;
+    var kgPerPalletActual = 1260; // Default
 
-$(document).ready(function () {
+    $(document).ready(function () {
 
-    function hitungMutu() {
-        var p_low = parseInt($('#pal_po_pri').val()) || 0;
-        var p_ws = parseInt($('#pal_ws').val()) || 0;
-        var p_kontam = parseInt($('#pal_kontaminasi').val()) || 0;
-        var p_repack = parseInt($('#pal_repacking').val()) || 0;
+        function hitungMutu() {
+            var p_low = parseInt($('#pal_po_pri').val()) || 0;
+            var p_ws = parseInt($('#pal_ws').val()) || 0;
+            var p_kontam = parseInt($('#pal_kontaminasi').val()) || 0;
+            var p_repack = parseInt($('#pal_repacking').val()) || 0;
 
-        var totalCacat = p_low + p_ws + p_kontam + p_repack;
-        var sisaPrima = globalTotalPallet - totalCacat;
-        if (sisaPrima < 0) sisaPrima = 0;
+            var totalCacat = p_low + p_ws + p_kontam + p_repack;
+            
+            // Rumus: Sisa Pallet (Prima) = Total Pallet Stok - Total Cacat
+            var sisaPrima = globalTotalPallet - totalCacat;
+            if (sisaPrima < 0) sisaPrima = 0;
 
-        $('#pal_mutu_prima').val(sisaPrima);
-        $('#kg_mutu_prima').val(sisaPrima * KG_PER_PALLET);
-
-        $('#kg_po_pri').val(p_low * KG_PER_PALLET);
-        $('#kg_ws').val(p_ws * KG_PER_PALLET);
-        $('#kg_kontaminasi').val(p_kontam * KG_PER_PALLET);
-        $('#kg_repacking').val(p_repack * KG_PER_PALLET);
-    }
-
-    $('.input-pallet').on('input keyup', hitungMutu);
-
-    // =========================
-    // TOMBOL INPUT DATA (FIX)
-    // =========================
-    $('#btnInputData').on('click', function () {
-
-        var tanggal = $('#filter_tanggal').val();
-
-        if (!tanggal) {
-            Swal.fire('Error', 'Tanggal belum dipilih', 'error');
-            return;
+            // Update UI
+            $('#pal_mutu_prima').val(sisaPrima);
+            
+            // Hitung Kg (Pakai rata-rata dinamis)
+            $('#kg_mutu_prima').val((sisaPrima * kgPerPalletActual).toFixed(2));
+            $('#kg_po_pri').val((p_low * kgPerPalletActual).toFixed(2));
+            $('#kg_ws').val((p_ws * kgPerPalletActual).toFixed(2));
+            $('#kg_kontaminasi').val((p_kontam * kgPerPalletActual).toFixed(2));
+            $('#kg_repacking').val((p_repack * kgPerPalletActual).toFixed(2));
         }
 
-        // 🔥 UPDATE TANGGAL KE INPUT HIDDEN MODAL
-        $('input[name="tanggal"]').val(tanggal);
+        $('.input-pallet').on('input keyup', hitungMutu);
 
-        // RESET SEMUA INPUT MUTU
-        $('.input-pallet').val('');
-        $('#pal_po_pri').val(0);
-        $('#pal_mutu_prima').val(0);
-        $('#kg_mutu_prima').val(0);
-        $('#kg_po_pri').val(0);
-        $('#kg_ws').val(0);
-        $('#kg_kontaminasi').val(0);
-        $('#kg_repacking').val(0);
-
-        $.ajax({
-            url: "{{ route('data-sir.getProductionToday') }}",
-            type: "GET",
-            data: { date: tanggal },
-            success: function (res) {
-
-                console.log('RESPON SERVER:', res);
-
-                globalTotalPallet = parseInt(res.total_target_pallet) || 0;
-
-                $('#lblTotalPallet').text(globalTotalPallet);
-                $('#lblTotalKg').text(
-                    new Intl.NumberFormat('id-ID').format(res.total_target_kg || 0)
-                );
-
-                $('#inputMasuk').val(res.masuk_kg || 0);
-
-                // PO / PRI Low dari LAB
-                $('#pal_po_pri').val(res.low_pri || 0);
-
-                hitungMutu();
-
-                $('#modalInputData').modal('show');
-            },
-            error: function () {
-                Swal.fire('Error', 'Gagal mengambil data produksi', 'error');
+        // =========================
+        // TOMBOL INPUT DATA
+        // =========================
+        $('#btnInputData').on('click', function () {
+            var tanggal = $('#filter_tanggal').val();
+            if (!tanggal) {
+                Swal.fire('Error', 'Tanggal belum dipilih', 'error');
+                return;
             }
-        });
-    });
 
-        // --- TOMBOL EDIT MUTU ---
-        $(document).on('click', '.btn-edit-vi', function() {
-            $('#groupGudang').hide(); 
-            $('#inputUraian').val(''); 
-            $('#editId').val($(this).data('id'));
+            // Update input hidden
+            $('input[name="tanggal"]').val(tanggal);
 
-            var uraian = $(this).data('uraian');
-            var palletDB = parseInt($(this).data('pallet')) || 0;
-            
+            // Reset input form
             $('.input-pallet').val('');
-            
-            if(uraian.includes("Mutu Prima")) {
-                globalTotalPallet = palletDB;
-                hitungMutu();
-            } else {
-                if(uraian.includes("PO")) $('#pal_po_pri').val(palletDB);
-                else if(uraian.includes("WhiteSpot")) $('#pal_ws').val(palletDB);
-                else if(uraian.includes("Kontaminasi")) $('#pal_kontaminasi').val(palletDB);
-                else if(uraian.includes("Repacking")) $('#pal_repacking').val(palletDB);
-                
-                hitungMutu();
-            }
+            $('#pal_po_pri').val(0);
 
-            setupKeterangan($(this).data('ket'));
-            $('#modalInputData').modal('show');
+            // AJAX Get Data Produksi
+            $.ajax({
+                url: "{{ route('data-sir.getProductionToday') }}",
+                type: "GET",
+                data: { date: tanggal },
+                success: function (res) {
+                    console.log('RESPON SERVER:', res);
+
+                    // 1. DATA HEADER MODAL
+                    // Total Pallet = Total Stok (Akumulasi)
+                    globalTotalPallet = parseInt(res.total_target_pallet) || 0;
+                    
+                    // Total Kg Stok (Akumulasi)
+                    globalTotalKg = parseFloat(res.total_target_kg) || 0;
+
+                    // Data Masuk Hari Ini
+                    var produksiHariIni = parseFloat(res.masuk_kg) || 0;
+
+                    // 2. TAMPILKAN DI HEADER
+                    $('#lblTotalPallet').text(globalTotalPallet); // Muncul 105 (Stok)
+                    
+                    // Label Kanan: Menampilkan PRODUKSI HARI INI (Sesuai request terakhir)
+                    $('#lblTotalKg').text(
+                        new Intl.NumberFormat('id-ID').format(produksiHariIni) 
+                    );
+
+                    // 3. LOGIC PENDUKUNG
+                    if (globalTotalPallet > 0) {
+                        kgPerPalletActual = globalTotalKg / globalTotalPallet;
+                    } else {
+                        kgPerPalletActual = 1260;
+                    }
+
+                    // Isi data Low dari Lab
+                    $('#pal_po_pri').val(res.low_pri || 0);
+
+                    // Hitung sisa Prima
+                    hitungMutu();
+
+                    $('#modalInputData').modal('show');
+                },
+                error: function () {
+                    Swal.fire('Error', 'Gagal mengambil data produksi', 'error');
+                }
+            });
         });
 
-        function setupKeterangan(ket) {
-            if (ket === 'PTNBL' || ket === 'PTPN4') {
-                $('#selectKeterangan').val(ket);
-                $('#inputKeterangan').val(ket).hide();
-            } else {
-                $('#selectKeterangan').val('Custom');
-                $('#inputKeterangan').val(ket).show();
-            }
+        // KLIK TOMBOL PINDAH (MUTASI)
+        // KLIK TOMBOL PINDAH (MUTASI)
+        // KLIK TOMBOL PINDAH (MUTASI)
+        $('.btn-mutasi').on('click', function() {
+            var idLokasi = $(this).data('id');
+            var namaLokasi = $(this).data('nama');
+
+            // Reset UI ke Step 1
+            $('#step1-content').show();
+            $('#step2-content').hide();
+            $('#actionButtonsStep1').show();
+            $('#actionButtonsStep2').hide();
+            $('#btnPrevStep').hide();
+            $('#btnCloseModal').show();
+            $('#hiddenInputsContainer').empty(); 
+
+            $('#lblSumber').text(namaLokasi);
+            $('#listPalletMutasi').html('<tr><td colspan="4" class="text-center py-3 text-muted"><i class="fas fa-spinner fa-spin"></i> Memuat data...</td></tr>');
+            $('#lblStokPallet').text('0');
+            $('#lblStokBerat').text('0');
+            
+            $('#modalMutasi').modal('show');
+
+            // Dropdown Option Mutu
+            var optionsMutu = '';
+            @foreach($mutuList as $m)
+                optionsMutu += '<option value="{{ $m->id_mutu }}">{{ $m->uraian }}</option>';
+            @endforeach
+
+            // AJAX Load Data
+            $.ajax({
+                url: "{{ route('data-sir.getPalletsByLocation') }}", 
+                type: "GET",
+                data: { id_lokasi: idLokasi },
+                success: function(res) {
+                    var html = '';
+                    var totalP = 0;
+                    var totalK = 0;
+
+                    if(res.length > 0) {
+                        $.each(res, function(i, val) {
+                            totalP++;
+                            var beratFloat = parseFloat(val.berat.replace(/\./g, '').replace(',', '.')) || 0;
+                            totalK += beratFloat;
+
+                            html += `
+                                <tr data-id="${val.id_pallet}" data-berat="${val.berat}">
+                                    <td class="text-center align-middle">
+                                        <input type="checkbox" class="chk-pallet" value="${val.id_pallet}">
+                                    </td>
+                                    <td class="align-middle font-weight-bold text-primary">${val.no_pallet}</td>
+                                    <td class="p-1">
+                                        <select class="form-control form-control-sm border-0 bg-light select-mutu-row">
+                                            ${optionsMutu}
+                                        </select>
+                                    </td>
+                                    <td class="text-right align-middle">${val.berat}</td>
+                                </tr>
+                            `;
+                        });
+                    } else {
+                        html = '<tr><td colspan="4" class="text-center text-danger py-3">Tidak ada pallet aktif di lokasi ini.</td></tr>';
+                    }
+                    
+                    $('#listPalletMutasi').html(html);
+                    
+                    // Set Value Mutu Default
+                    if(res.length > 0) {
+                        $.each(res, function(i, val) {
+                            $('#listPalletMutasi tr').eq(i).find('.select-mutu-row').val(val.id_mutu_now);
+                        });
+                    }
+
+                    $('#lblStokPallet').text(totalP);
+                    $('#lblStokBerat').text(new Intl.NumberFormat('id-ID').format(totalK));
+                }
+            });
+        });
+
+        // Check All
+        $('#checkAll').click(function() {
+            $('.chk-pallet').prop('checked', this.checked);
+        });
+
+        // --- FUNGSI BANTUAN: COLLECT DATA KE HIDDEN INPUT ---
+        function collectDataToHidden() {
+            var selectedCount = 0;
+            var selectedWeight = 0;
+            var hiddenHTML = '';
+
+            $('.chk-pallet:checked').each(function() {
+                selectedCount++;
+                var row = $(this).closest('tr');
+                var idPallet = $(this).val();
+                
+                var beratStr = row.data('berat'); 
+                var beratFloat = parseFloat(String(beratStr).replace(/\./g, '').replace(',', '.')) || 0;
+                selectedWeight += beratFloat;
+
+                var idMutu = row.find('.select-mutu-row').val();
+
+                // Buat Input Hidden
+                hiddenHTML += `<input type="hidden" name="selected_pallets[]" value="${idPallet}">`;
+                hiddenHTML += `<input type="hidden" name="mutu_baru[${idPallet}]" value="${idMutu}">`;
+            });
+
+            return { count: selectedCount, weight: selectedWeight, html: hiddenHTML };
         }
 
-        $('#selectKeterangan').change(function() {
-            var val = $(this).val();
-            if(val === 'Custom') $('#inputKeterangan').val('').show().focus();
-            else $('#inputKeterangan').val(val).hide();
+        // --- AKSI 1: SIMPAN MUTU SAJA (LANGSUNG SUBMIT) ---
+        $('#btnSaveMutuOnly').click(function() {
+            var data = collectDataToHidden();
+            if (data.count === 0) { Swal.fire('Peringatan', 'Pilih minimal satu pallet.', 'warning'); return; }
+
+            // Masukkan data hidden
+            $('#hiddenInputsContainer').html(data.html);
+
+            // Ubah Action Form ke Route Update Mutu
+            $('#formActionPallet').attr('action', "{{ route('data-sir.updateMutu') }}");
+            
+            // Matikan required di input step 2 agar tidak error validasi HTML5
+            $('#inputTanggalPindah').removeAttr('required');
+            $('#inputLokasiTujuan').removeAttr('required');
+
+            // Submit
+            $('#formActionPallet').submit();
         });
 
-        $(document).on('click', '.btn-reset', function(e) {
-            e.preventDefault(); var form = $(this).closest('form');
-            Swal.fire({ title: 'Hapus Data?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya' }).then((result) => { if (result.isConfirmed) form.submit(); })
+        // --- AKSI 2: LANJUT KE PINDAH (BUKA STEP 2) ---
+        $('#btnNextStep').click(function() {
+            var data = collectDataToHidden();
+            if (data.count === 0) { Swal.fire('Peringatan', 'Pilih minimal satu pallet.', 'warning'); return; }
+
+            // Masukkan data hidden
+            $('#hiddenInputsContainer').html(data.html);
+
+            // Update Info Ringkasan
+            $('#lblCountSelected').text(data.count);
+            $('#lblWeightSelected').text(new Intl.NumberFormat('id-ID').format(data.weight));
+
+            // Ganti Tampilan
+            $('#step1-content').slideUp(200);
+            $('#step2-content').slideDown(200);
+            $('#actionButtonsStep1').hide();
+            $('#actionButtonsStep2').show();
+            $('#btnCloseModal').hide();
+            $('#btnPrevStep').show();
         });
-        window.bukaDetailIV = function(el) { $('#detUraianIV').text($(el).data('uraian')); $('#detMasukIV').text($(el).data('masuk')); $('#detPengirimanIV').text($(el).data('pengiriman')); $('#detKetIV').text($(el).data('ket')); $('#modalDetailIV').modal('show'); }
-        window.bukaDetailVI = function(el) { $('#detUraianVI').text($(el).data('uraian')); $('#detKgVI').text($(el).data('kg')); $('#detPalletVI').text($(el).data('pallet')); $('#detKetVI').text($(el).data('ket')); $('#modalDetailVI').modal('show'); }
+
+        // --- AKSI 3: KONFIRMASI PINDAH (SUBMIT AKHIR) ---
+        $('#btnSubmitPindah').click(function(e) {
+            // Ubah Action Form ke Route Pindah Lokasi
+            $('#formActionPallet').attr('action', "{{ route('data-sir.pindahLokasi') }}");
+            
+            // Nyalakan kembali required
+            $('#inputTanggalPindah').attr('required', true);
+            $('#inputLokasiTujuan').attr('required', true);
+
+            // Form akan tersubmit secara normal
+        });
+
+        // --- TOMBOL KEMBALI KE STEP 1 ---
+        $('#btnPrevStep').click(function() {
+            $('#step2-content').slideUp(200);
+            $('#step1-content').slideDown(200);
+            $('#actionButtonsStep2').hide();
+            $('#actionButtonsStep1').show();
+            $('#btnPrevStep').hide();
+            $('#btnCloseModal').show();
+        });
     });
 </script>
 </body>

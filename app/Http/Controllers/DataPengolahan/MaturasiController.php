@@ -72,7 +72,7 @@ class MaturasiController extends Controller
             ->exists();
     }
 
-    protected function hitungSnapshot(Maturasi $maturasi, Carbon $selectedDate): array
+    protected function hitungSnapshot($maturasi, Carbon $selectedDate): array
     {
         // PK: id_maturasi
         if (! $this->hasAnyLogUpToDate($maturasi->id_maturasi, $selectedDate)) {
@@ -102,27 +102,35 @@ class MaturasiController extends Controller
         $keterangan = '-';
 
         if ($stok_akhir > 0) {
-            if ($masuk_hi_today > 0) {
+            
+            // A. Cari dulu history tanggal masuk SEBELUM hari ini
+            $last_before = $this->getLastMasukHiDateBefore($maturasi->id_maturasi, $selectedDate);
+
+            if ($last_before) {
+                // PRIORITAS 1: Jika ada history masa lalu (batch berjalan).
+                // Gunakan tanggal tersebut agar umur TIDAK reset jadi 0 hari ini.
+                // (Meskipun hari ini ada penambahan stok baru).
+                $tgl_masuk = $last_before->toDateString();
+                $umur = $last_before->diffInDays($selectedDate);
+                $keterangan = strtoupper($last_before->format('d M Y'));
+
+            } elseif ($masuk_hi_today > 0) {
+                // PRIORITAS 2: Jika history kosong (bak baru dipakai), DAN hari ini ada isi.
+                // Baru kita set umur jadi 0 (Batch Baru Start Hari Ini).
                 $tgl_masuk = $selectedDate->toDateString();
                 $umur = 0;
                 $keterangan = strtoupper($selectedDate->format('d M Y'));
-            } else {
-                $last_before = $this->getLastMasukHiDateBefore($maturasi->id_maturasi, $selectedDate);
-                
-                if ($last_before) {
-                    $tgl_masuk = $last_before->toDateString();
-                    $umur = $last_before->diffInDays($selectedDate);
-                    $keterangan = strtoupper($last_before->format('d M Y'));
-                } elseif ($maturasi->tgl_masuk) {
-                    try {
-                        $candidate = Carbon::parse($maturasi->tgl_masuk);
-                        if ($candidate->lte($selectedDate)) {
-                            $tgl_masuk = $candidate->toDateString();
-                            $umur = $candidate->diffInDays($selectedDate);
-                            $keterangan = strtoupper($candidate->format('d M Y'));
-                        }
-                    } catch (\Exception $e) {}
-                }
+
+            } elseif ($maturasi->tgl_masuk) {
+                // PRIORITAS 3: Fallback ke data master manual jika tidak ada log transaksi sama sekali
+                try {
+                    $candidate = Carbon::parse($maturasi->tgl_masuk);
+                    if ($candidate->lte($selectedDate)) {
+                        $tgl_masuk = $candidate->toDateString();
+                        $umur = $candidate->diffInDays($selectedDate);
+                        $keterangan = strtoupper($candidate->format('d M Y'));
+                    }
+                } catch (\Exception $e) {}
             }
         }
 
@@ -141,16 +149,31 @@ class MaturasiController extends Controller
     // =========================================================================
     // HELPER 2: LOGIKA "ASAL BOKAR" (CMP DETAILED)
     // =========================================================================
-    
-    private function getDetailedAsalBokarString(Maturasi $maturasi, float $stokAkhir, Carbon $filterDate)
+
+    private function getDetailedAsalBokarString($maturasi, float $stokAkhir, Carbon $filterDate)
     {
         if ($stokAkhir <= 0) return '-';
 
-        $defaultAsal = $maturasi->asal_bokar ?? '-';
+        /**
+         * 🔥 PRIORITAS 1
+         * Kalau bak ini sudah ditandai batch baru
+         * (asal_bokar & tgl_masuk di-set manual)
+         * → JANGAN tracing CMP
+         */
+        if (!empty($maturasi->asal_bokar) && !empty($maturasi->tgl_masuk)) {
+            $tglMasuk = Carbon::parse($maturasi->tgl_masuk);
 
+            if ($tglMasuk->lte($filterDate)) {
+                return strtoupper($maturasi->asal_bokar);
+            }
+        }
+
+        // ===============================
+        // BARU tracing CMP (kode lama)
+        // ===============================
         try {
             $realBatchStartDate = $filterDate->copy();
-            
+
             $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
                 ->whereDate('tgl_laporan', '<=', $filterDate)
                 ->orderBy('tgl_laporan', 'desc')
@@ -160,15 +183,14 @@ class MaturasiController extends Controller
 
             foreach ($logs as $log) {
                 $realBatchStartDate = Carbon::parse($log->tgl_laporan);
-                
-                $masuk = $log->masuk_hi;
+
+                $masuk  = $log->masuk_hi;
                 $keluar = $log->diolah + $log->mutasi;
-                
+
                 $prevStock = $currentTracingStock - $masuk + $keluar;
-                
-                if ($prevStock <= 0.01) { 
-                    break; 
-                }
+
+                if ($prevStock <= 0.01) break;
+
                 $currentTracingStock = $prevStock;
             }
 
@@ -176,7 +198,7 @@ class MaturasiController extends Controller
                 ->whereDate('tanggal', '>=', $realBatchStartDate)
                 ->whereDate('tanggal', '<=', $filterDate)
                 ->pluck('jenis')
-                ->map(function ($item) { return strtoupper(trim($item)); })
+                ->map(fn($v) => strtoupper(trim($v)))
                 ->unique()
                 ->filter()
                 ->sort()
@@ -184,17 +206,15 @@ class MaturasiController extends Controller
                 ->toArray();
 
             if (!empty($jenisList)) {
-                if (count($jenisList) > 1) {
-                    return 'CMP (' . implode(', ', $jenisList) . ')';
-                } else {
-                    return $jenisList[0];
-                }
+                return count($jenisList) > 1
+                    ? 'CMP (' . implode(', ', $jenisList) . ')'
+                    : $jenisList[0];
             }
 
-            return $defaultAsal;
+            return $maturasi->asal_bokar ?? '-';
 
         } catch (\Exception $e) {
-            return $defaultAsal;
+            return $maturasi->asal_bokar ?? '-';
         }
     }
 
@@ -231,8 +251,13 @@ class MaturasiController extends Controller
             $row->tgl_uji = $ujiLab->tanggal ?? null;
 
             // 3. Logika Asal Bokar
-            $row->asal_bokar = $this->getDetailedAsalBokarString($bak, $row->stok_akhir, $selectedDate);
+           $bakFresh = Maturasi::find($bak->id_maturasi);
 
+            $row->asal_bokar = $this->getDetailedAsalBokarString(
+                $bakFresh,
+                $row->stok_akhir,
+                $selectedDate
+            );
             if ($row->stok_akhir <= 0) {
                 $row->asal_bokar = '-';
             }
@@ -296,17 +321,16 @@ class MaturasiController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $clean = fn($v) => $v ? str_replace(',', '.', str_replace('.', '', $v)) : 0;
-        
-        // Bersihkan input sebelum validasi
+
         $request->merge([
             'mutasi' => $clean($request->input('mutasi')),
-            // 'diolah' diabaikan karena readonly/auto
         ]);
 
         $validator = Validator::make($request->all(), [
             'uraian' => 'required|string|exists:maturasi,uraian',
             'tanggal_input_harian' => 'required|date',
             'mutasi' => 'nullable|numeric|min:0',
+            'tujuan_mutasi' => 'nullable|exists:maturasi,id_maturasi',
             'keterangan' => 'nullable|string|max:255',
         ]);
 
@@ -314,48 +338,118 @@ class MaturasiController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $data = $validator->validated();
-        $tglInput = Carbon::parse($data['tanggal_input_harian']);
-        $maturasi = Maturasi::where('uraian', $data['uraian'])->firstOrFail();
+        $tglInput  = Carbon::parse($request->input('tanggal_input_harian'));
+        $mutasiVal = (float) $request->input('mutasi');
 
-        // 1. Ambil Data Lama (Agar nilai 'Diolah' dari Produksi TIDAK HILANG)
-        $existingLog = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
-                        ->whereDate('tgl_laporan', $tglInput)
-                        ->first();
-        
-        $diolahExisting = $existingLog ? $existingLog->diolah : 0;
+        $bakAsal = Maturasi::where('uraian', $request->input('uraian'))->firstOrFail();
 
-        // 2. Simpan Data (Update/Create)
-        PengolahanMaturasi::updateOrCreate(
-            [
-                'id_maturasi' => $maturasi->id_maturasi,
-                'tgl_laporan' => $tglInput,
-            ],
-            [
-                'diolah'     => $diolahExisting, // 🔥 TETAPKAN NILAI LAMA
-                'mutasi'     => $request->input('mutasi'),
-                'keterangan' => $data['keterangan'] ?? 'Input Mutasi Manual'
-                // masuk_hi tidak disentuh, biarkan apa adanya (default db 0)
-            ]
-        );
+        DB::beginTransaction();
+        try {
 
-        // 3. Update Master Stok (Snapshot)
-        $snap = $this->hitungSnapshot($maturasi, $tglInput);
-        
-        $maturasi->update([
-            'stok_awal'  => $snap['stok_awal'],
-            'diolah'     => $snap['diolah'],
-            'mutasi'     => $snap['mutasi'],
-            'masuk_hi'   => $snap['masuk_hi'],
-            'stok_akhir' => $snap['stok_akhir'],
-            'tgl_masuk'  => $snap['tgl_masuk'],
-            'umur'       => $snap['umur'],
-            'updated_at' => $tglInput 
-        ]);
+            // ===============================
+            // 1️⃣ HITUNG SNAPSHOT BAK ASAL
+            // ===============================
+            $snapAsalSebelum = $this->hitungSnapshot($bakAsal, $tglInput);
 
-        return redirect()->route('maturasi.index', [
-            'filter_tanggal' => $tglInput->format('Y-m-d')
-        ])->with('success', 'Data Mutasi berhasil disimpan. (Diolah tetap sesuai Produksi)');
+            // STOK BASIS UNTUK MUTASI
+            $stokBasisMutasi =
+                $snapAsalSebelum['stok_awal']
+                + $snapAsalSebelum['masuk_hi']
+                - $snapAsalSebelum['diolah'];
+
+            // ===============================
+            // 2️⃣ SIMPAN MUTASI BAK ASAL
+            // ===============================
+            $existingAsal = PengolahanMaturasi::where('id_maturasi', $bakAsal->id_maturasi)
+                ->whereDate('tgl_laporan', $tglInput)
+                ->first();
+
+            PengolahanMaturasi::updateOrCreate(
+                [
+                    'id_maturasi' => $bakAsal->id_maturasi,
+                    'tgl_laporan' => $tglInput
+                ],
+                [
+                    'diolah'     => $existingAsal->diolah ?? 0,
+                    'mutasi'     => ($existingAsal->mutasi ?? 0) + $mutasiVal,
+                    'keterangan' => $request->keterangan ?? 'Mutasi Keluar'
+                ]
+            );
+
+            // ===============================
+            // 3️⃣ PROSES BAK TUJUAN
+            // ===============================
+            if ($request->filled('tujuan_mutasi') && $mutasiVal > 0) {
+
+                $bakTujuan = Maturasi::findOrFail($request->tujuan_mutasi);
+
+                $existingTujuan = PengolahanMaturasi::where('id_maturasi', $bakTujuan->id_maturasi)
+                    ->whereDate('tgl_laporan', $tglInput)
+                    ->first();
+
+                // Mutasi masuk dicatat sebagai nilai negatif agar menambah stok di rumus (Total - Mutasi)
+                PengolahanMaturasi::updateOrCreate(
+                    [
+                        'id_maturasi' => $bakTujuan->id_maturasi,
+                        'tgl_laporan' => $tglInput
+                    ],
+                    [
+                        'mutasi'     => ($existingTujuan->mutasi ?? 0) - $mutasiVal,
+                        'keterangan' => 'Terima Mutasi dari ' . $bakAsal->uraian
+                    ]
+                );
+
+                // LOGIKA UPDATE IDENTITAS
+                if ($stokBasisMutasi > 0 && ($mutasiVal / $stokBasisMutasi) >= 0.5) {
+
+                    $asalBokarFinal = $this->getDetailedAsalBokarString(
+                        $bakAsal,
+                        $stokBasisMutasi,
+                        $tglInput
+                    );
+
+                    // ✅ UPDATE IDENTITAS (ASAL BOKAR) TANPA MENGHAPUS HISTORY
+                    $bakTujuan->update([
+                        'asal_bokar' => $asalBokarFinal,
+                        'tgl_masuk'  => $tglInput,
+                        'umur'       => 0,
+                        'keterangan' => strtoupper($tglInput->format('d M Y')),
+                    ]);
+
+                    // ❌ BARIS ->delete() DI SINI SUDAH DIHAPUS AGAR SALDO AWAL TIDAK HILANG
+                }
+
+                // Refresh stok akhir tujuan agar data di tabel master sinkron
+                $snapTujuan = $this->hitungSnapshot($bakTujuan, $tglInput);
+                $bakTujuan->update([
+                    'stok_akhir' => $snapTujuan['stok_akhir']
+                ]);
+            }
+
+            // ===============================
+            // 4️⃣ REFRESH MASTER BAK ASAL
+            // ===============================
+            $snapAsal = $this->hitungSnapshot($bakAsal, $tglInput);
+            $bakAsal->update([
+                'stok_awal'  => $snapAsal['stok_awal'],
+                'diolah'     => $snapAsal['diolah'],
+                'mutasi'     => $snapAsal['mutasi'],
+                'masuk_hi'   => $snapAsal['masuk_hi'],
+                'stok_akhir' => $snapAsal['stok_akhir'],
+                'updated_at' => $tglInput
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('maturasi.index', ['filter_tanggal' => $tglInput->format('Y-m-d')])
+                ->with('success', 'Mutasi berhasil diproses.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->with('error', 'Gagal memproses mutasi: ' . $e->getMessage());
+        }
     }
     
     // --- FUNGSI RESET ---
@@ -426,22 +520,127 @@ class MaturasiController extends Controller
             ? Carbon::parse($request->input('filter_tanggal')) 
             : Carbon::today();
 
+        // 1. Ambil hitungan dasar (Stok Awal, Masuk, Keluar, Stok Akhir)
         $snap = $this->hitungSnapshot($maturasi, $selectedDate);
-        $asalBokarDetailed = $this->getDetailedAsalBokarString($maturasi, $snap['stok_akhir'], $selectedDate);
+
+        /**
+         * =====================================================
+         * 🔥 LOGIKA IDENTITAS (PRIORITAS BATCH BARU / MUTASI)
+         * =====================================================
+         * Jika bak memiliki identitas statis (hasil mutasi besar),
+         * maka umur dan keterangan dihitung dari tgl_masuk master.
+         */
+        $asalBokarDisp = '';
+        $keteranganDisp = '';
+        $umurDisp = 0;
+
+        if (!empty($maturasi->asal_bokar) && !empty($maturasi->tgl_masuk)) {
+            $tglMasukMaster = Carbon::parse($maturasi->tgl_masuk);
+
+            // Jika tanggal masuk master lebih kecil/sama dengan tanggal filter
+            if ($tglMasukMaster->lte($selectedDate) && $snap['stok_akhir'] > 0) {
+                $asalBokarDisp = strtoupper($maturasi->asal_bokar);
+                $keteranganDisp = strtoupper($tglMasukMaster->format('d M Y'));
+                $umurDisp = $tglMasukMaster->diffInDays($selectedDate);
+            }
+        }
+
+        // Jika identitas statis tidak ditemukan, gunakan tracing dinamis (CMP)
+        if (empty($asalBokarDisp)) {
+            $asalBokarDisp = $this->getDetailedAsalBokarString(
+                $maturasi,
+                $snap['stok_akhir'],
+                $selectedDate
+            );
+            $keteranganDisp = $snap['keterangan'];
+            $umurDisp = $snap['umur'];
+        }
+
+        // Reset identitas tampilan jika stok kosong
+        if ($snap['stok_akhir'] <= 0) {
+            $asalBokarDisp = '-';
+            $keteranganDisp = 'KOSONG';
+            $umurDisp = 0;
+        }
 
         return response()->json([
-            'id_maturasi'=> $maturasi->id_maturasi,
-            'uraian'     => $maturasi->uraian,
-            'stok_awal'  => $snap['stok_awal'],
-            'umur'       => $snap['umur'],
-            'tgl_masuk'  => $snap['tgl_masuk'] ? Carbon::parse($snap['tgl_masuk'])->format('Y-m-d') : null,
-            'diolah'     => $snap['diolah'],
-            'mutasi'     => $snap['mutasi'],
-            'masuk_hi'   => $snap['masuk_hi'],
-            'stok_akhir' => $snap['stok_akhir'],
-            'asal_bokar' => $asalBokarDetailed,
-            'keterangan' => $snap['keterangan'],
-            'updated_at' => $selectedDate->format('Y-m-d'), 
+            'id_maturasi' => $maturasi->id_maturasi,
+            'uraian'      => $maturasi->uraian,
+            'stok_awal'   => $snap['stok_awal'],
+            'masuk_hi'    => $snap['masuk_hi'],
+            'diolah'      => $snap['diolah'],
+            'mutasi'      => $snap['mutasi'],
+            'stok_akhir'  => $snap['stok_akhir'],
+            'tgl_masuk'   => $snap['tgl_masuk'], // Digunakan untuk input tgl di modal jika perlu
+            'umur'        => $umurDisp,
+            'asal_bokar'  => $asalBokarDisp,
+            'keterangan'  => $keteranganDisp,
+            'updated_at'  => $selectedDate->format('Y-m-d'),
         ]);
+    }
+    public function update(Request $request, $id_maturasi): RedirectResponse
+    {
+        $clean = fn($v) => $v ? str_replace(',', '.', str_replace('.', '', $v)) : 0;
+        $mutasiBaru = (float) $clean($request->input('mutasi'));
+        
+        // Diambil dari hidden input modal edit
+        $tglInput = Carbon::parse($request->input('tanggal_input_harian'));
+
+        DB::beginTransaction();
+        try {
+            $bakAsal = Maturasi::findOrFail($id_maturasi);
+
+            // --- 1. CARI LOG ASAL (PENGIRIM) ---
+            $logAsal = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+                ->whereDate('tgl_laporan', $tglInput)
+                ->firstOrFail();
+
+            // --- 2. CARI LOG TUJUAN (PENERIMA) ---
+            // ✅ Perbaikan: Gunakan trim() agar spasi di awal/akhir nama bak tidak mengganggu pencarian
+            $namaBakAsal = trim($bakAsal->uraian);
+            $keteranganTarget = 'Terima Mutasi dari ' . $namaBakAsal;
+            
+            $logTujuan = PengolahanMaturasi::whereDate('tgl_laporan', $tglInput)
+                ->where('keterangan', 'LIKE', '%' . $namaBakAsal . '%') // ✅ Lebih aman menggunakan LIKE
+                ->where('mutasi', '<', 0) // ✅ Mutasi masuk selalu bernilai negatif
+                ->first();
+
+            // --- 3. PROSES UPDATE BAK ASAL ---
+            $logAsal->update(['mutasi' => $mutasiBaru]);
+
+            // --- 4. PROSES UPDATE BAK TUJUAN (JIKA DITEMUKAN) ---
+            if ($logTujuan) {
+                // Update nilai mutasi penerima (negatif agar menambah stok)
+                // Jika mutasiBaru adalah 0, maka mutasi penerima juga menjadi 0
+                $logTujuan->update(['mutasi' => -$mutasiBaru]);
+
+                // 🔥 REFRESH MASTER STOK BAK PENERIMA (Bak 12 / Bak 3)
+                $bakTujuan = Maturasi::find($logTujuan->id_maturasi);
+                if ($bakTujuan) {
+                    $snapTujuan = $this->hitungSnapshot($bakTujuan, $tglInput);
+                    $bakTujuan->update([
+                        'stok_akhir' => $snapTujuan['stok_akhir']
+                    ]);
+                }
+            }
+
+            // --- 5. REFRESH MASTER STOK BAK PENGIRIM (Bak 7 / Bak 1) ---
+            $snapAsal = $this->hitungSnapshot($bakAsal, $tglInput);
+            $bakAsal->update([
+                'stok_awal'  => $snapAsal['stok_awal'],
+                'diolah'     => $snapAsal['diolah'],
+                'mutasi'     => $snapAsal['mutasi'],
+                'masuk_hi'   => $snapAsal['masuk_hi'],
+                'stok_akhir' => $snapAsal['stok_akhir'],
+                'updated_at' => Carbon::now() 
+            ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Nilai mutasi berhasil diubah dan saldo kedua bak telah sinkron.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal memperbarui mutasi: ' . $e->getMessage());
+        }
     }
 }

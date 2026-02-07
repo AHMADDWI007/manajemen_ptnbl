@@ -279,4 +279,21 @@ class ProduksiSir20ApiController extends Controller
         if (is_numeric($value)) return (float) $value;
         return (float) str_replace(',', '.', str_replace('.', '', (string)$value));
     }
+
+    // TAMBAHAN KHUSUS API: Mengambil Nomor Terakhir
+    public function getLastNumber()
+    {
+        // Ambil data terakhir berdasarkan ID (descending)
+        $last = ProduksiSir20::orderBy('id_produksi_sir20', 'desc')->first();
+        
+        // Jika ada data, ambil total_nomor_akhir. Jika tidak ada (data pertama), mulai dari 0.
+        $num = $last ? $last->total_nomor_akhir : 0;
+
+        // 🔥 PERBAIKAN: Gunakan key 'data' agar terbaca oleh ApiResponse.java di Android
+        return response()->json([
+            'success' => true, 
+            'data' => $num,  // <-- Ubah 'last_number' menjadi 'data'
+            'message' => 'Nomor terakhir berhasil diambil'
+        ]);
+    }
 }

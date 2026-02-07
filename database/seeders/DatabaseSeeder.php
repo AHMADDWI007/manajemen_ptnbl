@@ -6,30 +6,32 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // Panggil seeder secara berurutan
-        // Urutan ini PENTING karena ada relasi antar tabel
-        
         $this->call([
-            // 1. Master Data User & Maturasi (Wajib duluan)
+            // 1. DATA USER (Tetap Paling Awal)
             UserSeeder::class,
-            MaturasiSeeder::class,
 
-            // 2. Data Transaksi Harian (Bokar -> Maturasi)
-            DummyPengolahanBasahSeeder::class,
+            // 2. DUMMY LHP (Jalankan ini duluan untuk RESET & ISI MATURASI)
+            // Ini akan menghapus data lama dan mengisi stok Maturasi per 1 Jan 2026
+            DummyLHPSeeder::class, 
 
-            // 3. Koreksi Data WIP (Terakhir, karena butuh data referensi)
-            // PerbaikanDataSaldoSeeder::class,
+            // --- SEEDER DI BAWAH INI AKAN MENIMPA/MENAMBAH SETELAH RESET ---
 
-            // 4. Saldo Awal Gudang Produksi SIR
+            // 3. MaturasiSeeder TIDAK PERLU DIJALANKAN LAGI 
+            // Karena datanya sudah di-handle oleh DummyLHPSeeder sesuai Excel.
+            // MaturasiSeeder::class, 
+
+            // 4. Koreksi Data WIP (Bahan Proses)
+            // Jalankan SETELAH DummyLHP, supaya datanya masuk dan TIDAK TERHAPUS.
+            PerbaikanDataSaldoSeeder::class,
+
+            // 5. Saldo Awal Gudang & Penjualan (Opsional)
             // SaldoAwalGudangSeeder::class,
-
-            // 5. Saldo Awal Penjualan SIR20
             // PenjualanAwalSeeder::class,
+
+            // 6. Data Awal Sistem SIR (Lokasi, Mutu, Saldo Awal)
+            DataAwalSirSeeder::class,
         ]);
     }
 }

@@ -204,14 +204,15 @@
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Data WIP Masuk, Keluar, dan Produksi dihitung <b>OTOMATIS</b>. Gunakan form ini hanya jika ada selisih stok (Rektifikasi).
+                        <i class="fas fa-info-circle"></i> Input jumlah <b>WIP Keluar</b> (Barang dipindah). Saldo Akhir akan dihitung otomatis.
                     </div>
                     
                     <input type="hidden" name="tanggal_input" value="{{ $selectedDate->format('Y-m-d') }}">
                     
+                    {{-- 1. PILIH URAIAN --}}
                     <div class="form-group mb-3">
                         <label>Pilih Tahapan Proses (Uraian)</label>
-                        <select name="uraian" class="form-control font-weight-bold" required>
+                        <select name="uraian" id="select_uraian" class="form-control font-weight-bold" required>
                             <option value="" disabled selected>-- Pilih Uraian --</option>
                             @foreach(['Lantai Umpan Kering', 'Di Blending Tank 4', 'Di Lump Breaker-2 (Di Blending Tank-4)', 'Di Pre Breaker-2 (Di Blending Tank-5)', 'Di Hammer Mill-2 (Di Blending Tank-6)', 'Di Blending Tank-7', 'Di Trolley', 'Di Dalam Dryer/Press Bale', 'Di Reproses Ex WS.'] as $u)
                                 <option value="{{ $u }}">{{ $u }}</option>
@@ -219,43 +220,37 @@
                         </select>
                     </div>
 
-                    <div class="form-group mb-3 bg-warning p-3 rounded border border-warning">
-                        <label class="text-dark font-weight-bold">Rektif (Kg)</label>
-                        <input type="number" name="rekfif" class="form-control font-weight-bold" step="0.01" placeholder="0">
-                        <small class="text-dark">
-                            Masukkan nilai <b>Positif (+)</b> untuk menambah stok, atau <b>Negatif (-)</b> untuk mengurangi stok.
-                        </small>
+                    {{-- 2. INPUT WIP KELUAR (YANG UTAMA) --}}
+                    <div class="form-group mb-3 bg-light p-3 rounded border">
+                        <div class="d-flex justify-content-between align-items-end mb-2">
+                            <label class="text-success font-weight-bold mb-0">Jumlah Diproses / Transfer Keluar (Kg)</label>
+                            {{-- Info Stok Tersedia --}}
+                            <span class="badge badge-info p-2" style="font-size: 0.9em;">
+                                Tersedia: <span id="label_stok_tersedia">0</span> Kg
+                            </span>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="number" name="wip_keluar" id="input_wip_keluar" class="form-control font-weight-bold text-success form-control-lg" step="0.01" placeholder="0" required>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-outline-success" id="btn_ambil_semua" title="Proses Semua Stok">
+                                    All
+                                </button>
+                            </div>
+                        </div>
+                        <small class="text-muted">Masukkan angka sesuai pengecekan fisik di lapangan.</small>
                     </div>
 
-                    {{-- KALKULATOR BANTU (OPSIONAL) --}}
-                    <div class="calculator-box">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="calculator-title"><i class="fas fa-calculator"></i> Kalkulator Fisik (Bantu Hitung)</span>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-4">
-                                <label class="small">Trolley (x490)</label>
-                                <input type="number" id="calc_trolley" class="form-control form-control-sm" placeholder="Jml" oninput="hitungFisik()">
-                            </div>
-                            <div class="col-4">
-                                <label class="small">Pallet (x1260)</label>
-                                <input type="number" id="calc_pallet" class="form-control form-control-sm" placeholder="Jml" oninput="hitungFisik()">
-                            </div>
-                            <div class="col-4">
-                                <label class="small">Tambahan (Kg)</label>
-                                <input type="number" id="calc_tambahan" class="form-control form-control-sm" placeholder="Kg" oninput="hitungFisik()">
-                            </div>
-                        </div>
-                        <div class="mt-2 text-right">
-                            <small>Total Fisik:</small> 
-                            <strong class="text-success" style="font-size: 1.1em;" id="calc_total_fisik">0</strong> 
-                            <small>Kg</small>
-                        </div>
+                    {{-- 3. INPUT REKTIF (OPSIONAL) --}}
+                    <div class="form-group mb-3">
+                        <label class="text-dark font-weight-bold">Koreksi / Rektif (Kg) <small class="text-muted font-weight-normal">(Opsional)</small></label>
+                        <input type="number" name="rekfif" class="form-control" step="0.01" placeholder="0">
+                        <small class="text-muted">Isi +/- jika ada selisih timbangan.</small>
                     </div>
 
                     <div class="form-group mt-3">
                         <label>Keterangan</label>
-                        <textarea name="keterangan" class="form-control" rows="2" placeholder="Alasan koreksi..."></textarea>
+                        <textarea name="keterangan" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -344,6 +339,45 @@ $(document).ready(function () {
         // karena kita tidak tahu Saldo Sistem saat ini secara realtime tanpa ajax.
         // User harus menghitung selisihnya manual berdasarkan data di tabel.
     }
+
+    // --- LOGIKA CEK STOK REALTIME ---
+    $('#select_uraian').on('change', function() {
+        var uraian = $(this).val();
+        var tanggal = $('input[name="tanggal_input"]').val();
+
+        // Tampilkan loading
+        $('#label_stok_tersedia').text('...');
+        $('#input_wip_keluar').val(''); // Reset input
+
+        $.ajax({
+            url: "{{ route('bahan-proses.check-stock') }}",
+            type: "POST",
+            data: {
+                _token: "{{ csrf_token() }}",
+                uraian: uraian,
+                tanggal: tanggal
+            },
+            success: function(response) {
+                // Format angka desimal Indonesia
+                var formatted = new Intl.NumberFormat('id-ID').format(response.stok_tersedia);
+                $('#label_stok_tersedia').text(formatted);
+                
+                // Simpan nilai asli di tombol "All"
+                $('#btn_ambil_semua').data('stok', response.stok_tersedia);
+            },
+            error: function() {
+                $('#label_stok_tersedia').text('Error');
+            }
+        });
+    });
+
+    // Tombol "All" (Proses Semua Stok)
+    $('#btn_ambil_semua').on('click', function() {
+        var stok = $(this).data('stok');
+        if(stok) {
+            $('#input_wip_keluar').val(stok);
+        }
+    });
 });
 </script>
 </body>

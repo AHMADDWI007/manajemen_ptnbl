@@ -77,74 +77,106 @@ class BahanProsesController extends Controller
      */
     private function recalculateAndSaveFlow($date)
     {
-        // 1. Ambil Input Awal dari Maturasi
+        // ... (Bagian ambil data Maturasi & Produksi SIR20 Tetap Sama) ...
         $maturasiToday = PengolahanMaturasi::whereDate('tgl_laporan', $date)
             ->selectRaw('SUM(diolah) as total_diolah, SUM(mutasi) as total_mutasi')->first();
         $inputDariMaturasi = $maturasiToday ? ($maturasiToday->total_diolah - $maturasiToday->total_mutasi) : 0;
-
-        // 2. Ambil Angka Produksi Real
-        // Asumsi ProduksiSir20 belum diubah PK-nya, jika sudah sesuaikan
+        
         $realProduction = ProduksiSir20::whereDate('tanggal_produksi', $date)->sum('kg_yang_dipress');
-
-        $prevWipKeluar = 0; 
+        $prevWipKeluar = 0;
 
         foreach ($this->masterUraian as $index => $uraian) {
             
-            // A. Ambil Data (Rektif User)
+            // A. Ambil Data Existing (Untuk melihat apa yang diinput user)
             $existingRow = BahanProses::whereDate('tanggal', $date)
                             ->where('uraian', $uraian)->first();
             
-            $rektifUser = $existingRow ? $existingRow->rekfif : 0;
-            $ketUser = $existingRow ? $existingRow->keterangan : '-';
+            // Ambil input user, kalau belum ada anggap 0
+            $userWipKeluar = $existingRow ? $existingRow->wip_keluar : 0;
+            $rektifUser    = $existingRow ? $existingRow->rekfif : 0;
+            $ketUser       = $existingRow ? $existingRow->keterangan : '-';
 
-            // B. Cari Saldo Awal (H-1)
+            // B. Saldo Awal (H-1)
             $lastData = BahanProses::where('uraian', $uraian)
                 ->whereDate('tanggal', '<', $date)
-                ->orderBy('tanggal', 'desc')
-                ->first();
+                ->orderBy('tanggal', 'desc')->first();
             $saldoAwal = $lastData ? $lastData->saldo_akhir : 0;
 
-            // C. Tentukan WIP Masuk
+            // C. WIP Masuk (Estafet)
             if ($index === 0) {
                 $wipMasuk = $inputDariMaturasi;
             } else {
                 $wipMasuk = $prevWipKeluar;
             }
 
-            // D. Hitung WIP Keluar & Saldo Akhir
+            // D. 🔥 RUMUS BARU (Sesuai Excel)
+            // Rumus: Saldo Akhir = (Awal + Masuk + Rektif) - Keluar
+            
             $produksi = 0;
-            $wipKeluar = 0;
-            $saldoAkhir = 0;
+            $finalWipKeluar = $userWipKeluar;
 
             if ($uraian == 'Di Dalam Dryer/Press Bale') {
-                // DRYER (Barang Jadi)
+                // Khusus Dryer, Outputnya adalah Produksi Jadi
                 $produksi = $realProduction;
-                $wipKeluar = $produksi; 
-                $saldoAkhir = $saldoAwal + $wipMasuk - $produksi + $rektifUser;
+                $finalWipKeluar = $produksi; 
             } else {
-                // MESIN PERANTARA
                 $produksi = 0;
-                $targetSaldoAkhir = $saldoAwal + $rektifUser;
-                $saldoAkhir = max(0, $targetSaldoAkhir); 
-                $wipKeluar = max(0, ($saldoAwal + $wipMasuk) - $saldoAkhir);
             }
 
-            // E. SIMPAN KE DATABASE
+            // Hitung Saldo Akhir
+            $totalTersedia = $saldoAwal + $wipMasuk + $rektifUser;
+            $saldoAkhir = $totalTersedia - $finalWipKeluar;
+
+            // E. Simpan
             BahanProses::updateOrCreate(
                 ['tanggal' => $date->format('Y-m-d'), 'uraian' => $uraian],
                 [
                     'saldo_awal'     => $saldoAwal,
                     'wip_masuk'      => $wipMasuk,
-                    'wip_keluar'     => $wipKeluar,
+                    'wip_keluar'     => $finalWipKeluar, // Disimpan sesuai input/produksi
                     'produksi_sir20' => $produksi,
                     'rekfif'         => $rektifUser,
-                    'saldo_akhir'    => $saldoAkhir,
+                    'saldo_akhir'    => $saldoAkhir, // Hasil hitungan rumus
                     'keterangan'     => $ketUser
                 ]
             );
 
-            $prevWipKeluar = $wipKeluar;
+            // ======================================================
+            // 🔥 LOGIKA CUT-OFF (MEMUTUS ALIRAN)
+            // ======================================================
+            if ($uraian == 'Di Dalam Dryer/Press Bale') {
+                // Jika sudah sampai Dryer, jangan oper ke 'Di Reproses Ex WS'
+                // Set estafet jadi 0.
+                $prevWipKeluar = 0; 
+            } else {
+                // Selain Dryer, lanjut estafet ke proses berikutnya
+                $prevWipKeluar = $finalWipKeluar;
+            }
         }
+    }
+
+    // 3. TAMBAHKAN HELPER BARU (Untuk AJAX di View)
+    public function checkStock(Request $request)
+    {
+        $date = Carbon::parse($request->tanggal);
+        $uraian = $request->uraian;
+
+        // Cek apakah data hari ini sudah terbentuk (karena auto-calculate index)
+        $data = BahanProses::whereDate('tanggal', $date)
+                ->where('uraian', $uraian)->first();
+
+        if ($data) {
+            // Stok Tersedia = Saldo Awal + Masuk + Rektif
+            $stok = $data->saldo_awal + $data->wip_masuk + $data->rekfif;
+        } else {
+            // Fallback ke H-1 jika data hari ini belum ada
+            $lastData = BahanProses::where('uraian', $uraian)
+                ->whereDate('tanggal', '<', $date)
+                ->orderBy('tanggal', 'desc')->first();
+            $stok = $lastData ? $lastData->saldo_akhir : 0;
+        }
+
+        return response()->json(['stok_tersedia' => $stok]);
     }
 
     public function store(Request $request)
@@ -152,25 +184,28 @@ class BahanProsesController extends Controller
         $validator = Validator::make($request->all(), [
             'tanggal_input' => 'required|date',
             'uraian'        => 'required|string',
+            // 🔥 PERUBAHAN: Wajib input WIP Keluar (Barang yang dipindah)
+            'wip_keluar'    => 'required|numeric|min:0', 
             'rekfif'        => 'nullable|numeric',
             'keterangan'    => 'nullable|string',
         ]);
 
         if ($validator->fails()) return redirect()->back()->withErrors($validator);
 
-        // 1. Simpan Rektif User
+        // Simpan Inputan User
         BahanProses::updateOrCreate(
             ['tanggal' => $request->tanggal_input, 'uraian' => $request->uraian],
             [
+                'wip_keluar' => $request->wip_keluar, // User yang menentukan ini
                 'rekfif'     => $request->rekfif ?? 0,
                 'keterangan' => $request->keterangan
             ]
         );
 
-        // 2. TRIGGER RE-CALCULATE
+        // Hitung ulang saldo akhir berdasarkan input baru
         $this->recalculateAndSaveFlow(Carbon::parse($request->tanggal_input));
 
-        return redirect()->back()->with('success', 'Koreksi stok berhasil disimpan dan alur proses diperbarui.');
+        return redirect()->back()->with('success', 'Data proses berhasil disimpan.');
     }
 
     public function destroy($id)

@@ -190,7 +190,15 @@
                     </a>
                 </li>
 
-                {{-- 6. DATA LAINNYA --}}
+                {{-- 🔥 6. PENGATURAN SISTEM (MENU BARU) --}}
+                <li class="nav-item">
+                    <a href="{{ route('pengaturan.index') }}" class="nav-link {{ request()->is('pengaturan*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-cogs"></i>
+                        <p>Pengaturan Sistem</p>
+                    </a>
+                </li>
+
+                {{-- 7. DATA LAINNYA --}}
                 @php
                     $isLainnyaOpen = request()->is('data-lainnya*');
                 @endphp
@@ -218,10 +226,11 @@
                     </ul>
                 </li>
 
-                {{-- 7. LAPORAN & PERSETUJUAN --}}
+                {{-- 8. LAPORAN & PERSETUJUAN --}}
                 <li class="nav-item">
-                    <a href="{{ url('/laporan-harian') }}" class="nav-link {{ request()->is('laporan-harian*') ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-book"></i>
+                    {{-- 🔥 UPDATE: Mengarah ke route 'laporan.index' (URL: /laporan) --}}
+                    <a href="{{ route('laporan.index') }}" class="nav-link {{ request()->is('laporan') || request()->is('laporan/*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-file-invoice"></i> {{-- Ganti ikon jadi 'Invoice/Laporan' biar lebih pas --}}
                         <p>Laporan Harian</p>
                     </a>
                 </li>

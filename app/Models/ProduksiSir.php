@@ -13,10 +13,16 @@ class ProduksiSir extends Model
     protected $primaryKey = 'id_produksi_sir';
     protected $guarded = [];
     
+    // Agar kolom angka desimal terbaca sebagai float, bukan string
     protected $casts = [
-        'saldo_awal' => 'float', 'masuk' => 'float', 'total' => 'float',
-        'prod_bln_lalu' => 'float', 'prod_sd_hi' => 'float', 'pengiriman' => 'float',
-        'saldo_akhir' => 'float', 'kg' => 'float', 'pallet' => 'integer',
-        'created_at' => 'datetime',
+        'kg' => 'float', 
+        'pallet' => 'integer',
+        'tanggal_produksi' => 'date',
     ];
+
+    // Relasi: Satu Laporan Produksi punya BANYAK Pallet
+    public function pallets()
+    {
+        return $this->hasMany(Pallet::class, 'id_produksi_sir', 'id_produksi_sir');
+    }
 }

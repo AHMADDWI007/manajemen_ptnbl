@@ -160,7 +160,16 @@
                                         
                                         {{-- Diproses --}}
                                         <td>{{ number_format($item->diolah, 0, ',', '.') }}</td>
-                                        <td>{{ number_format($item->mutasi, 0, ',', '.') }}</td>
+                                       {{-- ✅ PERUBAHAN TAMPILAN MUTASI (KURUNG UNTUK KELUAR) --}}
+                                        <td class="{{ $item->mutasi > 0 ? 'text-danger' : ($item->mutasi < 0 ? 'text-success' : '') }}">
+                                            @if($item->mutasi > 0)
+                                                ({{ number_format($item->mutasi, 0, ',', '.') }})
+                                            @elseif($item->mutasi < 0)
+                                                {{ number_format(abs($item->mutasi), 0, ',', '.') }}
+                                            @else
+                                                0
+                                            @endif
+                                        </td>
                                         
                                         {{-- Masuk --}}
                                         <td>{{ number_format($item->masuk_hi, 0, ',', '.') }}</td>
@@ -190,8 +199,10 @@
                                                        data-tanggal="{{ $selected_date }}">
                                                         <i class="fas fa-eye text-info mr-2"></i> Detail
                                                     </a>
-                                                    <a class="dropdown-item btn-edit" href="javascript:void(0)"
-                                                       data-id="{{ $item->id_maturasi }}">
+                                                   <a class="dropdown-item btn-edit"
+                                                    data-id="{{ $item->id_maturasi }}"
+                                                    data-id-log="{{ $item->id_log }}">
+
                                                         <i class="fas fa-edit text-warning mr-2"></i> Edit
                                                     </a>
                                                     <form action="{{ route('maturasi.reset', $item->id_maturasi) }}" method="POST"
@@ -215,7 +226,11 @@
                                         <td class="text-center">{{ number_format($footer_data['total_stok_awal'], 0, ',', '.') }}</td>
                                         <td></td> <td></td>
                                         <td class="text-center">{{ number_format($footer_data['total_diolah'], 0, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($footer_data['total_mutasi'], 0, ',', '.') }}</td>
+                                      {{-- ✅ FOOTER MUTASI (SUM BERSIH MUTASI KELUAR) --}}
+                                        <td class="text-center">
+                                            @php $totalMutasiKeluar = $data_maturasi->where('mutasi', '>', 0)->sum('mutasi'); @endphp
+                                            {{ $totalMutasiKeluar > 0 ? '(' . number_format($totalMutasiKeluar, 0, ',', '.') . ')' : '0' }}
+                                        </td>
                                         <td class="text-center">{{ number_format($footer_data['total_masuk_hi'], 0, ',', '.') }}</td>
                                         <td colspan="3"></td>
                                         <td class="text-center">{{ number_format($footer_data['total_stok_akhir'], 0, ',', '.') }}</td>
@@ -260,51 +275,70 @@
         <div class="modal-content">
             <form action="{{ route('maturasi.store') }}" method="POST" id="formTambah">
                 @csrf
+
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title fw-bold">Input Data Diolah / Mutasi</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-exchange-alt mr-2"></i>Input Data Diolah / Mutasi
+                    </h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
+
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label>Tanggal Input Harian</label>
+                            <label class="font-weight-bold">Tanggal Input Harian</label>
                             <input type="date" name="tanggal_input_harian" id="tanggal_input_tambah" class="form-control form-control-sm" required>
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Uraian (Hanya Bak Aktif)</label>
+                            <label class="font-weight-bold">Uraian (Bak Sumber)</label>
                             <select name="uraian" id="uraian" class="form-control form-control-sm" required>
                                 <option value="" disabled selected>-- Pilih Bak Maturasi --</option>
                                 @forelse ($bak_aktif_list as $uraian_aktif)
                                     <option value="{{ $uraian_aktif }}">{{ $uraian_aktif }}</option>
                                 @empty
-                                    <option value="" disabled>Tidak ada Bak dengan stok untuk tanggal ini</option>
+                                    <option value="" disabled>Tidak ada Bak aktif tersedia</option>
                                 @endforelse
                             </select>
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Stok Awal (Kg)</label>
-                            <input type="text" name="stok_awal" id="stok_awal" class="form-control form-control-sm" readonly required>
+                            <label class="text-muted">Stok(Kg)</label>
+                            <input type="text" name="stok_awal" id="stok_awal" class="form-control form-control-sm bg-light" readonly required placeholder="Otomatis...">
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Umur (Hari) (Otomatis)</label>
-                            <input type="number" name="umur" id="umur" class="form-control form-control-sm" readonly required>
+                            <label class="text-muted">Umur (Hari)</label>
+                            <input type="number" name="umur" id="umur" class="form-control form-control-sm bg-light" readonly required placeholder="Otomatis...">
                         </div>
+
+                        <hr class="col-12 my-2">
+
                         <div class="col-md-6 mb-3">
-                            <label>Diolah (Kg)</label>
-                            {{-- 🔥 PERUBAHAN: Set Readonly, Value 0, Background Abu --}}
-                            <input type="number" name="diolah" id="diolah" class="form-control form-control-sm" value="0" readonly style="background-color: #e9ecef;">
-                            <small class="text-danger">*Diisi otomatis dari Input Produksi</small>
+                            <label class="font-weight-bold text-success">Mutasi (Kg)</label>
+                            <input type="number" name="mutasi" id="mutasi" class="form-control form-control-sm border-success" value="0" step="0.01" min="0">
                         </div>
-                         <div class="col-md-6 mb-3">
-                            <label>Mutasi (Kg)</label>
-                            <input type="number" name="mutasi" id="mutasi" class="form-control form-control-sm" value="0" step="0.01" min="0">
-                        </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Masuk Hari Ini (Kg)</label>
-                            <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm" value="0,00" readonly>
+                            <label class="font-weight-bold text-success">Tujuan Mutasi</label>
+                            <select name="tujuan_mutasi" id="tujuan_mutasi" class="form-control form-control-sm border-success">
+                                <option value="" selected>-- Opsional: Pilih Bak Tujuan --</option>
+                                @foreach ($data_maturasi as $bak_tujuan)
+                                    <option value="{{ $bak_tujuan->id_maturasi }}">{{ $bak_tujuan->uraian }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-info font-italic">*Kosongkan jika hanya pengeluaran stok.</small>
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Asal Bokar</label>
+                            <label class="text-muted">Masuk Hari Ini (Kg)</label>
+                            <input type="text" name="masuk_hi" id="masuk_hi" class="form-control form-control-sm bg-light" value="0,00" readonly>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="font-weight-bold">Asal Bokar</label>
                             <select name="asal_bokar" id="asal_bokar" class="form-control form-control-sm">
                                 <option value="INHUT">INHUT</option>
                                 <option value="PT">PT</option>
@@ -312,20 +346,21 @@
                                 <option value="Petani" selected>Petani</option>
                             </select>
                         </div>
-                        <hr class="col-12 my-2">
-                        <div class="col-md-6 mb-3">
-                            <label>Perkiraan Stok Akhir (Kg)</label>
-                            <input type="text" id="stok_akhir_display" class="form-control form-control-sm" readonly>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Keterangan</label>
-                            <input type="text" name="keterangan" id="keterangan" class="form-control form-control-sm" readonly style="background-color: #e9ecef;">
+
+                        <div class="col-md-12 mb-3">
+                            <label class="text-muted">Keterangan / Label Tanggal</label>
+                            <input type="text" name="keterangan" id="keterangan" class="form-control form-control-sm bg-light" readonly style="background-color: #e9ecef;" placeholder="-">
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success btn-sm">Simpan Data</button>
+
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm shadow-sm" data-dismiss="modal">
+                        <i class="fas fa-times mr-1"></i>Batal
+                    </button>
+                    <button type="submit" class="btn btn-success btn-sm shadow-sm">
+                        <i class="fas fa-save mr-1"></i>Simpan Data
+                    </button>
                 </div>
             </form>
         </div>
@@ -333,70 +368,83 @@
 </div>
 
 {{-- MODAL EDIT --}}
+{{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <form id="formEdit" method="POST" data-error-id="{{ session('edit_id') }}">
+            <form id="formEdit" method="POST">
                 @csrf
                 @method('PUT')
-                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Edit Data Maturasi</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+                
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-edit mr-2"></i>Edit Data Diolah / Mutasi
+                    </h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
+
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label>Tanggal Input Harian</label>
-                            <input type="date" name="tanggal_input" id="editTanggalInput" class="form-control form-control-sm" required>
+                            <label class="font-weight-bold">Tanggal Input Harian</label>
+                            <input type="date" name="tanggal_input_harian" id="editTanggalInput" class="form-control form-control-sm bg-light" readonly required>
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Uraian</label>
-                            <input type="text" name="uraian" id="editUraian" class="form-control form-control-sm" readonly>
+                            <label class="font-weight-bold">Uraian (Bak Sumber)</label>
+                            <input type="text" name="uraian" id="editUraian" class="form-control form-control-sm bg-light" readonly>
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Stok Awal (Kg)</label>
-                            <input type="number" name="stok_awal" id="editStokAwal" class="form-control form-control-sm" step="0.01" required>
+                            <label class="text-muted">Stok Saat Ini (Kg)</label>
+                            {{-- 🔥 Menampilkan stok_akhir dari snapshot --}}
+                            <input type="text" id="editStokAkhirDisplay" class="form-control form-control-sm bg-light" readonly placeholder="0,00">
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Umur (Hari)</label>
-                            <input type="number" name="umur" id="editUmur" class="form-control form-control-sm" step="1" required>
+                            <label class="text-muted">Umur (Hari)</label>
+                            <input type="number" id="editUmur" class="form-control form-control-sm bg-light" readonly>
                         </div>
-                         <div class="col-md-6 mb-3">
-                            <label>Tanggal Masuk Bokar</label>
-                            <input type="date" name="tgl_masuk" id="editTglMasuk" class="form-control form-control-sm">
-                        </div>
+
+                        <hr class="col-12 my-2">
+
                         <div class="col-md-6 mb-3">
-                            <label>Diolah (Kg)</label>
-                            {{-- 🔥 PERUBAHAN: Set Readonly, Background Abu --}}
-                            <input type="number" name="diolah" id="editDiolah" class="form-control form-control-sm" readonly style="background-color: #e9ecef;">
-                            <small class="text-danger">*Diisi otomatis dari Input Produksi</small>
+                            <label class="font-weight-bold text-success">Mutasi (Kg)</label>
+                            <input type="number" name="mutasi" id="editMutasi" class="form-control form-control-sm border-success" step="0.01" min="0">
                         </div>
+
                         <div class="col-md-6 mb-3">
-                            <label>Mutasi (Kg)</label>
-                            <input type="number" name="mutasi" id="editMutasi" class="form-control form-control-sm" step="0.01">
-                        </div>
-                         <div class="col-md-6 mb-3">
-                            <label>Masuk HI (Kg)</label>
-                            <input type="number" name="masuk_hi" id="editMasukHi" class="form-control form-control-sm" step="0.01">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Asal Bokar</label>
-                            <select name="asal_bokar" id="editAsalBokar" class="form-control form-control-sm">
-                                <option value="" disabled>-- Pilih Asal --</option>
-                                <option value="INHUT">INHUT</option>
-                                <option value="PT">PT</option>
-                                <option value="CMP">CMP</option>
+                            <label class="font-weight-bold text-success">Tujuan Mutasi</label>
+                            {{-- 🔥 Sekarang bisa diubah --}}
+                            <select name="tujuan_mutasi" id="editTujuanMutasi" class="form-control form-control-sm border-success">
+                                <option value="">-- Pilih Bak Tujuan --</option>
+                                @foreach ($data_maturasi as $bak_tujuan)
+                                    <option value="{{ $bak_tujuan->id_maturasi }}">{{ $bak_tujuan->uraian }}</option>
+                                @endforeach
                             </select>
                         </div>
-                         <div class="col-md-6 mb-3">
-                            <label>Keterangan</label>
-                           <input type="text" name="keterangan" id="editKeterangan" class="form-control form-control-sm" readonly style="background-color: #e9ecef;">
+
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted">Masuk Hari Ini (Kg)</label>
+                            <input type="text" id="editMasukHi" class="form-control form-control-sm bg-light" readonly>
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="text-muted">Keterangan / Label Tanggal</label>
+                            <input type="text" name="keterangan" id="editKeterangan" class="form-control form-control-sm bg-light" readonly>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-warning btn-sm">Simpan Perubahan</button>
+
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm shadow-sm" data-dismiss="modal">
+                        <i class="fas fa-times mr-1"></i>Batal
+                    </button>
+                    <button type="submit" class="btn btn-warning btn-sm shadow-sm font-weight-bold">
+                        <i class="fas fa-save mr-1"></i>Simpan Perubahan
+                    </button>
                 </div>
             </form>
         </div>
@@ -536,53 +584,54 @@ $(document).ready(function() {
         }
     }
 
-    function fetchPreviousData() {
-        const selectedUraian = $('#uraian').val();
-        const selectedDate = $('#tanggal_input_tambah').val();
-        
-        if (selectedUraian && selectedDate) {
-            $.ajax({
-                url: "{{ route('maturasi.getPreviousData') }}", 
-                type: 'GET',
-                data: { uraian: selectedUraian, tanggal_filter: selectedDate },
-                dataType: 'json',
-                success: function(data) {
-                    // 1. Isi Data Angka (Yang sudah ada)
-                    $('#stok_awal').val(formatNumber(data.stok_awal, 2));
-                    $('#umur').val(data.umur !== null ? data.umur : 0);
-                    $('#masuk_hi').val(formatNumber(data.netto_kering_hi || data.masuk_hi, 2));
-                    
-                    // 2. 🔥 TAMBAHKAN INI: Update Dropdown Asal Bokar
-                    let asal = data.asal_bokar;
-                    
-                    // Cek logika: Jika string mengandung "CMP" (misal "CMP (PT, DS)"), set ke "CMP"
-                    if (asal && asal.includes('CMP')) {
-                        $('#asal_bokar').val('CMP');
-                    } 
-                    // Jika datanya pas (misal "PT", "INHUT"), set langsung
-                    else if (asal && (asal === 'PT' || asal === 'INHUT' || asal === 'Petani')) {
-                        $('#asal_bokar').val(asal);
-                    } 
-                    // Jika kosong atau tidak dikenali, bisa default ke Petani atau biarkan
-                    else {
-                        $('#asal_bokar').val('Petani'); 
-                    }
-
-                    // 3. Hitung ulang stok akhir
-                    calculateStokAkhirDisplay();
-                },
-                error: function() {
-                    // Reset jika error
-                    $('#stok_awal').val('0,00'); 
-                    $('#umur').val(0); 
-                    $('#masuk_hi').val('0,00');
-                    $('#asal_bokar').val('Petani'); // Reset asal bokar juga
-                    calculateStokAkhirDisplay();
+   function fetchPreviousData() {
+    const selectedUraian = $('#uraian').val();
+    const selectedDate = $('#tanggal_input_tambah').val();
+    
+    if (selectedUraian && selectedDate) {
+        $.ajax({
+            url: "{{ route('maturasi.getPreviousData') }}", 
+            type: 'GET',
+            data: { 
+                uraian: selectedUraian, 
+                tanggal_filter: selectedDate 
+            },
+            dataType: 'json',
+            success: function(data) {
+                // 1. ISI DATA STOK BERJALAN
+                // 🔥 Ambil STOK AKHIR saat ini sebagai STOK AWAL di form
+                $('#stok_awal').val(formatNumber(data.stok_akhir, 2));
+                
+                // Set UMUR sesuai data lab
+                $('#umur').val(data.umur !== null ? data.umur : 0);
+                
+                // 🔥 Set MASUK HI ke 0 karena nilainya sudah masuk di stok_akhir di atas
+                $('#masuk_hi').val('0,00');
+                
+                // 2. UPDATE DROPDOWN ASAL BOKAR
+                let asal = data.asal_bokar;
+                if (asal && asal.includes('CMP')) {
+                    $('#asal_bokar').val('CMP');
+                } else if (asal && (asal === 'PT' || asal === 'INHUT' || asal === 'Petani')) {
+                    $('#asal_bokar').val(asal);
+                } else {
+                    $('#asal_bokar').val('Petani'); 
                 }
-            });
-        }
-    }
 
+                // 3. HITUNG ULANG PREVIEW STOK AKHIR DI FORM
+                calculateStokAkhirDisplay();
+            },
+            error: function() {
+                // Reset form jika terjadi error
+                $('#stok_awal').val('0,00'); 
+                $('#umur').val(0); 
+                $('#masuk_hi').val('0,00');
+                $('#asal_bokar').val('Petani');
+                calculateStokAkhirDisplay();
+            }
+        });
+    }
+}
     $('#uraian').on('change', fetchPreviousData);
     $('#tanggal_input_tambah').on('change', function() { fetchPreviousData(); });
     $('#diolah, #mutasi').on('input keyup', calculateStokAkhirDisplay);
@@ -599,106 +648,109 @@ $(document).ready(function() {
     $(document).on('change', '#editTanggalInput', function() { updateKeterangan('edit'); });
 
     // --- LOGIKA TOMBOL DETAIL (UPDATE) ---
-    $(document).on('click', '.btn-detail', function () {
-        const uraian = $(this).data('uraian');
-        const tanggal = $(this).data('tanggal');
-        $.ajax({
-            url: "{{ route('maturasi.getPreviousData') }}",
-            method: "GET",
-            data: { uraian: uraian, tanggal_filter: tanggal },
-            dataType: "json",
-            success: function (data) {
-                const formatTanggal = (tgl) => {
-                    if (!tgl) return 'KOSONG';
-                    const d = new Date(tgl);
-                    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-                };
-                $('#detailUraian').text(uraian);
-                $('#detailStokAwal').text(formatNumber(data.stok_awal));
-                $('#detailTglMasuk').text(data.tgl_masuk ? formatTanggal(data.tgl_masuk) : 'KOSONG');
-                $('#detailUmur').text((data.umur ?? 0) + ' hari');
-                $('#detailDiolah').text(formatNumber(data.diolah));
-                $('#detailMutasi').text(formatNumber(data.mutasi));
-                $('#detailMasukHi').text(formatNumber(data.netto_kering_hi));
-                
-                // ✅ UPDATE BAGIAN INI: Membedakan K3 Masuk dan K3 Olah
-                $('#detailK3Masuk').text(data.k3_masuk ? formatNumber(data.k3_masuk, 2) : '-');
-                $('#detailK3Olah').text(data.k3_olah ? formatNumber(data.k3_olah, 2) : '-');
-                $('#detailPO').text(data.po || '-');
-                $('#detailPRI').text(data.pri || '-');
-                $('#detailTglUji').text(data.tgl_uji ? formatTanggal(data.tgl_uji) : '-');
-                
-                $('#detailStokAkhir').text(formatNumber(data.stok_akhir));
-                $('#detailAsalBokar').text(data.asal_bokar ? data.asal_bokar : '-');
-                $('#detailKeterangan').text(data.keterangan ?? '-');
-                $('#detailTglInputAsli').text(formatTanggal(tanggal));
-                $('#modalDetail').modal('show');
+  // --- LOGIKA TOMBOL DETAIL (UPDATE TAMPILAN MUTASI) ---
+$(document).on('click', '.btn-detail', function () {
+    const uraian = $(this).data('uraian');
+    const tanggal = $(this).data('tanggal');
+    
+    $.ajax({
+        url: "{{ route('maturasi.getPreviousData') }}",
+        method: "GET",
+        data: { uraian: uraian, tanggal_filter: tanggal },
+        dataType: "json",
+        success: function (data) {
+            const formatTanggal = (tgl) => {
+                if (!tgl) return 'KOSONG';
+                const d = new Date(tgl);
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+            };
+
+            $('#detailUraian').text(uraian);
+            $('#detailStokAwal').text(formatNumber(data.stok_awal));
+            $('#detailTglMasuk').text(data.tgl_masuk ? formatTanggal(data.tgl_masuk) : 'KOSONG');
+            $('#detailUmur').text((data.umur ?? 0) + ' hari');
+            $('#detailDiolah').text(formatNumber(data.diolah));
+            
+            // 🔥 LOGIKA BARU: TAMPILAN MUTASI DI DETAIL
+            let rawMutasi = parseFloat(data.mutasi) || 0;
+            let displayMutasi = '0';
+            let classColor = '';
+
+            if (rawMutasi > 0) {
+                // Berarti barang KELUAR dari bak ini (Source)
+                displayMutasi = '-' + formatNumber(rawMutasi);
+                classColor = 'text-danger font-weight-bold';
+            } else if (rawMutasi < 0) {
+                // Berarti barang MASUK ke bak ini (Destination)
+                displayMutasi = '+' + formatNumber(Math.abs(rawMutasi));
+                classColor = 'text-success font-weight-bold';
             }
-        });
+
+            $('#detailMutasi').text(displayMutasi)
+                             .removeClass('text-danger text-success')
+                             .addClass(classColor);
+
+            $('#detailMasukHi').text(formatNumber(data.masuk_hi));
+            $('#detailK3Masuk').text(data.k3_masuk ? formatNumber(data.k3_masuk, 2) : '-');
+            $('#detailK3Olah').text(data.k3_olah ? formatNumber(data.k3_olah, 2) : '-');
+            $('#detailPO').text(data.po || '-');
+            $('#detailPRI').text(data.pri || '-');
+            $('#detailTglUji').text(data.tgl_uji ? formatTanggal(data.tgl_uji) : '-');
+            $('#detailStokAkhir').text(formatNumber(data.stok_akhir));
+            $('#detailAsalBokar').text(data.asal_bokar ? data.asal_bokar : '-');
+            $('#detailKeterangan').text(data.keterangan ?? '-');
+            $('#detailTglInputAsli').text(formatTanggal(tanggal));
+            
+            $('#modalDetail').modal('show');
+        }
     });
+});
+ $(document).on('click', '.btn-edit', function () {
+    var id = $(this).data('id');
+    var filterTanggal = $('input[name="filter_tanggal"]').val(); 
 
-    $(document).on('click', '.btn-edit', function () {
-        console.log('Tombol Edit Diklik');
+    var baseUrl = "{{ url('/') }}";
+    var urlGet  = baseUrl + "/maturasi/" + id + "/edit";
+    var urlPost = baseUrl + "/maturasi/" + id;
 
-        var id = $(this).data('id');
-        
-        // 🔥 PERBAIKAN: Ambil tanggal dari input filter di atas tabel
-        var filterTanggal = $('input[name="filter_tanggal"]').val(); 
-        
-        var urlGet = "{{ url('maturasi') }}/" + id + "/edit";
-        var urlPost = "{{ url('maturasi') }}/" + id;
+    $.ajax({
+        url: urlGet,
+        type: 'GET',
+        data: { filter_tanggal: filterTanggal },
+        success: function(data) {
+            // 1. Isi data identitas dasar
+            $('#editTanggalInput').val(data.updated_at);
+            $('#editUraian').val(data.uraian);
+            
+            // 2. 🔥 Ambil Stok Akhir sebagai referensi "Stok Saat Ini"
+            $('#editStokAkhirDisplay').val(formatNumber(data.stok_akhir, 2));
+            $('#editUmur').val(data.umur || 0);
+            $('#editMasukHi').val(formatNumber(data.masuk_hi, 2));
+            
+            // 3. Nilai mutasi yang akan diedit
+            $('#editMutasi').val(parseFloat(data.mutasi || 0));
 
-        // Swal.fire({title: 'Memuat Data...', didOpen: () => Swal.showLoading()});
-
-        // 🔥 PERBAIKAN: Kirim parameter filter_tanggal ke Controller
-        $.ajax({
-            url: urlGet,
-            type: 'GET',
-            data: { filter_tanggal: filterTanggal }, // <-- INI KUNCINYA
-            success: function(data) {
-                Swal.close();
-                console.log('Data Edit Diterima:', data);
-
-                // --- Pengisian Form ---
-                
-                // Set Tanggal Input sesuai Filter Tanggal (dari updated_at controller)
-                $('#editTanggalInput').val(data.updated_at);
-
-                $('#editUraian').val(data.uraian);
-                
-                // Gunakan parseFloat agar angka '0.00' tidak error
-                $('#editStokAwal').val(parseFloat(data.stok_awal || 0));
-                $('#editUmur').val(data.umur || 0);
-                
-                // Tgl Masuk (sudah diformat Y-m-d di controller)
-                $('#editTglMasuk').val(data.tgl_masuk || '');
-                
-                $('#editDiolah').val(parseFloat(data.diolah || 0));
-                $('#editMutasi').val(parseFloat(data.mutasi || 0));
-                $('#editMasukHi').val(parseFloat(data.masuk_hi || 0));
-                
-                // Logic CMP (Asal Bokar)
-                let asal = data.asal_bokar;
-                if (asal && asal.includes('CMP')) {
-                    $('#editAsalBokar').val('CMP');
-                } else {
-                    $('#editAsalBokar').val(asal);
-                }
-
-                $('#editKeterangan').val(data.keterangan);
-
-                // Update Action Form
-                $('#formEdit').attr('action', urlPost);
-                $('#formEdit').attr('data-error-id', id);
-
-                $('#modalEdit').modal('show');
-            },
-            error: function(xhr) {
-                Swal.fire('Error', 'Gagal memuat data. Cek Console.', 'error');
-                console.error(xhr);
+            // 4. 🔥 Set Bak Tujuan jika ada pasangan mutasi
+            // Catatan: Pastikan Controller mengirimkan 'id_tujuan' jika ada
+            if(data.tujuan_mutasi_id) {
+                $('#editTujuanMutasi').val(data.tujuan_mutasi_id);
+            } else {
+                $('#editTujuanMutasi').val('');
             }
-        });
+
+            $('#editKeterangan').val(data.keterangan);
+
+            // Set Action Form
+            $('#formEdit').attr('action', urlPost);
+            
+            // Tampilkan Modal
+            $('#modalEdit').modal('show');
+        },
+        error: function(xhr) {
+            Swal.fire('Error', 'Gagal memuat data edit.', 'error');
+        }
     });
+});
 
     @if (session('success'))
         Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2500 });

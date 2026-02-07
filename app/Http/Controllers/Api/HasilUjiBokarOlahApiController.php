@@ -94,37 +94,37 @@ class HasilUjiBokarOlahApiController extends Controller
      */
     public function store(Request $request) 
     {
-        // Gunakan Transaction agar aman
         DB::beginTransaction();
         try {
+            // 🔥 PERBAIKAN: Pastikan nama parameter SAMA dengan ApiService.java
+            // Di ApiService: @Field("id_pengolahan_basah")
             $validator = Validator::make($request->all(), [
-                // Validasi ID Pengolahan Basah
-                'pengolahan_basah_id' => 'required|exists:pengolahan_basah,id_pengolahan_basah',
+                'id_pengolahan_basah' => 'required|exists:pengolahan_basah,id_pengolahan_basah',
                 'k3' => 'required|numeric|min:0|max:100',
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+                return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
             }
 
             // 1. Ambil Data Induk
-            $dataBasah = PengolahanBasah::where('id_pengolahan_basah', $request->pengolahan_basah_id)->firstOrFail();
+            $dataBasah = PengolahanBasah::where('id_pengolahan_basah', $request->id_pengolahan_basah)->firstOrFail();
             
             // 2. Hitung Kering
             $k3 = $request->k3;
             $netto_kering = $dataBasah->netto_basah * ($k3 / 100);
 
-            // 3. Update Tabel Induk (Pengolahan Basah)
+            // 3. Update Tabel Induk
             $dataBasah->update([
                 'k3'           => $k3,
                 'netto_kering' => $netto_kering
             ]);
 
-            // 4. Catat Log History (Tabel Hasil Uji)
+            // 4. Catat Log History
             $log = HasilUjiLabBokarDiolah::create([
                 'id_pengolahan_basah' => $dataBasah->id_pengolahan_basah,
                 'tanggal'             => $dataBasah->tanggal,
-                'id_maturasi'         => $dataBasah->id_maturasi, // Ambil ID Maturasi dari induk
+                'id_maturasi'         => $dataBasah->id_maturasi,
                 'jenis'               => $dataBasah->jenis,
                 'netto_basah'         => $dataBasah->netto_basah,
                 'k3'                  => $k3,
@@ -144,7 +144,7 @@ class HasilUjiBokarOlahApiController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error store API: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Server Error: ' . $e->getMessage()], 500);
         }
     }
 
@@ -241,7 +241,7 @@ class HasilUjiBokarOlahApiController extends Controller
         $maturasiMaster->asal_bokar = $asalBaru;
 
         // 2. Hitung Total Masuk Hari Ini (Agregat dari semua Pengolahan Basah di tanggal & bak yg sama)
-        $totalMasukHariIni = PengolahanBasah::where('id_maturasi', $idMaturasi)
+        $totalMasukHariIni = HasilUjiLabBokarDiolah::where('id_maturasi', $idMaturasi)
             ->whereDate('tanggal', $tanggal)
             ->sum('netto_kering'); // Sum netto kering yang valid (yg null diabaikan)
 
@@ -251,6 +251,7 @@ class HasilUjiBokarOlahApiController extends Controller
             ['masuk_hi' => $totalMasukHariIni, 'keterangan' => 'Auto-Sync dari Lab API']
         );
 
+        
         // 4. Hitung Saldo Akhir Master (Snapshot saat ini)
         // Rumus: Stok Awal + Masuk - Diolah - Mutasi = Stok Akhir
         // Note: Stok awal idealnya statis per periode, tapi di sini kita update snapshot real-time

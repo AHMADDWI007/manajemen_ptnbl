@@ -116,66 +116,81 @@ class GudangSirApiController extends Controller
     {
         $request->validate([
             'tanggal' => 'required|date',
-            'uraian' => 'required',
+            'uraian'  => 'required',
         ]);
 
-        $tgl = Carbon::parse($request->tanggal);
+        $tgl = Carbon::parse($request->tanggal)->startOfDay();
         DB::beginTransaction();
 
         try {
-            // Logic ini SAMA PERSIS dengan Web Controller
-            // Cari data sebelumnya untuk Saldo Awal
-            $prevData = ProduksiSir::where('uraian', $request->uraian)
-                ->whereDate('created_at', '<', $tgl)
+            // ==========================================================
+            // 1. UPDATE TABEL IV (GUDANG / LOKASI)
+            // ==========================================================
+            // Logic Saldo Awal (Estafet dari hari sebelumnya)
+            $prevGudang = ProduksiSir::where('uraian', $request->uraian)
+                ->where('created_at', '<', $tgl)
                 ->orderBy('created_at', 'desc')->first();
 
-            $saldo_awal = $prevData ? $prevData->saldo_akhir : 0;
-            $prod_bln_lalu = $prevData ? $prevData->prod_sd_hi : 0;
+            $saldoAwal = $prevGudang ? $prevGudang->saldo_akhir : 0;
+            $prodLalu  = $prevGudang ? $prevGudang->prod_sd_hi : 0;
 
-            // Parameter dari Android
             $masuk = $request->input('masuk', 0);
             $pengiriman = $request->input('pengiriman', 0);
-            $kg = $request->input('kg', 0);
-            $pallet = $request->input('pallet', 0);
-
+            
             // Hitung
-            $total = $saldo_awal + $masuk;
-            $prod_sd_hi = $prod_bln_lalu + $masuk;
-            $saldo_akhir = $total - $pengiriman;
+            $total = $saldoAwal + $masuk;
+            $prodSdHi = $prodLalu + $masuk;
+            $saldoAkhir = $total - $pengiriman;
 
-            // Simpan
             ProduksiSir::updateOrCreate(
+                ['uraian' => $request->uraian, 'created_at' => $tgl],
                 [
-                    'uraian' => $request->uraian,
-                    'created_at' => $tgl->format('Y-m-d H:i:s') // Kunci Harian
-                ],
-                [
-                    'saldo_awal' => $saldo_awal,
-                    'masuk' => $masuk,
-                    'total' => $total,
-                    'prod_bln_lalu' => $prod_bln_lalu,
-                    'prod_sd_hi' => $prod_sd_hi,
-                    'pengiriman' => $pengiriman,
-                    'saldo_akhir' => $saldo_akhir,
-                    
-                    // Field Mutu
-                    'kg' => $kg,
-                    'pallet' => $pallet,
-                    
-                    'keterangan' => $request->keterangan,
-                    'updated_at' => Carbon::now()
+                    'saldo_awal'    => $saldoAwal,
+                    'masuk'         => $masuk,
+                    'total'         => $total,
+                    'prod_bln_lalu' => $prodLalu,
+                    'prod_sd_hi'    => $prodSdHi,
+                    'pengiriman'    => $pengiriman,
+                    'saldo_akhir'   => $saldoAkhir,
+                    'keterangan'    => $request->keterangan,
+                    // Simpan pallet total gudang jika ada
+                    'pallet'        => $request->input('pallet_gudang', 0) 
                 ]
             );
 
-            // Trigger Sinkronisasi Penjualan (Jika Gudang SIR)
+            // ==========================================================
+            // 2. UPDATE TABEL VI (RINCIAN MUTU - 5 ITEM)
+            // ==========================================================
+            // Hanya update mutu jika inputnya dari "Di Gudang SIR" (Pusat Produksi)
+            // Atau jika Anda ingin update mutu dari gudang manapun, hapus if ini.
             if ($request->uraian == 'Di Gudang SIR') {
-                $penjualan = new PenjualanSir20Controller();
-                $penjualan->recalculateAndSave($tgl->format('Y-m-d'), 'SIR20 PTNBL', $pengiriman, 'Auto Sync Android');
-                $penjualan->recalculateAndSave($tgl->format('Y-m-d'), 'SIR20 PTPN4', 0, 'Auto Sync Android');
+                
+                $mutuItems = [
+                    'Mutu Prima (siap jual)' => ['kg' => 'mutu_prima', 'pal' => 'pal_prima'],
+                    'PO / PRI Low'           => ['kg' => 'po_pri',     'pal' => 'pal_po'],
+                    'WhiteSpot (WS)'         => ['kg' => 'ws',         'pal' => 'pal_ws'],
+                    'Kontaminasi'            => ['kg' => 'kontaminasi','pal' => 'pal_kontam'],
+                    'Repacking On Hold'      => ['kg' => 'repacking',  'pal' => 'pal_repack'],
+                ];
+
+                foreach ($mutuItems as $namaMutu => $field) {
+                    $kgVal = $request->input($field['kg'], 0);
+                    $palVal = $request->input($field['pal'], 0);
+
+                    // Update row mutu
+                    ProduksiSir::updateOrCreate(
+                        ['uraian' => $namaMutu, 'created_at' => $tgl],
+                        [
+                            'kg'         => $kgVal,
+                            'pallet'     => $palVal,
+                            'keterangan' => '-'
+                        ]
+                    );
+                }
             }
 
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Data tersimpan']);
+            return response()->json(['success' => true, 'message' => 'Data Gudang & Mutu Tersimpan']);
 
         } catch (\Exception $e) {
             DB::rollBack();

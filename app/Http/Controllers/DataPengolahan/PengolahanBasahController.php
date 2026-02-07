@@ -18,13 +18,31 @@ class PengolahanBasahController extends Controller
 {
     public function index(Request $request)
     {
-        // 🔥 [PERBAIKAN] Menggunakan relasi 'maturasi' yang sudah didefinisikan di Model
-        $data_pengolahan = PengolahanBasah::with('maturasi')->orderBy('tanggal', 'desc')->get();
+        // 1. QUERY DATA UTAMA
+        // Ambil semua data, urutkan dari yang terbaru
+        $query = PengolahanBasah::with('maturasi')
+                    ->orderBy('tanggal', 'desc')
+                    ->orderBy('created_at', 'desc');
 
+        // Filter Tanggal (Jika User Memilih Tanggal)
+        if ($request->has('tanggal') && $request->tanggal != '') {
+            $query->whereDate('tanggal', $request->tanggal);
+        }
+
+        $raw_data = $query->get();
+
+        // 2. 🔥 LOGIKA GROUPING FINAL (PENGGABUNGAN TAMPILAN)
+        // Kita kelompokkan berdasarkan: TANGGAL + ID BAK + JAM & MENIT
+        // Format 'YmdHi' (Tanpa detik 's') menjamin data pecahan yang selisih detik tetap menyatu.
+        $data_pengolahan = $raw_data->groupBy(function($item) {
+            return $item->tanggal . '-' . $item->id_maturasi . '-' . $item->created_at->format('YmdHi');
+        });
+
+        // 3. LOGIKA SUMMARY STOK (CARD ATAS)
         $selected_date_str = $request->query('tanggal');
         $today = $selected_date_str ? Carbon::parse($selected_date_str) : Carbon::today();
 
-        // Init Summary
+        // Inisialisasi default array
         $summary_data = [
             'stok_awal'          => 0,
             'masuk_hi'           => 0,
@@ -39,52 +57,199 @@ class PengolahanBasahController extends Controller
             $result = $this->calculateAllRecapTotals($today);
             $all_totals = $result['total'];
 
-            $summary_data['stok_awal']          = $all_totals['stok_awal'];
-            $summary_data['masuk_hi']           = $all_totals['masuk_hi'];
-            $summary_data['masuk_sdhi']         = $all_totals['penerimaan_sid_hi'];
-            $summary_data['diolah_hi']          = $all_totals['diolah_hi'];
-            $summary_data['diolah_sdhi']        = $all_totals['diolah_sdhi'];
-            $summary_data['stok_akhir']         = $all_totals['stok_akhir'];
-            $summary_data['jumlah_stock_bokar'] = $all_totals['jumlah_stock_bokar'];
+            // Merge data summary
+            $summary_data = array_merge($summary_data, $all_totals);
 
-        } catch (Exception $e) { }
+        } catch (Exception $e) {
+            // Silent fail agar halaman tetap loading walau hitungan error
+        }
 
-        $total_data = [
-            'total_pt_netto_kering'    => 0,
-            'total_ds_netto_kering'    => 0,
-            'total_inhut_netto_kering' => 0,
-            'jumlah_netto_kering'      => 0,
-        ];
+        // Variabel dummy untuk total footer (karena dihitung JS)
+        $total_data = [];
 
+        // 4. RETURN KE VIEW
         return view('DataPengolahan.pengolahan-basah', compact('data_pengolahan', 'summary_data', 'total_data', 'today'));
     }
 
     public function store(Request $request)
     {
+        // 1. Validasi Input
         $validator = Validator::make($request->all(), [
             'tanggal'       => 'required|date',
-            // 🔥 [PERBAIKAN] Validasi FK ke tabel 'maturasi' kolom 'id_maturasi'
-            'id_maturasi'   => 'required|exists:maturasi,id_maturasi', 
-            'jenis'         => 'required|string|in:PT,DS,INHUT',
+            'id_maturasi'   => 'required|exists:maturasi,id_maturasi',
             'berat_truck'   => 'required|numeric|min:0',
-            'berat_timbang' => 'required|numeric|min:' . $request->input('berat_truck', 0),
+            'berat_timbang' => 'required|numeric|gte:berat_truck',
+            'split_pt'      => 'nullable|numeric|min:0',
+            'split_ds'      => 'nullable|numeric|min:0',
+            'split_inhut'   => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
 
-        $data = $validator->validated();
-        $netto_basah = $data['berat_timbang'] - $data['berat_truck'];
+        // 2. Hitung Data Utama
+        $berat_truck_total = (float) $request->berat_truck;
+        $berat_timbang_total = (float) $request->berat_timbang;
+        $netto_total_real = $berat_timbang_total - $berat_truck_total;
 
-        // 🔥 [PERBAIKAN] Pastikan field foreign key pakai 'id_maturasi' (sesuai $fillable/guarded model)
-        PengolahanBasah::create(array_merge($data, [
-            'netto_basah'  => $netto_basah,
-            'k3'           => null,
-            'netto_kering' => null,
-        ]));
+        // 3. Ambil Input Pecahan
+        $pt_netto = (float) $request->input('split_pt', 0);
+        $ds_netto = (float) $request->input('split_ds', 0);
+        $inhut_netto = (float) $request->input('split_inhut', 0);
+        $total_split = $pt_netto + $ds_netto + $inhut_netto;
 
-        $this->updateMaturasiTrigger($data['id_maturasi'], $data['jenis'], $data['tanggal']);
+        try {
+            // === SKENARIO 1: INPUT UTUH (GELONDONGAN) ===
+            // Jika user membiarkan kolom pecahan kosong (0)
+            if ($total_split == 0) {
+                // Simpan sebagai 1 baris utuh
+                // Kita defaultkan ke 'DS' (atau jenis lain sesuai kesepakatan) sebagai penampung sementara
+                PengolahanBasah::create([
+                    'tanggal'       => $request->tanggal,
+                    'id_maturasi'   => $request->id_maturasi,
+                    'jenis'         => 'PENDING', // Default sementara, nanti di-Pecah oleh Admin
+                    'berat_truck'   => $berat_truck_total,
+                    'berat_timbang' => $berat_timbang_total,
+                    'netto_basah'   => $netto_total_real,
+                    'k3'            => null,
+                    'netto_kering'  => null,
+                ]);
 
-        return redirect()->route('pengolahan-basah.index')->with('success', 'Data produksi berhasil ditambahkan.');
+                // Update Trigger (Label DS akan masuk ke master bak)
+                $this->updateMaturasiTrigger($request->id_maturasi, 'DS', $request->tanggal);
+
+                return redirect()->route('pengolahan-basah.index')->with('success', 'Data utuh berhasil disimpan (Belum dipecah).');
+            }
+
+            // === SKENARIO 2: INPUT LANGSUNG PECAH ===
+            // Jika user mengisi kolom pecahan
+            else {
+                // Validasi: Total pecahan harus sama dengan Netto (Toleransi 0.1)
+                if (abs($total_split - $netto_total_real) > 0.1) {
+                    return redirect()->back()->withErrors(['msg' => 'Total rincian (' . $total_split . ') tidak sama dengan Netto (' . $netto_total_real . '). Jika ingin simpan utuh, kosongkan semua kolom rincian.'])->withInput();
+                }
+
+                $splits = [
+                    'PT' => $pt_netto,
+                    'DS' => $ds_netto,
+                    'INHUT' => $inhut_netto
+                ];
+
+                foreach ($splits as $jenis => $netto_bagian) {
+                    if ($netto_bagian > 0) {
+                        // Hitung Proporsional Berat Truk & Timbang
+                        $persentase = $netto_bagian / $netto_total_real;
+                        $proporsi_truck = $berat_truck_total * $persentase;
+                        $proporsi_timbang = $berat_timbang_total * $persentase;
+
+                        PengolahanBasah::create([
+                            'tanggal'       => $request->tanggal,
+                            'id_maturasi'   => $request->id_maturasi,
+                            'jenis'         => $jenis,
+                            'berat_truck'   => $proporsi_truck,
+                            'berat_timbang' => $proporsi_timbang,
+                            'netto_basah'   => $netto_bagian,
+                            'k3'            => null,
+                            'netto_kering'  => null,
+                        ]);
+
+                        $this->updateMaturasiTrigger($request->id_maturasi, $jenis, $request->tanggal);
+                    }
+                }
+                
+                return redirect()->route('pengolahan-basah.index')->with('success', 'Data berhasil disimpan dan dipecah otomatis.');
+            }
+
+        } catch (Exception $e) {
+            return redirect()->back()->withErrors(['msg' => 'Error: ' . $e->getMessage()])->withInput();
+        }
+    }
+
+    // Method baru untuk menangani proses Pecah Data
+    public function pecahStore(Request $request)
+    {
+        // 1. Cari Data Asal
+        $dataAsal = PengolahanBasah::find($request->id_asal);
+        if (!$dataAsal) {
+            return redirect()->back()->with('error', 'Data asal tidak ditemukan.');
+        }
+
+        // CEK PENTING: Pastikan data asal sudah punya K3 & Netto Kering
+        // Karena kita mau mecah berdasarkan Kering, kalau Keringnya 0, error kan.
+        if ($dataAsal->netto_kering <= 0 || empty($dataAsal->k3)) {
+            return redirect()->back()->with('error', 'Data ini belum memiliki Nilai Netto Kering / Hasil Lab (K3). Tidak bisa dipecah.');
+        }
+
+        // 2. Ambil Inputan Pecahan (INI ADALAH NILAI KERING)
+        $pt_kering    = (float) $request->split_pt;
+        $ds_kering    = (float) $request->split_ds;
+        $inhut_kering = (float) $request->split_inhut;
+        
+        $totalInputKering = $pt_kering + $ds_kering + $inhut_kering;
+
+        // 3. Validasi: Total Input harus sama dengan Netto Kering Asal (Dibulatkan ke atas biar klop sama View)
+        // Kita pakai ceil() di sini karena di View tombolnya pakai ceil()
+        $targetKering = ceil($dataAsal->netto_kering); 
+
+        if (abs($totalInputKering - $targetKering) > 0.1) {
+            return redirect()->back()->withErrors(['msg' => 'Total pecahan (' . number_format($totalInputKering) . ') tidak sama dengan Netto Kering asal (' . number_format($targetKering) . ').'])->withInput();
+        }
+
+        try {
+            // Array Data (Nilai Kering)
+            $splits = [
+                'PT'    => $pt_kering, 
+                'DS'    => $ds_kering, 
+                'INHUT' => $inhut_kering
+            ];
+
+            // Ambil K3 Asal (Persentase) untuk hitung mundur
+            $k3_persen = $dataAsal->k3; 
+            
+            foreach ($splits as $jenis => $nilaiKering) {
+                if ($nilaiKering > 0) {
+                    
+                    // --- A. HITUNG MUNDUR NETTO BASAH ---
+                    // Rumus: Basah = Kering / (K3 / 100)
+                    // Contoh: Kering 500, K3 50% -> Basah = 500 / 0.5 = 1000
+                    $nilaiBasah = $nilaiKering / ($k3_persen / 100);
+
+                    // --- B. LOGIKA PROPORSIONAL (BERAT TRUK & TIMBANG) ---
+                    // Kita pakai rasio dari Netto Kering
+                    // Rumus: (Nilai Kering Bagian / Total Kering Asal)
+                    $ratio = $nilaiKering / $dataAsal->netto_kering;
+
+                    $beratTruckBaru   = $dataAsal->berat_truck * $ratio;
+                    $beratTimbangBaru = $dataAsal->berat_timbang * $ratio;
+
+                    // --- C. SIMPAN DATA BARU ---
+                    PengolahanBasah::create([
+                        'tanggal'       => $dataAsal->tanggal,
+                        'id_maturasi'   => $dataAsal->id_maturasi,
+                        'jenis'         => $jenis, 
+                        
+                        // Data Timbangan (Proporsional)
+                        'berat_truck'   => $beratTruckBaru,
+                        'berat_timbang' => $beratTimbangBaru,
+                        
+                        // Data Hasil Hitungan
+                        'netto_basah'   => $nilaiBasah,   // Hasil hitung mundur
+                        'k3'            => $k3_persen,    // COPY K3 DARI INDUK (JANGAN DI-NULL)
+                        'netto_kering'  => $nilaiKering,  // Inputan Admin
+                    ]);
+                    
+                    // Update Trigger Maturasi
+                    $this->updateMaturasiTrigger($dataAsal->id_maturasi, $jenis, $dataAsal->tanggal);
+                }
+            }
+
+            // 4. Hapus Data Lama
+            $dataAsal->delete();
+
+            return redirect()->back()->with('success', 'Data berhasil dipecah berdasarkan Netto Kering.');
+
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memecah data: ' . $e->getMessage());
+        }
     }
 
     public function show($id) 
@@ -139,6 +304,32 @@ class PengolahanBasahController extends Controller
         if($pengolahan) $pengolahan->delete();
         
         return redirect()->route('pengolahan-basah.index')->with('success', 'Data dihapus.');
+    }
+
+    // Hapus Banyak Data Sekaligus (Group)
+    public function destroyGroup(Request $request)
+    {
+        $ids = json_decode($request->group_ids, true); // Terima array ID dari view
+        
+        if (!empty($ids) && is_array($ids)) {
+            // Ambil sample data untuk trigger (ambil data pertama sebelum dihapus)
+            $sample = PengolahanBasah::find($ids[0]);
+            
+            if ($sample) {
+                $maturasiId = $sample->id_maturasi;
+                $tanggal = $sample->tanggal;
+
+                // Hapus Semua Data berdasarkan ID array
+                PengolahanBasah::whereIn('id_pengolahan_basah', $ids)->delete();
+
+                // 🔥 PENTING: Jalankan Trigger untuk update Status Bak
+                // Kita kirim jenisBaru = '' (kosong) karena kita sedang menghapus, bukan menambah.
+                // Trigger akan otomatis scan ulang sisa data di database.
+                $this->updateMaturasiTrigger($maturasiId, '', $tanggal);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Seluruh data pecahan dalam grup berhasil dihapus.');
     }
 
     public function updateRektif(Request $request) 
@@ -276,23 +467,45 @@ class PengolahanBasahController extends Controller
         return max(0, $stok);
     }
 
-    private function updateMaturasiTrigger($maturasiId, $jenis, $tanggal)
+    // Function Helper untuk Update Status Bak Maturasi Otomatis (REVISI: Target kolom asal_bokar)
+    public function updateMaturasiTrigger($id_maturasi, $jenisBaru, $tanggal)
     {
-        // 🔥 [PERBAIKAN] find($maturasiId) mencari di kolom id_maturasi
-        $maturasi = Maturasi::find($maturasiId);
+        // 1. Ambil SEMUA jenis bokar unik di Bak & Tanggal tersebut
+        $listJenis = PengolahanBasah::where('id_maturasi', $id_maturasi)
+                        ->where('tanggal', $tanggal)
+                        ->pluck('jenis')
+                        // 🔥 PERBAIKAN DISINI: Tambahkan "&& $value !== 'PENDING'"
+                        ->filter(function ($value) { 
+                            return !is_null($value) && $value !== '' && $value !== 'PENDING'; 
+                        })
+                        ->unique()
+                        ->sort() 
+                        ->values();
+
+        // 2. Tentukan Label Akhir
+        $labelAkhir = '';
+
+        if ($listJenis->count() > 1) {
+            // Jika Multi Jenis -> CMP (DS, PT)
+            $rincian = $listJenis->implode(', '); 
+            $labelAkhir = "CMP ($rincian)";
+        } 
+        elseif ($listJenis->count() == 1) {
+            // Jika cuma 1 jenis -> Tetap PT / DS / INHUT
+            $labelAkhir = $listJenis->first();
+        } 
+        else {
+            // Jika data kosong
+            $labelAkhir = null; 
+        }
+
+        // 3. Update ke Tabel Master Maturasi
+        $bak = Maturasi::find($id_maturasi);
         
-        if ($maturasi) {
-            $asalBaru = strtoupper($jenis);
-            if ($maturasi->asal_bokar && $maturasi->asal_bokar !== $asalBaru && $maturasi->asal_bokar !== 'CMP') {
-                $asalBaru = 'CMP';
-            }
-            $maturasi->update(['asal_bokar' => $asalBaru]);
-            
-            // 🔥 [PERBAIKAN] FK 'maturasi_id' jadi 'id_maturasi' di PengolahanMaturasi
-            PengolahanMaturasi::firstOrCreate(
-                ['id_maturasi' => $maturasiId, 'tgl_laporan' => $tanggal],
-                ['masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0, 'keterangan' => 'Fisik Bokar Masuk']
-            );
+        if ($bak) {
+            // 🔥 PERBAIKAN DI SINI: Simpan ke kolom 'asal_bokar'
+            $bak->asal_bokar = $labelAkhir; 
+            $bak->save();
         }
     }
 }

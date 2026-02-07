@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Maturasi;
 use App\Models\PengolahanBasah;
 use App\Models\PengolahanMaturasi;
-use App\Models\TransaksiApiBokar;
-use App\Models\HasilUjiLabBokarDiolah; // 🔥 [PERBAIKAN MODEL]
-use App\Models\HasilUjiLabMaturasi;    // 🔥 [PERBAIKAN MODEL]
+use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\HasilUjiLabMaturasi;
+use App\Models\BahanProses;
+use App\Models\Lokasi; // Tambahan Model Baru
+use App\Models\Mutu;   // Tambahan Model Baru
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
@@ -17,168 +19,164 @@ class DummyLHPSeeder extends Seeder
 {
     public function run()
     {
-        // 1. BERSIHKAN TABEL TRANSAKSI
-        Schema::disableForeignKeyConstraints();
+        // =================================================================
+        // 1. BERSIHKAN DATABASE (METODE AMAN DARI ERROR #1701)
+        // =================================================================
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        
         Maturasi::truncate();
         PengolahanBasah::truncate();
         PengolahanMaturasi::truncate();
-        TransaksiApiBokar::truncate();
+        // TransaksiApiBokar::truncate(); // <-- DIHAPUS (Biar data bokar aman/manual)
         HasilUjiLabBokarDiolah::truncate();
         HasilUjiLabMaturasi::truncate();
-        Schema::enableForeignKeyConstraints();
+        BahanProses::truncate();
+        
+        // Bersihkan Tabel Master Baru (Agar ID reset ke 1)
+        Lokasi::truncate();
+        Mutu::truncate();
+        
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        $this->command->info('Data lama dibersihkan. Memulai seeding data LHP 1 Oktober 2025...');
+        // Target Tanggal Laporan: 01 Januari 2026
+        $targetDate = '2026-01-01'; 
+        $this->command->info("Seeding LHP KHUSUS MATURASI (Total 162.395) - Target: $targetDate");
 
-        // 2. SETUP MASTER MATURASI (49 BAK KOSONG)
+        // =================================================================
+        // 1.B ISI MASTER LOKASI & MUTU (UNTUK SISTEM BARU TRACKING PALLET)
+        // =================================================================
+        $this->command->info('Seeding Master Lokasi & Mutu...');
+
+        $lokasi = [
+            'Di Gudang SIR',
+            'Di Areal Press Bale',
+            'Di Gudang TOH 1',
+            'Di Gudang TOH 2',
+            'Area Repacking', 
+        ];
+        foreach ($lokasi as $l) {
+            Lokasi::create(['nama' => $l]);
+        }
+
+        $mutu = [
+            'Mutu Prima (siap jual)',
+            'PO / PRI Low',
+            'WhiteSpot (WS)',
+            'Kontaminasi',
+            'Repacking On Hold',
+        ];
+        foreach ($mutu as $m) {
+            Mutu::create(['uraian' => $m]);
+        }
+
+        // =================================================================
+        // 2. SETUP 49 BAK KOSONG TERLEBIH DAHULU
+        // =================================================================
         for ($i = 1; $i <= 49; $i++) {
             Maturasi::create([
-                'uraian' => "Di Bak Maturasi-$i",
-                'stok_awal' => 0, 'stok_akhir' => 0, 'umur' => 0, 'keterangan' => 'KOSONG'
+                'uraian'       => "Di Bak Maturasi-$i",
+                'stok_awal'    => 0, 'masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0,
+                'stok_akhir'   => 0, 'umur' => 0, 'asal_bokar' => null,
+                'keterangan'   => 'KOSONG'
             ]);
         }
 
         // =================================================================
-        // BAGIAN I: PENGADAAN BOKAR
+        // 3. INPUT DATA REAL (SESUAI GAMBAR EXCEL - TOTAL 162.395)
         // =================================================================
+        // Format: [Berat, Tgl Masuk, Asal Bokar]
         
-        // A. STOK AWAL
-        $this->seedApiBokar('2025-09-30', 'petani', 13708);
-        $this->seedApiBokar('2025-09-30', 'ptpn', 41165);
-        $this->seedApiBokar('2025-09-30', 'inhut', 12598);
+        $dataReal = [
+            // --- BARIS KIRI ---
+            2  => [5654, '2025-12-26', 'CMP INHUT'],
+            3  => [5629, '2025-12-26', 'CMP INHUT'],
+            4  => [5468, '2025-12-26', 'CMP INHUT'],
+            5  => [5528, '2025-12-25', 'CMP PT'],
+            
+            7  => [5455, '2025-12-25', 'CMP PT'],
+            
+            // ANOMALI (Saldo ada, tapi status KOSONG & Umur 0)
+            14 => [-10,  null,         null], 
+            16 => [13,   null,         null], 
 
-        // B. TRANSAKSI HARI INI (1 Okt)
-        $this->seedApiBokar('2025-10-01', 'petani', 13460);
-        $this->seedApiBokar('2025-10-01', 'ptpn', 963);
+            17 => [5289, '2025-12-24', 'CMP PT'],
+            19 => [4875, '2025-12-25', 'CMP PT'],
+            20 => [5671, '2025-12-22', 'CMP PT'],
+            21 => [6091, '2025-12-31', 'DS'],
+            22 => [5562, '2025-12-25', 'CMP PT'],
+            23 => [2570, '2025-12-31', 'DS'],
+            24 => [5449, '2025-12-25', 'CMP PT'],
+            25 => [5548, '2025-12-25', 'CMP PT'],
 
-        // C. DIOLAH (Dummy ke Bak 1)
-        // 🔥 [PERBAIKAN] Ambil ID Maturasi (PK Baru)
-        $bakDummy = Maturasi::first()->id_maturasi;
-
-        $this->seedPengolahanBasah('2025-10-01', 'DS', 12242, $bakDummy);
-        $this->seedPengolahanBasah('2025-10-01', 'PT', 3060, $bakDummy);
-
-
-        // =================================================================
-        // BAGIAN II: MATURASI
-        // =================================================================
-        
-        $stokMaturasi = [
-            3  => [5075, '2025-09-24', 'INHUT'],
-            6  => [4813, '2025-08-20', 'PT'],
-            7  => [5084, '2025-09-30', 'CMP'],
-            9  => [5090, '2025-09-30', 'CMP'],
-            10 => [2566, '2025-08-20', 'PT'],
-            11 => [5248, '2025-09-29', 'CMP'],
-            12 => [5248, '2025-09-30', 'CMP'],
-            17 => [4979, '2025-09-27', 'CMP'],
-            22 => [5227, '2025-09-27', 'CMP'],
-            23 => [2364, '2025-09-27', 'CMP'],
-            24 => [4941, '2025-09-27', 'CMP'],
-            28 => [4927, '2025-09-29', 'CMP'],
-            37 => [5278, '2025-08-16', 'PT'],
-            40 => [4915, '2025-08-16', 'PT'],
-            41 => [5163, '2025-09-26', 'DS'],
-            42 => [5183, '2025-09-26', 'DS'],
-            43 => [2438, '2025-09-30', 'CMP'],
-            44 => [5109, '2025-09-30', 'CMP'],
-            45 => [5103, '2025-09-29', 'CMP'],
-            49 => [5267, '2025-09-25', 'CMP'],
+            // --- BARIS KANAN ---
+            33 => [5675, '2025-12-30', 'DS'],
+            34 => [5333, '2025-12-18', 'CMP INHUT'],
+            35 => [6251, '2025-12-31', 'DS'],
+            36 => [5113, '2025-12-29', 'CMP PT'],
+            37 => [5546, '2025-12-26', 'CMP PT'],
+            38 => [5440, '2025-12-24', 'CMP PT'],
+            39 => [3936, '2025-12-23', 'CMP PT'],
+            40 => [5613, '2025-12-31', 'DS'],
+            41 => [5409, '2025-12-22', 'CMP PT'],
+            42 => [5535, '2025-12-26', 'CMP PT'],
+            43 => [5665, '2025-12-29', 'CMP PT'],
+            44 => [5672, '2025-12-30', 'DS'],
+            45 => [5936, '2025-12-29', 'CMP PT'], 
+            46 => [5744, '2025-12-29', 'CMP PT'],
+            47 => [5914, '2025-12-31', 'DS'],
+            48 => [5701, '2025-12-31', 'DS'],
+            49 => [5120, '2025-12-13', 'CMP PT'],
         ];
 
-        foreach ($stokMaturasi as $noBak => $data) {
-            $this->seedMaturasi($noBak, $data[0], $data[1], $data[2]);
+        // Loop Update Data
+        foreach ($dataReal as $noBak => $val) {
+            $this->updateBakMaturasi($noBak, $val[0], $val[1], $val[2], $targetDate);
         }
 
-        $masukHiMaturasi = [
-            19 => 2092, 20 => 5361, 21 => 5216, 43 => 2633,
-        ];
-
-        foreach ($masukHiMaturasi as $noBak => $kgMasuk) {
-            $this->seedMaturasiMasukHi($noBak, $kgMasuk, '2025-10-01');
-        }
-
-        $this->command->info('SELESAI! Data Dummy LHP 1 Oktober 2025 berhasil digenerate.');
+        $this->command->info('SELESAI! Data Maturasi telah di-reset ke saldo awal tahun (162.395 Kg).');
+        $this->command->info('Master Lokasi & Mutu telah diisi.');
     }
 
-    // --- HELPER FUNCTIONS ---
-
-    private function seedApiBokar($tgl, $kode, $kg) {
-        if ($kg <= 0) return;
-        TransaksiApiBokar::create([
-            'tanggal' => $tgl,
-            'kode_api' => $kode,
-            'masuk_hi' => $kg,
-            'masuk_sd_kemarin' => 0 
-        ]);
-    }
-
-    private function seedPengolahanBasah($tgl, $jenis, $kgKering, $idMaturasi) {
-        if ($kgKering <= 0) return;
-        
-        $k3 = 100; 
-        $nettoBasah = $kgKering; 
-
-        // 🔥 [PERBAIKAN] FK: id_maturasi
-        PengolahanBasah::create([
-            'tanggal' => $tgl,
-            'id_maturasi' => $idMaturasi, 
-            'jenis' => $jenis,
-            'berat_truck' => 5000,
-            'berat_timbang' => 5000 + $nettoBasah,
-            'netto_basah' => $nettoBasah,
-            'k3' => $k3,
-            'netto_kering' => $kgKering
-        ]);
-    }
-
-    private function seedMaturasi($noBak, $kg, $tglMasuk, $asal) {
+    // --- LOGIKA UPDATE ---
+    private function updateBakMaturasi($noBak, $berat, $tglMasuk, $asal, $targetDate)
+    {
         $bak = Maturasi::where('uraian', "Di Bak Maturasi-$noBak")->first();
         if (!$bak) return;
 
-        // 🔥 [PERBAIKAN] FK: id_maturasi
-        PengolahanMaturasi::create([
-            'id_maturasi' => $bak->id_maturasi,
-            'tgl_laporan' => $tglMasuk,
-            'masuk_hi' => $kg,
-            'diolah' => 0, 'mutasi' => 0,
-            'keterangan' => 'Stok Awal Seeder'
+        // Hitung Umur (Target 1 Jan 2026)
+        $umur = 0;
+        $keterangan = 'KOSONG';
+        $tglInject = '2025-12-31'; // Default untuk yang tgl kosong
+
+        if ($tglMasuk) {
+            $diff = Carbon::parse($tglMasuk)->diffInDays(Carbon::parse($targetDate));
+            $umur = $diff; 
+            $keterangan = Carbon::parse($tglMasuk)->format('d-M-y'); // Format spt Excel
+            $tglInject = $tglMasuk;
+        } else {
+            // Kasus Bak 14 & 16
+            $keterangan = 'KOSONG';
+        }
+
+        // A. Update Master Maturasi
+        $bak->update([
+            'stok_awal'  => $berat,
+            'stok_akhir' => $berat,
+            'tgl_masuk'  => $tglMasuk,
+            'umur'       => $umur,
+            'asal_bokar' => $asal,
+            'keterangan' => $keterangan,
+            'updated_at' => $targetDate
         ]);
 
-        $bak->stok_awal = 0;
-        $bak->masuk_hi = $kg;
-        $bak->stok_akhir = $kg;
-        $bak->tgl_masuk = $tglMasuk;
-        $bak->umur = Carbon::parse('2025-10-01')->diffInDays(Carbon::parse($tglMasuk));
-        $bak->asal_bokar = $asal;
-        $bak->keterangan = strtoupper(Carbon::parse($tglMasuk)->format('d M Y'));
-        $bak->save();
-    }
-
-    private function seedMaturasiMasukHi($noBak, $kg, $tgl) {
-        $bak = Maturasi::where('uraian', "Di Bak Maturasi-$noBak")->first();
-        if (!$bak) return;
-
-        // 🔥 [PERBAIKAN] FK: id_maturasi
+        // B. Insert Log Pengolahan (PENTING UNTUK HISTORY)
         PengolahanMaturasi::create([
             'id_maturasi' => $bak->id_maturasi,
-            'tgl_laporan' => $tgl,
-            'masuk_hi' => $kg,
-            'diolah' => 0, 'mutasi' => 0,
-            'keterangan' => 'Masuk HI Seeder'
+            'tgl_laporan' => $tglInject,
+            'masuk_hi'    => $berat,
+            'diolah'      => 0,
+            'mutasi'      => 0,
+            'keterangan'  => 'Saldo Awal Tahun'
         ]);
-
-        $stokBaru = $bak->stok_akhir + $kg;
-        
-        $bak->stok_awal = $bak->stok_akhir;
-        $bak->masuk_hi = $kg;
-        $bak->stok_akhir = $stokBaru;
-        $bak->tgl_masuk = $tgl;
-        $bak->umur = 0;
-        $bak->keterangan = strtoupper(Carbon::parse($tgl)->format('d M Y'));
-        
-        if(empty($bak->asal_bokar)) $bak->asal_bokar = 'CMP';
-        elseif ($bak->asal_bokar != 'CMP') $bak->asal_bokar = 'CMP';
-
-        $bak->save();
     }
 }

@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\DataProduksi;
 
-use App\Http\Controllers\Controller;
-use App\Models\PenjualanSir20;
-use App\Models\ProduksiSir; 
-use App\Models\HasilUjiLabSIR20; // Sumber data utama
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Models\Mutu;
+use App\Models\Pallet;
+use App\Models\ProduksiSir; 
+use Illuminate\Http\Request;
+use App\Models\KondisiPallet;
+use App\Models\PenjualanSir20;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
+use App\Models\HasilUjiLabSIR20; // Sumber data utama
 
 class PenjualanSir20Controller extends Controller
 {
@@ -20,12 +23,29 @@ class PenjualanSir20Controller extends Controller
             : Carbon::today();
 
         // Ambil stok resmi Mutu Prima dari tabel Gudang & Mutu (Data Gudang)
-        $stokMutuPrima = ProduksiSir::where('uraian', 'Mutu Prima (siap jual)')
-            ->whereDate('created_at', '<=', $selectedDate)
-            ->orderBy('created_at', 'desc')
-            ->first();
+        // Cari ID untuk "Mutu Prima" dulu
+        $mutuPrima = Mutu::where('uraian', 'LIKE', '%Prima%')->first();
+        $idMutuPrima = $mutuPrima ? $mutuPrima->id_mutu : 0;
 
-        $mutuTersedia = $stokMutuPrima ? $stokMutuPrima->pallet : 0;
+        // Hitung Pallet yang: 
+        // 1. Belum Terjual (tanggal_penjualan NULL)
+        // 2. Mutu TERAKHIR-nya adalah Prima
+        $mutuTersedia = 0;
+        
+        // Ambil semua pallet aktif
+        $pallets = Pallet::whereNull('tanggal_penjualan')->get();
+        
+        foreach($pallets as $p) {
+            // Cek kondisi terakhir pallet ini
+            $lastKondisi = KondisiPallet::where('id_pallet', $p->id_pallet)
+                            ->orderBy('id_kondisi_pallet', 'desc')
+                            ->first();
+            
+            // Jika kondisi terakhirnya Prima, hitung
+            if ($lastKondisi && $lastKondisi->id_mutu == $idMutuPrima) {
+                $mutuTersedia++;
+            }
+        }
 
         // Data Summary (Tabel V) - Logika tetap sama
         $dataDB = PenjualanSir20::whereDate('tanggal', $selectedDate)->where('is_summary', 1)->get()->keyBy('uraian');
@@ -111,94 +131,66 @@ class PenjualanSir20Controller extends Controller
     }
 
     public function store(Request $request)
-{
-    $request->validate([
-        'no_kontrak' => 'required',
-        'no_invoice' => 'required',
-        'tanggal'    => 'required|date',
-        'uraian'     => 'required', 
-        'selected_pallets' => 'required|array',
-        'hari_ini'   => 'required|numeric', // Nilai Kg Penjualan
-        'harga'      => 'required|numeric',
-    ]);
-
-    DB::beginTransaction();
-    try {
-        $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
-        $kgTerjual = $request->hari_ini;
-        $palletTerjual = count($request->selected_pallets);
-
-        // 1. Simpan Detail Penjualan
-        PenjualanSir20::create([
-            'tanggal'    => $tgl,
-            'uraian'     => $request->uraian,
-            'no_kontrak' => $request->no_kontrak,
-            'no_invoice' => $request->no_invoice,
-            'pallet'     => $palletTerjual,
-            'hari_ini'   => $kgTerjual,
-            'harga'      => $request->harga,
-            'no_palet_list' => implode(',', $request->selected_pallets),
-            'is_summary' => 0 
+    {
+        $request->validate([
+            'no_kontrak' => 'required',
+            'no_invoice' => 'required',
+            'tanggal'    => 'required|date',
+            'uraian'     => 'required', 
+            'selected_pallets' => 'required|array',
+            'hari_ini'   => 'required|numeric', // Nilai Kg Penjualan
+            'harga'      => 'required|numeric',
         ]);
 
-        // 2. Sinkronisasi ke Summary Penjualan (Tabel V)
-        $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
-            ->where('uraian', $request->uraian)
-            ->where('is_summary', 0)
-            ->sum('hari_ini');
-        $this->recalculateAndSave($tgl, $request->uraian, $totalKgHariIni);
+        DB::beginTransaction();
+        try {
+            $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
+            $kgTerjual = $request->hari_ini;
+            $palletTerjual = count($request->selected_pallets);
 
-        // --- 3. SINKRONISASI KE GUDANG (TABEL IV) ---
-        // Ambil data gudang hari sebelumnya untuk mendapatkan saldo awal
-        $prevGudang = ProduksiSir::where('uraian', 'Di Gudang SIR')
-            ->whereDate('created_at', '<', $tgl)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        $saldoAwal = $prevGudang->saldo_akhir ?? 0;
-        $prodLalu  = $prevGudang->prod_sd_hi ?? 0;
-
-        // Ambil data "Masuk" hari ini jika sudah ada input produksi
-        $dataToday = ProduksiSir::where('uraian', 'Di Gudang SIR')
-            ->whereDate('created_at', $tgl)
-            ->first();
-        $masukHariIni = $dataToday->masuk ?? 0;
-
-        // Gunakan updateOrCreate agar data Pengiriman masuk meskipun belum input gudang
-        ProduksiSir::updateOrCreate(
-            ['uraian' => 'Di Gudang SIR', 'created_at' => $tgl],
-            [
-                'saldo_awal' => $saldoAwal,
-                'masuk'      => $masukHariIni,
-                'total'      => $saldoAwal + $masukHariIni,
-                'prod_bln_lalu' => $prodLalu,
-                'prod_sd_hi'    => $prodLalu + $masukHariIni,
-                'pengiriman'    => $totalKgHariIni, // Mengisi kolom Pengiriman secara akumulatif
-                'saldo_akhir'   => ($saldoAwal + $masukHariIni) - $totalKgHariIni
-            ]
-        );
-
-        // --- 4. SINKRONISASI KE MUTU (TABEL VI) ---
-        // Potong stok Mutu Prima secara otomatis
-        $mutu = ProduksiSir::where('uraian', 'Mutu Prima (siap jual)')
-            ->whereDate('created_at', $tgl)
-            ->first();
-
-        if ($mutu) {
-            $mutu->update([
-                'pallet' => $mutu->pallet - $palletTerjual,
-                'kg'     => $mutu->kg - $kgTerjual
+            // 1. Simpan Detail Penjualan (Untuk Arsip Invoice/Kontrak)
+            PenjualanSir20::create([
+                'tanggal'    => $tgl,
+                'uraian'     => $request->uraian,
+                'no_kontrak' => $request->no_kontrak,
+                'no_invoice' => $request->no_invoice,
+                'pallet'     => $palletTerjual,
+                'hari_ini'   => $kgTerjual,
+                'harga'      => $request->harga,
+                'no_palet_list' => implode(',', $request->selected_pallets),
+                'is_summary' => 0 
             ]);
+
+            // 2. Sinkronisasi ke Summary Penjualan (Tabel V - Laporan Penjualan)
+            // Bagian ini TETAP ADA agar Tabel V di halaman Penjualan terisi rekapnya
+            $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
+                ->where('uraian', $request->uraian)
+                ->where('is_summary', 0)
+                ->sum('hari_ini');
+            
+            $this->recalculateAndSave($tgl, $request->uraian, $totalKgHariIni);
+
+            // =========================================================================
+            // 🔥 3. UPDATE STATUS PALLET MENJADI TERJUAL (CORE TRACKING SYSTEM) 🔥
+            // =========================================================================
+            // Inilah pengganti langkah 3 & 4 yang error tadi.
+            // Cukup update kolom 'tanggal_penjualan' di tabel pallet.
+            // Sistem Dashboard otomatis tidak akan menghitung pallet ini lagi sebagai stok.
+            
+            Pallet::whereIn('no_pallet', $request->selected_pallets)
+                ->update([
+                    'tanggal_penjualan' => $tgl
+                ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Penjualan berhasil disimpan. Stok gudang otomatis terpotong!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal: ' . $e->getMessage());
         }
-
-        DB::commit();
-        return redirect()->back()->with('success', 'Penjualan berhasil disimpan dan stok gudang terpotong!');
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return back()->with('error', 'Gagal: ' . $e->getMessage());
     }
-}
+
     public function recalculateAndSave($tgl, $uraian, $hari_ini, $keterangan = null)
     {
         $tglCarbon = Carbon::parse($tgl);

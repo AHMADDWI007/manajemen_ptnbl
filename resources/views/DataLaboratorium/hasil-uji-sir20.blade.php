@@ -29,7 +29,7 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Hasil Uji Sir 20</h1>
-                <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambahSir"> 
+                <button class="btn btn-success btn-sm fw-bold" id="btnTambahData" data-toggle="modal" data-target="#modalTambahSir"> 
                     <i class="fas fa-plus-circle"></i> Tambah Data
                 </button>
             </div>
@@ -46,22 +46,44 @@
                         </ul></div>
                         @endif
 
-                        {{-- FILTER TANGGAL (VERSI RAPI - TETAP SAMA) --}}
-                        <div class="row mb-3 align-items-end">
-                            <div class="col-auto">
-                                <label for="min-date" class="form-label small fw-bold mb-1">Dari Tanggal:</label>
-                                <input type="text" id="min-date" class="form-control form-control-sm" placeholder="dd/mm/yyyy" style="width: 140px;">
-                            </div>
-                            <div class="col-auto">
-                                <label for="max-date" class="form-label small fw-bold mb-1">Sampai Tanggal:</label>
-                                <input type="text" id="max-date" class="form-control form-control-sm" placeholder="dd/mm/yyyy" style="width: 140px;">
-                            </div>
-                            <div class="col-auto">
-                                <button id="filter-btn" class="btn btn-primary btn-sm fw-bold mr-2"><i class="fas fa-filter mr-1"></i> Filter</button>
-                                <button id="reset-filter" class="btn btn-secondary btn-sm fw-bold"><i class="fas fa-undo mr-1"></i> Reset</button>
-                            </div>
-                        </div>
+{{-- FILTER TANGGAL & MUTU --}}
+<form method="GET" action="{{ route('hasil-uji-sir20.index') }}">
+    <div class="row mb-3 align-items-end">
+        <div class="col-auto">
+ 
+    <label for="min-date" class="form-label small fw-bold mb-1">Dari Tanggal:</label>
+    {{-- ✅ Ganti ke type="text", tambah bg-light dan readonly --}}
+    <input type="text" name="start_date" id="min-date" 
+           class="form-control form-control-sm bg-light" 
+           value="{{ $fromDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
+</div>
+<div class="col-auto">
+    <label for="max-date" class="form-label small fw-bold mb-1">Sampai Tanggal:</label>
+    {{-- ✅ Lakukan hal yang sama untuk input ini --}}
+    <input type="text" name="end_date" id="max-date" 
+           class="form-control form-control-sm bg-light" 
+           value="{{ $toDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
+</div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Status Mutu:</label>
+            <select name="status_mutu" id="filter-mutu" class="form-control form-control-sm" style="width: 150px;">
+                <option value="all" {{ $statusMutu == 'all' ? 'selected' : '' }}>Semua Data</option>
+                <option value="low" {{ $statusMutu == 'low' ? 'selected' : '' }}>Hanya Low (PRI < 60)</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm fw-bold">
+                <i class="fas fa-filter mr-1"></i> Filter
+            </button>
+            {{-- ✅ Tambahkan id="reset-filter" --}}
+            <a href="{{ route('hasil-uji-sir20.index') }}" id="reset-filter" class="btn btn-secondary btn-sm fw-bold">
+                <i class="fas fa-undo mr-1"></i> Reset
+            </a>
+        </div>
+    </div>
+</form>
                         <hr>
+                        
 
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped align-middle" id="dataTable" style="width:100%">
@@ -79,17 +101,16 @@
                                             <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d-m-Y') }}</td>
                                             <td>{{ $item->jenis_kemasan ?? '-' }}</td>
                                             <td>{{ $item->no_palet }}</td>
-                                            <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td>
-                                            <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
-                                            <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
-                                            <td>{{ is_numeric($item->dirt) ? (fmod($item->dirt, 1) == 0 ? (int)$item->dirt : $item->dirt) : '-' }}</td> 
-                                            <td>{{ is_numeric($item->ash) ? (fmod($item->ash, 1) == 0 ? (int)$item->ash : $item->ash) : '-' }}</td>
-                                            <td>{{ is_numeric($item->vm) ? (fmod($item->vm, 1) == 0 ? (int)$item->vm : $item->vm) : '-' }}</td>
-                                            <td>{{ is_numeric($item->money) ? (fmod($item->money, 1) == 0 ? (int)$item->money : $item->money) : '-' }}</td>
-                                            <td>{{ is_numeric($item->nitrogen) ? (fmod($item->nitrogen, 1) == 0 ? (int)$item->nitrogen : $item->nitrogen) : '-' }}</td>
+                                            <td>{{ $item->po }}</td>
+                                            <td>{{ $item->pa }}</td>
+                                            <td>{{ $item->pri }}</td>
+                                            <td>{{ $item->dirt }}</td> 
+                                            <td>{{ $item->ash }}</td>
+                                            <td>{{ $item->vm }}</td>
+                                            <td>{{ $item->money }}</td>
+                                            <td>{{ $item->nitrogen }}</td>
                                             <td>
                                                 <div class="action-buttons">
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}"><i class="fas fa-eye"></i></button>
                                                     <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}"><i class="fas fa-edit"></i></button>
                                                     <form action="{{ route('hasil-uji-sir20.destroy', $item->id_hasil_uji_lab_sir_20) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block; margin:0;"> 
                                                         @csrf @method('DELETE')
@@ -113,46 +134,119 @@
 
 {{-- MODAL TAMBAH --}}
 <div class="modal fade" id="modalTambahSir" tabindex="-1" role="dialog" aria-hidden="true">
-     <div class="modal-dialog" role="document">
-        <div class="modal-content">
+    <div class="modal-dialog modal-lg" role="document"> <div class="modal-content">
             <form action="{{ route('hasil-uji-sir20.store') }}" method="POST">
                 @csrf
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title fw-bold">Tambah Hasil Uji SIR 20</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-flask mr-2"></i>Tambah Hasil Uji SIR 20
+                    </h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
+
                 <div class="modal-body">
-                    <div class="form-group"><label>Tanggal Produksi</label><input type="date" name="tanggal" id="tambah_tanggal" class="form-control" required></div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                            <label>Tanggal Uji</label>
+                            <input type="date" name="tanggal" class="form-control" value="{{ $today }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Jenis Kemasan</label>
+                                <select name="jenis_kemasan" class="form-control" required>
+                                    <option value="">-- Pilih Jenis --</option>
+                                    <option value="MB5">MB5</option>
+                                    <option value="SW">SW</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label>Jenis Kemasan</label>
-                        <select name="jenis_kemasan" class="form-control" required>
-                            <option value="">-- Pilih Jenis --</option>
-                            <option value="MB5">MB5</option>
-                            <option value="SW">SW</option>
+                        <label class="font-weight-bold">No. Palet <span class="text-muted small">(Sisa yang belum diuji)</span></label>
+                        <select name="no_palet" id="tambah_no_palet" class="form-control" required disabled>
+                            <option value="">-- Pilih Tanggal Dahulu --</option>
                         </select>
                     </div>
-                    {{-- REVISI: NO PALET JADI DROPDOWN --}}
-                    <div class="form-group">
-                        <label>No. Palet</label>
-                        <select name="no_palet" id="tambah_no_palet" class="form-control" required>
-                            <option value="">-- Pilih Nomor Palet --</option>
-                            @foreach ($palletOptions as $no)
-                                <option value="{{ $no }}">Palet No. {{ $no }}</option>
-                            @endforeach
-                        </select>
+
+                    <hr class="my-4">
+                    <h6 class="text-success fw-bold mb-3"><i class="fas fa-vial mr-2"></i>Parameter Hasil Uji</h6>
+
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Po</label>
+                                <input type="number" name="po" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Pa</label>
+                                <input type="number" name="pa" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Dirt (%)</label><input type="number" name="dirt" class="form-control" step="0.001"></div>
-                    <div class="form-group"><label>Ash (%)</label><input type="number" name="ash" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>VM (%)</label><input type="number" name="vm" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Mooney</label><input type="number" name="money" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Nitrogen (%)</label><input type="number" name="nitrogen" class="form-control" step="0.01"></div>
+
+                    <div class="row">
+                       <div class="col-6">
+    <div class="form-group">
+        <label class="font-weight-bold">PRI</label>
+        {{-- bg-light memberikan warna abu muda, readonly mencegah pengetikan manual --}}
+        <input type="number" name="pri" class="form-control bg-light" 
+               step="0.01" placeholder="Otomatis" readonly 
+               style="background-color: #e9ecef; border: 1px solid #ced4da;">
+    </div>
+</div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Dirt (%)</label>
+                                <input type="number" name="dirt" class="form-control" step="0.001" placeholder="0.000">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Ash (%)</label>
+                                <input type="number" name="ash" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">VM (%)</label>
+                                <input type="number" name="vm" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Mooney</label>
+                                <input type="number" name="money" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Nitrogen (%)</label>
+                                <input type="number" name="nitrogen" class="form-control" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success">Simpan</button>
+
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary shadow-sm" data-dismiss="modal">
+                        <i class="fas fa-times mr-1"></i> Batal
+                    </button>
+                    <button type="submit" class="btn btn-success shadow-sm font-weight-bold">
+                        <i class="fas fa-save mr-1"></i> Simpan Data Hasil Uji
+                    </button>
                 </div>
             </form>
         </div>
@@ -166,36 +260,110 @@
             <form id="formEdit" method="POST">
                 @csrf @method('PUT')
                 <div class="modal-header bg-success text-white"> 
-                    <h5 class="modal-title">Edit Hasil Uji SIR 20</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                    <h5 class="modal-title font-weight-bold">Edit Hasil Uji SIR 20</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group"><label>Tanggal</label><input type="date" name="tanggal" id="editTanggal" class="form-control" required></div>
+                    {{-- Baris 1: Tanggal --}}
                     <div class="form-group">
-                        <label>Jenis Kemasan</label>
-                        <select name="jenis_kemasan" id="editJenisKemasan" class="form-control" required>
-                            <option value="MB5">MB5</option>
-                            <option value="SW">SW</option>
-                        </select>
+                        <label class="font-weight-bold">Tanggal Produksi</label>
+                        <input type="date" name="tanggal" id="editTanggal" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>No. Palet</label>
-                        <select name="no_palet" id="editNoPalet" class="form-control" required>
-                            {{-- Diisi via JS --}}
-                        </select>
+
+                    {{-- Baris 2: Kemasan & Palet --}}
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Jenis Kemasan</label>
+                                <select name="jenis_kemasan" id="editJenisKemasan" class="form-control" required>
+                                    <option value="MB5">MB5</option>
+                                    <option value="SW">SW</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">No. Palet</label>
+                                <select name="no_palet" id="editNoPalet" class="form-control" required>
+                                    {{-- Diisi secara otomatis via JavaScript --}}
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Dirt (%)</label><input type="number" name="dirt" id="editDirt" class="form-control" step="0.001"></div>
-                    <div class="form-group"><label>Ash (%)</label><input type="number" name="ash" id="editAsh" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>VM (%)</label><input type="number" name="vm" id="editVm" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Mooney</label><input type="number" name="money" id="editMoney" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Nitrogen (%)</label><input type="number" name="nitrogen" id="editNitrogen" class="form-control" step="0.01"></div>
+
+                    <hr>
+
+                    {{-- Baris 3: Po & Pa --}}
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Po</label>
+                                <input type="number" name="po" id="editPo" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Pa</label>
+                                <input type="number" name="pa" id="editPa" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Baris 4: PRI & Dirt --}}
+                    <div class="row">
+                       <div class="col-6">
+    <div class="form-group">
+        <label class="font-weight-bold">PRI</label>
+        <input type="number" name="pri" id="editPri" class="form-control bg-light" 
+               step="0.01" readonly 
+               style="background-color: #e9ecef; border: 1px solid #ced4da;">
+    </div>
+</div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Dirt (%)</label>
+                                <input type="number" name="dirt" id="editDirt" class="form-control" step="0.001">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Baris 5: Ash & VM --}}
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Ash (%)</label>
+                                <input type="number" name="ash" id="editAsh" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">VM (%)</label>
+                                <input type="number" name="vm" id="editVm" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Baris 6: Mooney & Nitrogen --}}
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Mooney</label>
+                                <input type="number" name="money" id="editMoney" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="font-weight-bold">Nitrogen (%)</label>
+                                <input type="number" name="nitrogen" id="editNitrogen" class="form-control" step="0.01">
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-warning">Simpan Perubahan</button>
+                    <button type="submit" class="btn btn-warning shadow-sm font-weight-bold">
+                        <i class="fas fa-save mr-1"></i> Simpan Perubahan
+                    </button>
                 </div>
             </form>
         </div>
@@ -210,107 +378,131 @@
 
 <script>
 $(document).ready(function(){
+    $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    @if (session('success'))
-        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
-    @endif
-
-    // --- LOGIKA FILTER TANGGAL (TETAP SAMA) ---
-    var fpMin, fpMax;
-    function parseDMY(dateStr){
-        var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
-    }
-    fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat:"Y-m-d", defaultDate: "today" });
-    fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat:"Y-m-d", defaultDate: "today" });
-
-    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex){
-        var min = $('#min-date').val(), max = $('#max-date').val(), tableDateStr = data[1] || '';
-        if (!tableDateStr || tableDateStr==='-') return true; var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
-        var minDate = min ? new Date(min + 'T00:00:00') : null, maxDate = max ? new Date(max + 'T23:59:59') : null;
-        if((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; return false;
+    flatpickr("#min-date", { 
+        altInput: true, 
+        altFormat: "d/m/Y", 
+        dateFormat: "Y-m-d", 
+        defaultDate: "{{ $fromDate }}" 
     });
+
+    flatpickr("#max-date", { 
+        altInput: true, 
+        altFormat: "d/m/Y", 
+        dateFormat: "Y-m-d", 
+        defaultDate: "{{ $toDate }}" 
+    });
+    // ✅ 1. LOGIKA HITUNG PRI OTOMATIS (SIR 20: Pa / Po * 100)
+    function hitungPRI(poSelector, paSelector, priSelector) {
+        let po = parseFloat($(poSelector).val()) || 0;
+        let pa = parseFloat($(paSelector).val()) || 0;
+        let priField = $(priSelector);
+
+        if (po > 0) { // Proteksi pembagian dengan nol
+            let hasil = (pa / po) * 100;
+            priField.val(hasil.toFixed(2)); 
+        } else {
+            priField.val(''); 
+        }
+    }
+
+    // Modal Tambah
+    $(document).on('input', '#modalTambahSir input[name="po"], #modalTambahSir input[name="pa"]', function() {
+        hitungPRI('#modalTambahSir input[name="po"]', '#modalTambahSir input[name="pa"]', '#modalTambahSir input[name="pri"]');
+    });
+
+    // Modal Edit
+    $(document).on('input', '#editPo, #editPa', function() {
+        hitungPRI('#editPo', '#editPa', '#editPri');
+    });
+
+    // ✅ 2. DATATABLES & FILTER (Sama dengan Uji Troli)
+    function parseDMY(dateStr){
+        var parts = dateStr.split('-');
+        if(parts.length !== 3) return null;
+        return new Date(parts[2], parts[1]-1, parts[0]);
+    }
 
     var table = $('#dataTable').DataTable({
         "order": [[1,"desc"]],
         "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" }
     });
 
-    table.draw();
-    $('#filter-btn').click(function(e){ e.preventDefault(); table.draw(); });
-    $('#reset-filter').click(function(e){ e.preventDefault(); fpMin.setDate("today"); fpMax.setDate("today"); setTimeout(function(){ table.search('').draw(); },100); });
+    // Push filter ke DataTables
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        var min = $('#min-date').val();
+        var max = $('#max-date').val();
+        var statusMutu = $('#filter-mutu').val();
+        
+        var tableDateStr = data[1] || '';      
+        var priValue = parseFloat(data[6]) || 0; 
 
-    $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
+        // Filter Tanggal
+        var matchDate = true;
+        if (tableDateStr) {
+            var tableDate = parseDMY(tableDateStr);
+            var minDate = min ? new Date(min + 'T00:00:00') : null;
+            var maxDate = max ? new Date(max + 'T23:59:59') : null;
+            if ((minDate && tableDate < minDate) || (maxDate && tableDate > maxDate)) {
+                matchDate = false;
+            }
+        }
 
-    // --- LOGIKA AJAX UPDATE NOMOR PALET BERDASARKAN TANGGAL MODAL ---
-    function fetchPallets(tanggal, targetDropdown, selectedVal = null) {
-        if (!tanggal) return;
+        // Filter Mutu
+        var matchMutu = true;
+        if (statusMutu === 'low') { matchMutu = (priValue < 60.00); }
+
+        return matchDate && matchMutu;
+    });
+
+    table.draw(); // Jalankan saat load awal
+
+    // Reset Button Logic
+    $('#reset-filter').on('click', function() {
+        // Biarkan link <a> bekerja untuk reload halaman ke index awal
+    });
+
+    // --- Logika Edit ---
+    $(document).on('click', '.btn-edit', function(){
+        var id = $(this).data('id');
+        $.get("{{ url('hasil-uji-sir20') }}/" + id + "/edit", function(data){
+            $('#editTanggal').val(data.tanggal);
+            $('#editJenisKemasan').val(data.jenis_kemasan);
+            $('#editNoPalet').html(`<option value="${data.no_palet}" selected>Palet No. ${data.no_palet}</option>`).prop('disabled', false);
+            $('#editPo').val(data.po);
+            $('#editPa').val(data.pa);
+            $('#editPri').val(data.pri);
+            $('#editDirt').val(data.dirt);
+            $('#editAsh').val(data.ash);
+            $('#editVm').val(data.vm);
+            $('#editMoney').val(data.money);
+            $('#editNitrogen').val(data.nitrogen);
+            
+            $('#formEdit').attr('action', "{{ url('hasil-uji-sir20') }}/" + id);
+            $('#modalEdit').modal('show');
+        });
+    });
+
+    // AJAX Load Pallets
+    function loadAvailablePallets() {
+        let dropdown = $('#tambah_no_palet');
+        dropdown.html('<option value="">Memuat Palet...</option>').prop('disabled', true);
         $.ajax({
-            url: "{{ route('uji-sir20.get-pallets') }}", // Pastikan route ini ada di web.php
+            url: "{{ route('uji-sir20.get-pallets') }}", 
             type: "GET",
-            data: { tanggal: tanggal },
             success: function(response) {
-                let dropdown = $(targetDropdown);
                 dropdown.empty().append('<option value="">-- Pilih Nomor Palet --</option>');
                 $.each(response, function(key, val) {
-                    let selected = (val.nomor == selectedVal) ? 'selected' : '';
-                    dropdown.append('<option value="'+val.nomor+'" '+selected+'>Palet No. '+val.nomor+'</option>');
+                    dropdown.append(`<option value="${val.nomor}">Palet No. ${val.nomor}</option>`);
                 });
+                dropdown.prop('disabled', false);
             }
         });
     }
 
-    $('#tambah_tanggal').on('change', function() {
-        fetchPallets($(this).val(), '#tambah_no_palet');
-    });
-
-    $('#editTanggal').on('change', function() {
-        fetchPallets($(this).val(), '#editNoPalet');
-    });
-
-    // EDIT
-    $(document).on('click', '.btn-edit', function(){
-        var id = $(this).data('id');
-        var urlGet = "{{ url('hasil-uji-sir20') }}/" + id + "/edit";
-        var urlPost = "{{ url('hasil-uji-sir20') }}/" + id;
-        $.get(urlGet, function(data){
-            $('#editTanggal').val(data.tanggal); 
-            $('#editJenisKemasan').val(data.jenis_kemasan);
-            $('#editPo').val(data.po);
-            $('#editPa').val(data.pa); 
-            $('#editPri').val(data.pri); 
-            $('#editDirt').val(data.dirt);
-            $('#editAsh').val(data.ash); 
-            $('#editVm').val(data.vm); 
-            $('#editMoney').val(data.money);
-            $('#editNitrogen').val(data.nitrogen); 
-            $('#formEdit').attr('action', urlPost); 
-
-            // Load No Palet untuk Modal Edit
-            fetchPallets(data.tanggal, '#editNoPalet', data.no_palet);
-
-            $('#modalEdit').modal('show'); 
-        });
-    });
-
-    // DETAIL (TETAP SAMA)
-    $(document).on('click', '.btn-detail', function(){
-        var id = $(this).data('id');
-        var url = "{{ url('hasil-uji-sir20') }}/" + id;
-        $.get(url, function(data){
-            $('#detailTanggal').text(new Date(data.tanggal + 'T00:00:00Z').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }));
-            $('#detailJenisKemasan').text(data.jenis_kemasan || '-');
-            $('#detailNoPalet').text(data.no_palet || '-');
-            function formatNumber(num) { if (!$.isNumeric(num)) return '-'; return (num % 1 === 0) ? parseInt(num) : parseFloat(num); }
-            $('#detailPo').text(formatNumber(data.po));
-            $('#detailPa').text(formatNumber(data.pa));
-            $('#detailPri').text(formatNumber(data.pri));
-            $('#detailDirt').text(formatNumber(data.dirt) !== '-' ? formatNumber(data.dirt) + ' %' : '-');
-            $('#detailAsh').text(formatNumber(data.ash) !== '-' ? formatNumber(data.ash) + ' %' : '-');
-            $('#detailVm').text(formatNumber(data.vm) !== '-' ? formatNumber(data.vm) + ' %' : '-');
-            $('#detailMoney').text(formatNumber(data.money));
-            $('#detailNitrogen').text(formatNumber(data.nitrogen) !== '-' ? formatNumber(data.nitrogen) + ' %' : '-');
-            $('#modalDetail').modal('show'); 
-        });
+    $('#btnTambahData').on('click', function() {
+        loadAvailablePallets();
     });
 });
 </script>

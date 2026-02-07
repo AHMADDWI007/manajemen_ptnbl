@@ -2,47 +2,72 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Models\ProduksiSir20;
 use Illuminate\Validation\Rule;
+use App\Models\HasilUjiLabSIR20;
+use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Validator;
-use App\Models\HasilUjiLabSIR20; // 🔥 [PERBAIKAN 1] Gunakan Model Baru
 
 class HasilUjiSIR20Controller extends Controller
 {
-  public function index()
+public function index(Request $request)
 {
-    $data_sir_20 = HasilUjiLabSIR20::orderBy('tanggal', 'desc')->get();
-
-    // Ambil data produksi terakhir sebagai default dropdown
-    $latestProd = \App\Models\ProduksiSir20::latest('tanggal_produksi')->first();
+    $query = HasilUjiLabSIR20::query();
     
+    $status = $request->get('status_mutu', 'all');
+    
+    // Ambil tanggal dari request, jika kosong gunakan hari ini (Asia/Makassar)
+    $today = Carbon::now('Asia/Makassar')->format('Y-m-d');
+    $start = $request->get('start_date', $today);
+    $end   = $request->get('end_date', $today);
+
+    // 1. Filter Mutu
+    if ($status === 'low') {
+        $query->where(function($q) {
+            $q->where('pri', '<', 40)
+              ->orWhere('po', '<', 30);
+        });
+    }
+
+    // 2. Filter Tanggal (Selalu berjalan karena sudah ada default hari ini)
+    $query->whereBetween('tanggal', [$start, $end]);
+
+    $data_sir_20 = $query->orderBy('tanggal', 'desc')->get();
+
+    // Logika Pallet Options (tetap sama)
+    $testedPallets = HasilUjiLabSIR20::pluck('no_palet')->toArray();
+    $allProd = ProduksiSir20::orderBy('tanggal_produksi', 'asc')->get();
     $palletOptions = [];
-    if ($latestProd) {
-        for ($i = (int)$latestProd->nomor_start; $i <= (int)$latestProd->nomor_end; $i++) {
-            $palletOptions[] = $i;
+    foreach ($allProd as $prod) {
+        for ($i = (int)$prod->nomor_start; $i <= (int)$prod->nomor_end; $i++) {
+            if (!in_array($i, $testedPallets)) {
+                $palletOptions[] = ['nomor' => $i, 'tanggal_prod' => $prod->tanggal_produksi];
+            }
         }
     }
 
-    return view('DataLaboratorium.hasil-uji-sir20', compact('data_sir_20', 'palletOptions'));
+    return view('DataLaboratorium.hasil-uji-sir20', [
+        'data_sir_20'   => $data_sir_20,
+        'palletOptions' => $palletOptions,
+        'fromDate'      => $start, // Kirim nilai start
+        'toDate'        => $end,   // Kirim nilai end
+        'statusMutu'    => $status,
+        'today'         => $today
+    ]);
 }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
             'tanggal'       => 'required|date',
             'jenis_kemasan' => 'nullable|string|in:MB5,SW',
-            'no_palet'      => [
-                'required', 
-                'string', 
-                'max:255',
-                // 🔥 [PERBAIKAN 2] Validasi Unik di Tabel Baru
-                'unique:hasil_uji_lab_sir_20,no_palet'
-            ],
-            'po'            => 'nullable|numeric',
-            'pa'            => 'nullable|numeric',
-            'pri'           => 'nullable|numeric',
+            'no_palet'      => 'required|string|max:255|unique:hasil_uji_lab_sir_20,no_palet',
+            'po'            => 'nullable|numeric|min:0',
+            'pa'            => 'nullable|numeric|min:0',
             'dirt'          => 'nullable|numeric',
             'ash'           => 'nullable|numeric',
             'vm'            => 'nullable|numeric',
@@ -54,57 +79,52 @@ class HasilUjiSIR20Controller extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        HasilUjiLabSIR20::create($validator->validated());
+        $data = $validator->validated();
+
+        // ✅ LOGIKA HITUNG PRI OTOMATIS (Pa / Po * 100)
+        $po = $request->input('po');
+        $pa = $request->input('pa');
+
+        if ($po !== null && $pa !== null && $po > 0) {
+            $data['pri'] = ($pa / $po) * 100;
+        } else {
+            $data['pri'] = 0;
+        }
+
+        HasilUjiLabSIR20::create($data);
 
         return redirect()->route('hasil-uji-sir20.index')
                          ->with('success', 'Data hasil uji SIR 20 berhasil ditambahkan!');
     }
 
-    public function show($id)
-    {
-        // 🔥 [PERBAIKAN 3] Gunakan PK custom
-        $data = HasilUjiLabSIR20::find($id); // find($id) otomatis cari di PK model
-
-        if(!$data) {
-            return response()->json(['error' => 'Data tidak ditemukan'], 404);
-        }
-
-        return response()->json($data);
-    }
-
-    public function edit($id)
+    public function show($id): JsonResponse
     {
         $data = HasilUjiLabSIR20::find($id);
-
-        if(!$data) {
-            return response()->json(['error' => 'Data tidak ditemukan'], 404);
-        }
-
+        if(!$data) return response()->json(['error' => 'Data tidak ditemukan'], 404);
         return response()->json($data);
     }
 
-    public function update(Request $request, $id)
+    public function edit($id): JsonResponse
+    {
+        $data = HasilUjiLabSIR20::find($id);
+        if(!$data) return response()->json(['error' => 'Data tidak ditemukan'], 404);
+        return response()->json($data);
+    }
+
+    public function update(Request $request, $id): RedirectResponse
     {
         $hasilUji = HasilUjiLabSIR20::find($id);
-
-        if (!$hasilUji) {
-            return redirect()->back()->with('error', 'Data tidak ditemukan.');
-        }
+        if (!$hasilUji) return redirect()->back()->with('error', 'Data tidak ditemukan.');
 
         $validator = Validator::make($request->all(), [
             'tanggal'       => 'required|date',
             'jenis_kemasan' => 'nullable|string|in:MB5,SW',
             'no_palet'      => [
-                'required', 
-                'string', 
-                'max:255',
-                // 🔥 [PERBAIKAN 4] Validasi Unique Ignore dengan PK yang Benar
-                Rule::unique('hasil_uji_lab_sir_20')
-                    ->ignore($hasilUji->id_hasil_uji_lab_sir_20, 'id_hasil_uji_lab_sir_20')
+                'required', 'string', 'max:255',
+                Rule::unique('hasil_uji_lab_sir_20')->ignore($hasilUji->id_hasil_uji_lab_sir_20, 'id_hasil_uji_lab_sir_20')
             ],
-            'po'            => 'nullable|numeric',
-            'pa'            => 'nullable|numeric',
-            'pri'           => 'nullable|numeric',
+            'po'            => 'nullable|numeric|min:0',
+            'pa'            => 'nullable|numeric|min:0',
             'dirt'          => 'nullable|numeric',
             'ash'           => 'nullable|numeric',
             'vm'            => 'nullable|numeric',
@@ -112,59 +132,61 @@ class HasilUjiSIR20Controller extends Controller
             'nitrogen'      => 'nullable|numeric',
         ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+        if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
+
+        $data = $validator->validated();
+
+        // ✅ LOGIKA HITUNG PRI OTOMATIS (UPDATE)
+        $po = $request->input('po');
+        $pa = $request->input('pa');
+
+        if ($po !== null && $pa !== null && $po > 0) {
+            $data['pri'] = ($pa / $po) * 100;
+        } else {
+            $data['pri'] = 0;
         }
 
-        $hasilUji->update($validator->validated());
+        $hasilUji->update($data);
 
-        return redirect()->route('hasil-uji-sir20.index')
-                         ->with('success', 'Data berhasil diperbarui!');
+        return redirect()->route('hasil-uji-sir20.index')->with('success', 'Data berhasil diperbarui!');
     }
 
-    public function destroy($id)
+    public function destroy($id): RedirectResponse
     {
         $hasilUji = HasilUjiLabSIR20::find($id);
-        
         if ($hasilUji) {
             $hasilUji->delete();
-            return redirect()->route('hasil-uji-sir20.index')
-                             ->with('success', 'Data berhasil dihapus!');
+            return redirect()->route('hasil-uji-sir20.index')->with('success', 'Data berhasil dihapus!');
         }
-
-        return redirect()->route('hasil-uji-sir20.index')
-                         ->with('error', 'Data gagal dihapus atau tidak ditemukan.');
+        return redirect()->route('hasil-uji-sir20.index')->with('error', 'Data gagal dihapus.');
     }
+
     public function getAvailablePallets(Request $request)
     {
-        $tanggal = $request->tanggal;
+        // 1. Ambil SEMUA nomor palet yang sudah pernah diuji
+        $palletSudahDiuji = HasilUjiLabSIR20::pluck('no_palet')->toArray();
 
-        // 1. Cari data produksi di tanggal tersebut
-        $produksi = ProduksiSir20::whereDate('tanggal_produksi', $tanggal)->get();
-
-        if ($produksi->isEmpty()) {
-            return response()->json(['message' => 'Tidak ada produksi di tanggal ini'], 404);
-        }
+        // 2. Ambil data Pallet Fisik dari Tabel Pallet
+        // Tambahkan 'id_pallet' ke dalam select
+        $palletTersedia = \App\Models\Pallet::whereNull('tanggal_penjualan')
+                            ->orderBy('id_pallet', 'asc') // Urutkan berdasarkan ID
+                            ->get(['id_pallet', 'no_pallet', 'tanggal_produksi']);
 
         $daftarPalet = [];
-
-        foreach ($produksi as $prod) {
-            $start = (int) $prod->nomor_start;
-            $end = (int) $prod->nomor_end;
-
-            // 2. Loop untuk menghasilkan angka dari start sampai end (misal 1 s/d 15)
-            for ($i = $start; $i <= $end; $i++) {
-                // 3. (Opsional) Cek apakah nomor palet ini sudah pernah diuji?
-                $sudahDiuji = HasilUjiLabSIR20::where('no_palet', $i)
-                    ->whereDate('tanggal', $tanggal)
-                    ->exists();
-
-                if (!$sudahDiuji) {
-                    $daftarPalet[] = [
-                        'nomor' => $i,
-                        'label' => 'Palet No. ' . $i
-                    ];
-                }
+        
+        foreach ($palletTersedia as $p) {
+            // 3. Hanya masukkan palet yang BELUM ada di tabel hasil uji
+            if (!in_array($p->no_pallet, $palletSudahDiuji)) {
+                
+                $daftarPalet[] = [
+                    // VALUE: Tetap 'no_pallet' string agar Controller Store tidak Error Validasi
+                    'nomor' => $p->no_pallet, 
+                    
+                    // LABEL: Tampilkan ID Pallet sesuai permintaan
+                    'label' => 'ID: ' . $p->id_pallet . ' (Tgl: ' . Carbon::parse($p->tanggal_produksi)->format('d/m/y') . ')',
+                    
+                    'tanggal_prod' => $p->tanggal_produksi
+                ];
             }
         }
 

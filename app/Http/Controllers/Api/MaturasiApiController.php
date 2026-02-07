@@ -72,7 +72,7 @@ class MaturasiApiController extends Controller
             ->exists();
     }
 
-    protected function hitungSnapshot(Maturasi $maturasi, Carbon $selectedDate): array
+    protected function hitungSnapshot($maturasi, Carbon $selectedDate): array
     {
         if (! $this->hasAnyLogUpToDate($maturasi->id_maturasi, $selectedDate)) {
             return [
@@ -146,7 +146,7 @@ class MaturasiApiController extends Controller
         ];
     }
 
-    private function getDetailedAsalBokarString(Maturasi $maturasi, float $stokAkhir, Carbon $filterDate)
+    private function getDetailedAsalBokarString($maturasi, float $stokAkhir, Carbon $filterDate)
     {
         if ($stokAkhir <= 0) return '-';
 
@@ -223,8 +223,14 @@ class MaturasiApiController extends Controller
                 // 1. Hitung Snapshot (LOGIKA WEB)
                 $snap = $this->hitungSnapshot($bak, $selectedDate);
                 
-                // Masukkan hasil snapshot ke object
-                $row = $bak->toArray();
+                // 🔥 PERBAIKAN DISINI: Cek tipe data sebelum toArray()
+                if ($bak instanceof Maturasi) {
+                    $row = $bak->toArray();
+                } else {
+                    // Jika stdClass, casting manual ke array
+                    $row = (array) $bak;
+                }
+
                 $row['stok_awal']  = $snap['stok_awal'];
                 $row['diolah']     = $snap['diolah'];
                 $row['mutasi']     = $snap['mutasi'];
