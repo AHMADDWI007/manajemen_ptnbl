@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\ProduksiSir;
-use App\Models\BahanProses;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
-use App\Http\Controllers\DataProduksi\PenjualanSir20Controller; 
+use App\Models\Mutu;
+use App\Models\Lokasi;
+use App\Models\Pallet;
+use App\Models\BahanProses;
+use App\Models\ProduksiSir;
+use App\Models\LokasiPallet;
+use Illuminate\Http\Request;
+use App\Models\KondisiPallet;
+use App\Models\ProduksiSir20;
+use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 
 class GudangSirApiController extends Controller
 {
@@ -18,92 +22,114 @@ class GudangSirApiController extends Controller
         try {
             $dateStr = $request->query('date', Carbon::today()->format('Y-m-d'));
             $selectedDate = Carbon::parse($dateStr);
+            $formattedDate = $selectedDate->format('Y-m-d');
+            $startOfMonth = $selectedDate->copy()->startOfMonth()->format('Y-m-d');
 
-            // 1. Ambil Data Hari Ini & Kemarin (Logic sama dengan Web Controller)
-            $dataDB = ProduksiSir::whereDate('created_at', $selectedDate)->get()->keyBy('uraian');
+            // 1. Ambil Master Data
+            $lokasiList = Lokasi::all();
+            $mutuList = Mutu::all();
             
-            $prevDataDB = ProduksiSir::whereDate('created_at', '<', $selectedDate)
-                ->orderBy('created_at', 'desc')->get()->unique('uraian')->keyBy('uraian');
+            // 2. Ambil SEMUA Pallet Aktif & Terjual Hari Ini
+            $allActivePallets = Pallet::whereNull('tanggal_penjualan')->get();
+            $soldPalletsToday = Pallet::whereDate('tanggal_penjualan', $formattedDate)->get();
 
-            // 2. Susun Data TABEL IV (GUDANG)
-            $masterGudang = [
-                '4.1' => 'Di Gudang SIR',
-                '4.2' => 'Di Areal Press Bale',
-                '4.3' => 'Di Gudang TOH 1',
-                '4.4' => 'Di Gudang TOH 2',
-            ];
-
+            // =================================================================
+            // 🔥 SUSUN TABEL IV (GUDANG / LOKASI) DARI TRACKING PALLET
+            // =================================================================
             $listGudang = [];
-            $totalSaldoAkhir = 0;
+            $saldoGudangUtama = 0;
 
-            foreach ($masterGudang as $no => $nama) {
-                $item = $dataDB[$nama] ?? null;
-                $prevItem = $prevDataDB[$nama] ?? null;
-
-                // Logic Estafet Saldo
-                $saldo_awal = $item ? $item->saldo_awal : ($prevItem ? $prevItem->saldo_akhir : 0);
-                $prod_bln_lalu = $item ? $item->prod_bln_lalu : ($prevItem ? $prevItem->prod_sd_hi : 0);
+            foreach ($lokasiList as $lokasi) {
+                $saldo_akhir_kg = 0;
                 
-                $masuk = $item->masuk ?? 0;
-                $pengiriman = $item->pengiriman ?? 0;
-                $total = $saldo_awal + $masuk;
-                $prod_sd_hi = $prod_bln_lalu + $masuk;
-                $saldo_akhir = $total - $pengiriman;
+                // Saldo Akhir Real-time
+                foreach($allActivePallets as $p) {
+                    $lastLoc = LokasiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_lokasi_pallet', 'desc')->first();
+                    if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                        $saldo_akhir_kg += $p->berat;
+                    }
+                }
 
-                // Jika nama "Di Gudang SIR", simpan saldo akhirnya untuk referensi info
-                if ($nama == 'Di Gudang SIR') {
-                    $saldoGudangUtama = $saldo_akhir;
+                // Masuk Hari Ini
+                $masuk_kg = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
+                                ->whereDate('tanggal', $formattedDate)
+                                ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
+                                ->sum('pallet.berat');
+
+                // Produksi s/d HI
+                $sd_hi_kg = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
+                                ->whereBetween('tanggal', [$startOfMonth, $formattedDate])
+                                ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
+                                ->sum('pallet.berat');
+
+                $yg_lalu_kg = $sd_hi_kg - $masuk_kg;
+                $keluar_kg = 0; 
+
+                // Pengiriman
+                foreach($soldPalletsToday as $sold) {
+                    $lastLoc = LokasiPallet::where('id_pallet', $sold->id_pallet)->orderBy('id_lokasi_pallet', 'desc')->first();
+                    if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                        $keluar_kg += $sold->berat;
+                    }
+                }
+
+                $saldo_awal_kg = $saldo_akhir_kg - $masuk_kg + $keluar_kg;
+
+                if ($lokasi->nama == 'Di Gudang SIR') {
+                    $saldoGudangUtama = $saldo_akhir_kg;
                 }
 
                 $listGudang[] = [
-                    'id_produksi_sir' => $item->id_produksi_sir ?? null,
-                    'no' => $no,
-                    'uraian' => $nama,
-                    'saldo_awal' => (float)$saldo_awal,
-                    'masuk' => (float)$masuk,
-                    'total' => (float)$total,
-                    'prod_bln_lalu' => (float)$prod_bln_lalu,
-                    'prod_sd_hi' => (float)$prod_sd_hi,
-                    'pengiriman' => (float)$pengiriman,
-                    'saldo_akhir' => (float)$saldo_akhir,
-                    'keterangan' => $item->keterangan ?? ''
+                    'no'            => '4.'.$lokasi->id_lokasi,
+                    'uraian'        => $lokasi->nama,
+                    'saldo_awal'    => (float)$saldo_awal_kg,
+                    'masuk'         => (float)$masuk_kg,
+                    'total'         => (float)($saldo_awal_kg + $masuk_kg),
+                    'prod_bln_lalu' => (float)$yg_lalu_kg,
+                    'prod_sd_hi'    => (float)$sd_hi_kg,
+                    'pengiriman'    => (float)$keluar_kg,
+                    'saldo_akhir'   => (float)$saldo_akhir_kg,
+                    'keterangan'    => '-'
                 ];
             }
 
-            // 3. Susun Data TABEL VI (MUTU)
-            $masterMutu = [
-                '6.1' => 'Mutu Prima (siap jual)',
-                '6.2' => 'PO / PRI Low',
-                '6.3' => 'WhiteSpot (WS)',
-                '6.4' => 'Kontaminasi',
-                '6.5' => 'Repacking On Hold',
-            ];
-
+            // =================================================================
+            // 🔥 SUSUN TABEL VI (MUTU) DARI TRACKING PALLET
+            // =================================================================
             $listMutu = [];
-            foreach ($masterMutu as $no => $nama) {
-                $item = $dataDB[$nama] ?? null;
+            $no = 1;
+
+            foreach ($mutuList as $mutu) {
+                $kg = 0;
+                $palletCount = 0;
+
+                foreach($allActivePallets as $p) {
+                    $lastMutu = KondisiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_kondisi_pallet', 'desc')->first();
+                    if ($lastMutu && $lastMutu->id_mutu == $mutu->id_mutu) {
+                        $kg += $p->berat;
+                        $palletCount++;
+                    }
+                }
+
                 $listMutu[] = [
-                    'id_produksi_sir' => $item->id_produksi_sir ?? null,
-                    'no' => $no,
-                    'uraian' => $nama,
-                    'kg' => (float)($item->kg ?? 0),
-                    'pallet' => (int)($item->pallet ?? 0),
-                    'keterangan' => $item->keterangan ?? ''
+                    'no'         => '6.'.$no++,
+                    'uraian'     => $mutu->uraian,
+                    'kg'         => (float)$kg,
+                    'pallet'     => (int)$palletCount,
+                    'keterangan' => '-'
                 ];
             }
 
-            // 4. Info Tambahan (WIP Hari Ini untuk saran input)
-            $wip = BahanProses::whereDate('tanggal', $selectedDate)
-                ->where('uraian', 'Di Dalam Dryer/Press Bale')->first();
-            $wipKg = $wip ? $wip->produksi_sir20 : 0;
+            // Info Produksi (Untuk Modal Input di HP)
+            $produksiHariIni = ProduksiSir20::whereDate('tanggal_produksi', $selectedDate)->sum('kg_yang_dipress');
 
             return response()->json([
-                'success' => true,
+                'success'    => true,
                 'dataGudang' => $listGudang,
-                'dataMutu' => $listMutu,
-                'info' => [
-                    'wipHariIni' => (float)$wipKg,
-                    'saldoGudangSir' => (float)($saldoGudangUtama ?? 0)
+                'dataMutu'   => $listMutu,
+                'info'       => [
+                    'wipHariIni'     => (float)$produksiHariIni,
+                    'saldoGudangSir' => (float)$saldoGudangUtama
                 ]
             ]);
 
@@ -119,17 +145,18 @@ class GudangSirApiController extends Controller
             'uraian'  => 'required',
         ]);
 
-        $tgl = Carbon::parse($request->tanggal)->startOfDay();
+        $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
         DB::beginTransaction();
 
         try {
             // ==========================================================
             // 1. UPDATE TABEL IV (GUDANG / LOKASI)
             // ==========================================================
-            // Logic Saldo Awal (Estafet dari hari sebelumnya)
+            
+            // Ambil Saldo Awal (H-1)
             $prevGudang = ProduksiSir::where('uraian', $request->uraian)
-                ->where('created_at', '<', $tgl)
-                ->orderBy('created_at', 'desc')->first();
+                ->whereDate('tanggal_produksi', '<', $tgl)
+                ->orderBy('tanggal_produksi', 'desc')->first();
 
             $saldoAwal = $prevGudang ? $prevGudang->saldo_akhir : 0;
             $prodLalu  = $prevGudang ? $prevGudang->prod_sd_hi : 0;
@@ -137,13 +164,12 @@ class GudangSirApiController extends Controller
             $masuk = $request->input('masuk', 0);
             $pengiriman = $request->input('pengiriman', 0);
             
-            // Hitung
             $total = $saldoAwal + $masuk;
             $prodSdHi = $prodLalu + $masuk;
             $saldoAkhir = $total - $pengiriman;
 
             ProduksiSir::updateOrCreate(
-                ['uraian' => $request->uraian, 'created_at' => $tgl],
+                ['uraian' => $request->uraian, 'tanggal_produksi' => $tgl],
                 [
                     'saldo_awal'    => $saldoAwal,
                     'masuk'         => $masuk,
@@ -153,18 +179,14 @@ class GudangSirApiController extends Controller
                     'pengiriman'    => $pengiriman,
                     'saldo_akhir'   => $saldoAkhir,
                     'keterangan'    => $request->keterangan,
-                    // Simpan pallet total gudang jika ada
                     'pallet'        => $request->input('pallet_gudang', 0) 
                 ]
             );
 
             // ==========================================================
-            // 2. UPDATE TABEL VI (RINCIAN MUTU - 5 ITEM)
+            // 2. UPDATE TABEL VI (MUTU)
             // ==========================================================
-            // Hanya update mutu jika inputnya dari "Di Gudang SIR" (Pusat Produksi)
-            // Atau jika Anda ingin update mutu dari gudang manapun, hapus if ini.
             if ($request->uraian == 'Di Gudang SIR') {
-                
                 $mutuItems = [
                     'Mutu Prima (siap jual)' => ['kg' => 'mutu_prima', 'pal' => 'pal_prima'],
                     'PO / PRI Low'           => ['kg' => 'po_pri',     'pal' => 'pal_po'],
@@ -177,9 +199,8 @@ class GudangSirApiController extends Controller
                     $kgVal = $request->input($field['kg'], 0);
                     $palVal = $request->input($field['pal'], 0);
 
-                    // Update row mutu
                     ProduksiSir::updateOrCreate(
-                        ['uraian' => $namaMutu, 'created_at' => $tgl],
+                        ['uraian' => $namaMutu, 'tanggal_produksi' => $tgl],
                         [
                             'kg'         => $kgVal,
                             'pallet'     => $palVal,
@@ -191,6 +212,144 @@ class GudangSirApiController extends Controller
 
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Data Gudang & Mutu Tersimpan']);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // =========================================================================
+    // API: AMBIL DAFTAR PALLET UNTUK MUTASI (MOBILE)
+    // =========================================================================
+    public function getPalletsByLocation(Request $request)
+    {
+        try {
+            $id_lokasi = $request->query('id_lokasi');
+            $pallets = Pallet::whereNull('tanggal_penjualan')->get();
+            $result = [];
+
+            foreach($pallets as $p) {
+                $lastLoc = LokasiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_lokasi_pallet', 'desc')->first();
+
+                if ($lastLoc && $lastLoc->id_lokasi == $id_lokasi) {
+                    $lastMutuRow = KondisiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_kondisi_pallet', 'desc')->first();
+                    
+                    $namaMutu = 'Unknown';
+                    $idMutuNow = null;
+
+                    if($lastMutuRow) {
+                        $m = Mutu::find($lastMutuRow->id_mutu);
+                        if($m) {
+                            $namaMutu = $m->uraian;
+                            $idMutuNow = $m->id_mutu;
+                        }
+                    }
+
+                    $result[] = [
+                        'id_pallet'   => $p->id_pallet,
+                        'no_pallet'   => $p->no_pallet,
+                        'berat'       => number_format($p->berat, 0, ',', '.'),
+                        'mutu'        => $namaMutu,
+                        'id_mutu_now' => $idMutuNow
+                    ];
+                }
+            }
+
+            return response()->json($result, 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // =========================================================================
+    // API: PROSES PINDAH LOKASI (MOBILE)
+    // =========================================================================
+    public function pindahLokasi(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            $count = 0;
+            $mutuBaruArr = $request->input('mutu_baru'); // Tangkap array dari Android
+
+            if($request->selected_pallets) {
+                foreach($request->selected_pallets as $idPallet) {
+                    
+                    // 1. Pindah Lokasi
+                    LokasiPallet::create([
+                        'id_lokasi' => $request->id_lokasi_tujuan,
+                        'id_pallet' => $idPallet,
+                        'tanggal'   => $request->tanggal_pindah
+                    ]);
+
+                    // 2. Update Mutu (Cari ID berdasarkan Nama String)
+                    if (is_array($mutuBaruArr) && isset($mutuBaruArr[$idPallet])) {
+                        $namaMutu = $mutuBaruArr[$idPallet];
+                        $mutuModel = Mutu::where('uraian', $namaMutu)->first();
+
+                        if ($mutuModel) {
+                            $newMutuId = $mutuModel->id_mutu;
+                            $lastMutu = KondisiPallet::where('id_pallet', $idPallet)
+                                        ->orderBy('id_kondisi_pallet', 'desc')->first();
+                            
+                            if (!$lastMutu || $lastMutu->id_mutu != $newMutuId) {
+                                KondisiPallet::create([
+                                    'id_pallet' => $idPallet,
+                                    'id_mutu'   => $newMutuId,
+                                    'tanggal'   => $request->tanggal_pindah // Samakan dgn tgl pindah
+                                ]);
+                            }
+                        }
+                    }
+                    $count++;
+                }
+            }
+            
+            DB::commit();
+            return response()->json(['success' => true, 'message' => "$count Pallet berhasil dipindahkan."]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // =========================================================================
+    // API: UPDATE MUTU SAJA (MOBILE)
+    // =========================================================================
+    public function updateStatusMutu(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            $count = 0;
+            $mutuBaruArr = $request->input('mutu_baru'); // Tangkap array dari Android
+
+            if($request->selected_pallets && is_array($mutuBaruArr)) {
+                foreach($request->selected_pallets as $idPallet) {
+                    if (isset($mutuBaruArr[$idPallet])) {
+                        $namaMutu = $mutuBaruArr[$idPallet];
+                        $mutuModel = Mutu::where('uraian', $namaMutu)->first();
+
+                        if ($mutuModel) {
+                            $newMutuId = $mutuModel->id_mutu;
+                            $lastMutu = KondisiPallet::where('id_pallet', $idPallet)
+                                        ->orderBy('id_kondisi_pallet', 'desc')->first();
+                            
+                            if (!$lastMutu || $lastMutu->id_mutu != $newMutuId) {
+                                KondisiPallet::create([
+                                    'id_pallet' => $idPallet,
+                                    'id_mutu'   => $newMutuId,
+                                    'tanggal'   => Carbon::now()->format('Y-m-d')
+                                ]);
+                                $count++; // Hitung yg benar-benar berubah
+                            }
+                        }
+                    }
+                }
+            }
+            
+            DB::commit();
+            return response()->json(['success' => true, 'message' => "$count Pallet berhasil diperbarui mutunya."]);
 
         } catch (\Exception $e) {
             DB::rollBack();

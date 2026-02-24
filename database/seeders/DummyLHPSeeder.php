@@ -7,70 +7,45 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Maturasi;
 use App\Models\PengolahanBasah;
 use App\Models\PengolahanMaturasi;
-use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\HasilUjiLabBokarDiolah; // Pastikan Model ini ada
 use App\Models\HasilUjiLabMaturasi;
 use App\Models\BahanProses;
-use App\Models\Lokasi; // Tambahan Model Baru
-use App\Models\Mutu;   // Tambahan Model Baru
+use App\Models\Lokasi;
+use App\Models\Mutu;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 
 class DummyLHPSeeder extends Seeder
 {
     public function run()
     {
         // =================================================================
-        // 1. BERSIHKAN DATABASE (METODE AMAN DARI ERROR #1701)
+        // 1. BERSIHKAN DATABASE
         // =================================================================
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        
         Maturasi::truncate();
         PengolahanBasah::truncate();
         PengolahanMaturasi::truncate();
-        // TransaksiApiBokar::truncate(); // <-- DIHAPUS (Biar data bokar aman/manual)
-        HasilUjiLabBokarDiolah::truncate();
+        HasilUjiLabBokarDiolah::truncate(); // Kita akan isi ini agar history terbaca
         HasilUjiLabMaturasi::truncate();
         BahanProses::truncate();
-        
-        // Bersihkan Tabel Master Baru (Agar ID reset ke 1)
         Lokasi::truncate();
         Mutu::truncate();
-        
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        // Target Tanggal Laporan: 01 Januari 2026
         $targetDate = '2026-01-01'; 
-        $this->command->info("Seeding LHP KHUSUS MATURASI (Total 162.395) - Target: $targetDate");
+        $this->command->info("Seeding LHP KHUSUS MATURASI - Target: $targetDate");
 
         // =================================================================
-        // 1.B ISI MASTER LOKASI & MUTU (UNTUK SISTEM BARU TRACKING PALLET)
+        // 1.B ISI MASTER LOKASI & MUTU
         // =================================================================
-        $this->command->info('Seeding Master Lokasi & Mutu...');
+        $lokasi = ['Di Gudang SIR', 'Di Areal Press Bale', 'Di Gudang TOH 1', 'Di Gudang TOH 2', 'Area Repacking'];
+        foreach ($lokasi as $l) Lokasi::create(['nama' => $l]);
 
-        $lokasi = [
-            'Di Gudang SIR',
-            'Di Areal Press Bale',
-            'Di Gudang TOH 1',
-            'Di Gudang TOH 2',
-            'Area Repacking', 
-        ];
-        foreach ($lokasi as $l) {
-            Lokasi::create(['nama' => $l]);
-        }
-
-        $mutu = [
-            'Mutu Prima (siap jual)',
-            'PO / PRI Low',
-            'WhiteSpot (WS)',
-            'Kontaminasi',
-            'Repacking On Hold',
-        ];
-        foreach ($mutu as $m) {
-            Mutu::create(['uraian' => $m]);
-        }
+        $mutu = ['Mutu Prima (siap jual)', 'PO / PRI Low', 'WhiteSpot (WS)', 'Kontaminasi', 'Repacking On Hold'];
+        foreach ($mutu as $m) Mutu::create(['uraian' => $m]);
 
         // =================================================================
-        // 2. SETUP 49 BAK KOSONG TERLEBIH DAHULU
+        // 2. SETUP 49 BAK KOSONG
         // =================================================================
         for ($i = 1; $i <= 49; $i++) {
             Maturasi::create([
@@ -82,27 +57,25 @@ class DummyLHPSeeder extends Seeder
         }
 
         // =================================================================
-        // 3. INPUT DATA REAL (SESUAI GAMBAR EXCEL - TOTAL 162.395)
+        // 3. INPUT DATA REAL
         // =================================================================
-        // Format: [Berat, Tgl Masuk, Asal Bokar]
-        
+        // Kita gunakan kode singkat, nanti fungsi updateBakMaturasi yang menerjemahkannya
         $dataReal = [
             // --- BARIS KIRI ---
-            2  => [5654, '2025-12-26', 'CMP INHUT'],
+            2  => [5654, '2025-12-26', 'CMP INHUT'], // Campuran DS & INHUT
             3  => [5629, '2025-12-26', 'CMP INHUT'],
             4  => [5468, '2025-12-26', 'CMP INHUT'],
-            5  => [5528, '2025-12-25', 'CMP PT'],
-            
+            5  => [5528, '2025-12-25', 'CMP PT'],    // Campuran DS & PT
             7  => [5455, '2025-12-25', 'CMP PT'],
             
-            // ANOMALI (Saldo ada, tapi status KOSONG & Umur 0)
+            // ANOMALI
             14 => [-10,  null,         null], 
             16 => [13,   null,         null], 
 
             17 => [5289, '2025-12-24', 'CMP PT'],
             19 => [4875, '2025-12-25', 'CMP PT'],
             20 => [5671, '2025-12-22', 'CMP PT'],
-            21 => [6091, '2025-12-31', 'DS'],
+            21 => [6091, '2025-12-31', 'DS'],        // Murni DS
             22 => [5562, '2025-12-25', 'CMP PT'],
             23 => [2570, '2025-12-31', 'DS'],
             24 => [5449, '2025-12-25', 'CMP PT'],
@@ -128,48 +101,92 @@ class DummyLHPSeeder extends Seeder
             49 => [5120, '2025-12-13', 'CMP PT'],
         ];
 
-        // Loop Update Data
         foreach ($dataReal as $noBak => $val) {
             $this->updateBakMaturasi($noBak, $val[0], $val[1], $val[2], $targetDate);
         }
 
-        $this->command->info('SELESAI! Data Maturasi telah di-reset ke saldo awal tahun (162.395 Kg).');
-        $this->command->info('Master Lokasi & Mutu telah diisi.');
+        $this->command->info('SELESAI! Data Maturasi & History Transaksi telah dibuat.');
     }
 
-    // --- LOGIKA UPDATE ---
-    private function updateBakMaturasi($noBak, $berat, $tglMasuk, $asal, $targetDate)
+    // --- LOGIKA UTAMA ---
+    // --- LOGIKA UTAMA (UPDATE V3: ISI K3 & NETTO KERING) ---
+    // --- LOGIKA UTAMA (UPDATE FINAL: PAKSA KERING = BASAH UNTUK SALDO) ---
+    private function updateBakMaturasi($noBak, $berat, $tglMasuk, $kodeAsal, $targetDate)
     {
         $bak = Maturasi::where('uraian', "Di Bak Maturasi-$noBak")->first();
         if (!$bak) return;
 
-        // Hitung Umur (Target 1 Jan 2026)
+        // 1. Tentukan Komponen
+        $komponen = []; 
+        $labelAkhir = null;
+
+        if ($kodeAsal === 'CMP PT') {
+            $komponen = ['DS', 'PT'];
+            $labelAkhir = 'CMP (DS, PT)';
+        } elseif ($kodeAsal === 'CMP INHUT') {
+            $komponen = ['DS', 'INHUT'];
+            $labelAkhir = 'CMP (DS, INHUT)';
+        } elseif ($kodeAsal === 'DS') {
+            $komponen = ['DS'];
+            $labelAkhir = 'DS';
+        }
+
+        // 2. Hitung Umur & Tanggal
         $umur = 0;
         $keterangan = 'KOSONG';
-        $tglInject = '2025-12-31'; // Default untuk yang tgl kosong
+        $tglInject = '2025-12-31';
 
         if ($tglMasuk) {
             $diff = Carbon::parse($tglMasuk)->diffInDays(Carbon::parse($targetDate));
             $umur = $diff; 
-            $keterangan = Carbon::parse($tglMasuk)->format('d-M-y'); // Format spt Excel
+            $keterangan = strtoupper(Carbon::parse($tglMasuk)->format('d M Y'));
             $tglInject = $tglMasuk;
-        } else {
-            // Kasus Bak 14 & 16
-            $keterangan = 'KOSONG';
         }
 
-        // A. Update Master Maturasi
+        // 3. 🔥 SIMULASI TRANSAKSI (TEKNIK BALANCING)
+        // Agar hitungan stok pas, kita set Netto Kering = Netto Basah (K3 100%)
+        // Khusus untuk data inisialisasi ini saja.
+        if (!empty($komponen) && $berat > 0) {
+            $beratPerBagian = $berat / count($komponen);
+            
+            foreach ($komponen as $jenis) {
+                // A. Buat Induk (PengolahanBasah)
+                $induk = PengolahanBasah::create([
+                    'tanggal'       => $tglInject,
+                    'id_maturasi'   => $bak->id_maturasi,
+                    'jenis'         => $jenis,
+                    'berat_truck'   => 0, 
+                    'berat_timbang' => $beratPerBagian, 
+                    'netto_basah'   => $beratPerBagian,
+                    'k3'            => 100,             // 🔥 SET 100% AGAR HITUNGAN MUDAH
+                    'netto_kering'  => $beratPerBagian, // 🔥 KERING = BASAH (KUNCI BALANCING)
+                ]);
+
+                // B. Buat Data Lab
+                HasilUjiLabBokarDiolah::create([
+                    'id_pengolahan_basah' => $induk->id_pengolahan_basah, 
+                    'id_maturasi'         => $bak->id_maturasi,
+                    'tanggal'             => $tglInject,
+                    'jenis'               => $jenis, 
+                    'netto_basah'         => $beratPerBagian, 
+                    'netto_kering'        => $beratPerBagian, // 🔥 KERING = BASAH
+                    'k3'                  => 100, 
+                ]);
+            }
+        }
+
+        // 4. Update Master Maturasi
         $bak->update([
-            'stok_awal'  => $berat,
-            'stok_akhir' => $berat,
-            'tgl_masuk'  => $tglMasuk,
-            'umur'       => $umur,
-            'asal_bokar' => $asal,
-            'keterangan' => $keterangan,
-            'updated_at' => $targetDate
+            'stok_awal'    => $berat,
+            'stok_akhir'   => $berat,
+            'tgl_masuk'    => $tglInject, 
+            'umur'         => $umur,
+            'asal_bokar'   => $labelAkhir, 
+            'keterangan'   => $keterangan,
+            'updated_at'   => $targetDate
         ]);
 
-        // B. Insert Log Pengolahan (PENTING UNTUK HISTORY)
+        // 5. Insert Log Harian
         PengolahanMaturasi::create([
             'id_maturasi' => $bak->id_maturasi,
             'tgl_laporan' => $tglInject,

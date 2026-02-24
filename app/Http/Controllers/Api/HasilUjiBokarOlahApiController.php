@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
-use App\Models\HasilUjiLabBokarDiolah; // Gunakan Model yang benar
+use App\Models\HasilUjiLabBokarDiolah; 
 
 class HasilUjiBokarOlahApiController extends Controller
 {
@@ -19,21 +19,24 @@ class HasilUjiBokarOlahApiController extends Controller
      * [LIST UTAMA] Mengambil data history dari tabel hasil_uji_lab_bokar_diolah
      * Android Endpoint: GET /hasil-uji-bokar-olah
      */
-    public function index()
+    public function index(Request $request) // 🔥 TERIMA REQUEST
     {
         try {
-            // Ambil dari tabel log history, join ke pengolahan basah jika perlu info tambahan
-            $data = HasilUjiLabBokarDiolah::with(['pengolahanBasah', 'maturasi'])
-                        ->orderBy('tanggal', 'desc')
+            $query = HasilUjiLabBokarDiolah::with(['pengolahanBasah', 'maturasi']);
+
+            // 🔥 FILTER TANGGAL JIKA ADA REQUEST 'date' DARI ANDROID
+            if ($request->has('date')) {
+                $date = Carbon::parse($request->query('date'))->format('Y-m-d');
+                $query->whereDate('tanggal', $date);
+            }
+
+            $data = $query->orderBy('tanggal', 'desc')
                         ->get()
                         ->map(function($item) {
-                            // Flatten data untuk Android (agar mudah dibaca)
                             return [
                                 'id' => $item->id_hasil_uji_lab_bokar_diolah, // ID History
                                 'pengolahan_basah_id' => $item->id_pengolahan_basah, // ID Timbang
-                                // 🔥 PERBAIKAN BARIS 33: Pakai Carbon::parse
                                 'tanggal' => Carbon::parse($item->tanggal)->format('Y-m-d'),
-                                // Ambil nama bak dari relasi maturasi atau string manual
                                 'bak_maturasi' => $item->maturasi ? $item->maturasi->uraian : '-',
                                 'jenis' => $item->jenis,
                                 'netto_basah' => (float) $item->netto_basah,
@@ -59,16 +62,13 @@ class HasilUjiBokarOlahApiController extends Controller
     public function getPendingK3()
     {
         try {
-            // Cari data di pengolahan_basah yang belum punya K3
             $data = PengolahanBasah::with('maturasi')
                         ->whereNull('k3')
                         ->orderBy('tanggal', 'desc')
                         ->get()
                         ->map(function($item) {
-                            // Format ulang agar Android bisa baca ID dan Nama Bak
                             return [
-                                'id' => $item->id_pengolahan_basah, // ID Timbang
-                                // 🔥 PERBAIKAN BARIS 69: Pakai Carbon::parse
+                                'id_pengolahan_basah' => $item->id_pengolahan_basah, 
                                 'tanggal' => Carbon::parse($item->tanggal)->format('Y-m-d'),
                                 'bak_maturasi' => $item->maturasi ? $item->maturasi->uraian : 'Unknown',
                                 'jenis' => $item->jenis,
@@ -96,8 +96,6 @@ class HasilUjiBokarOlahApiController extends Controller
     {
         DB::beginTransaction();
         try {
-            // 🔥 PERBAIKAN: Pastikan nama parameter SAMA dengan ApiService.java
-            // Di ApiService: @Field("id_pengolahan_basah")
             $validator = Validator::make($request->all(), [
                 'id_pengolahan_basah' => 'required|exists:pengolahan_basah,id_pengolahan_basah',
                 'k3' => 'required|numeric|min:0|max:100',
@@ -107,20 +105,16 @@ class HasilUjiBokarOlahApiController extends Controller
                 return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
             }
 
-            // 1. Ambil Data Induk
             $dataBasah = PengolahanBasah::where('id_pengolahan_basah', $request->id_pengolahan_basah)->firstOrFail();
             
-            // 2. Hitung Kering
             $k3 = $request->k3;
             $netto_kering = $dataBasah->netto_basah * ($k3 / 100);
 
-            // 3. Update Tabel Induk
             $dataBasah->update([
-                'k3'           => $k3,
+                'k3'            => $k3,
                 'netto_kering' => $netto_kering
             ]);
 
-            // 4. Catat Log History
             $log = HasilUjiLabBokarDiolah::create([
                 'id_pengolahan_basah' => $dataBasah->id_pengolahan_basah,
                 'tanggal'             => $dataBasah->tanggal,
@@ -131,7 +125,6 @@ class HasilUjiBokarOlahApiController extends Controller
                 'netto_kering'        => $netto_kering
             ]);
 
-            // 5. TRIGGER MATURASI
             $this->syncToMaturasi($dataBasah->id_maturasi, $dataBasah->jenis, $dataBasah->tanggal);
 
             DB::commit();
@@ -150,8 +143,6 @@ class HasilUjiBokarOlahApiController extends Controller
 
     /**
      * [UPDATE] Edit K3 yang sudah ada
-     * Android Endpoint: PUT /hasil-uji-bokar-olah/update-k3/{id}
-     * Parameter {id} adalah ID PENGOLAHAN BASAH
      */
     public function updateK3(Request $request, $id)
     {
@@ -171,12 +162,19 @@ class HasilUjiBokarOlahApiController extends Controller
             // Update Induk
             $dataBasah->update(['k3' => $k3, 'netto_kering' => $netto_kering]);
             
-            // Update Log History
-            HasilUjiLabBokarDiolah::where('id_pengolahan_basah', $id)->update([
-                'k3' => $k3, 'netto_kering' => $netto_kering
-            ]);
+            // 🔥 PERBAIKAN: Gunakan updateOrCreate untuk API Mobile
+            HasilUjiLabBokarDiolah::updateOrCreate(
+                ['id_pengolahan_basah' => $id],
+                [
+                    'id_maturasi'  => $dataBasah->id_maturasi,
+                    'tanggal'      => $dataBasah->tanggal,
+                    'jenis'        => $dataBasah->jenis,
+                    'netto_basah'  => $dataBasah->netto_basah,
+                    'k3'           => $k3,
+                    'netto_kering' => $netto_kering
+                ]
+            );
 
-            // Trigger Ulang Maturasi
             $this->syncToMaturasi($dataBasah->id_maturasi, $dataBasah->jenis, $dataBasah->tanggal);
 
             DB::commit();
@@ -190,30 +188,24 @@ class HasilUjiBokarOlahApiController extends Controller
 
     /**
      * [DESTROY] Reset K3 (Hapus History & Null-kan Induk)
-     * Android Endpoint: DELETE /uji-bokar-olah/{id}
-     * Parameter {id} adalah ID HISTORY (id_hasil_uji_lab_bokar_diolah)
      */
     public function destroy($id)
     {
         DB::beginTransaction();
         try {
-            // Cari data history
             $history = HasilUjiLabBokarDiolah::where('id_hasil_uji_lab_bokar_diolah', $id)->firstOrFail();
             $idPengolahan = $history->id_pengolahan_basah;
             $idMaturasi = $history->id_maturasi;
             $tanggal = $history->tanggal;
             $jenis = $history->jenis;
 
-            // Hapus History
             $history->delete();
 
-            // Reset Induk (Pengolahan Basah) jadi NULL
             PengolahanBasah::where('id_pengolahan_basah', $idPengolahan)->update([
                 'k3' => null,
                 'netto_kering' => null
             ]);
 
-            // Sync Ulang Maturasi (Stok akan berkurang otomatis)
             $this->syncToMaturasi($idMaturasi, $jenis, $tanggal);
 
             DB::commit();
@@ -230,41 +222,72 @@ class HasilUjiBokarOlahApiController extends Controller
     // ==========================================================
     private function syncToMaturasi($idMaturasi, $jenis, $tanggal)
     {
-        $maturasiMaster = Maturasi::find($idMaturasi);
-        if (!$maturasiMaster) return;
+        $maturasi = Maturasi::find($idMaturasi);
+        if (!$maturasi) return;
 
-        // 1. Update Asal Bokar (CMP Logic)
-        $asalBaru = strtoupper($jenis);
-        if (!empty($maturasiMaster->asal_bokar) && $maturasiMaster->asal_bokar != $asalBaru && $maturasiMaster->asal_bokar !== 'CMP') {
-            $asalBaru = 'CMP';
-        }
-        $maturasiMaster->asal_bokar = $asalBaru;
+        $tgl = Carbon::parse($tanggal);
+        
+        $log = PengolahanMaturasi::firstOrNew([
+            'id_maturasi' => $idMaturasi,
+            'tgl_laporan' => $tgl
+        ]);
 
-        // 2. Hitung Total Masuk Hari Ini (Agregat dari semua Pengolahan Basah di tanggal & bak yg sama)
         $totalMasukHariIni = HasilUjiLabBokarDiolah::where('id_maturasi', $idMaturasi)
-            ->whereDate('tanggal', $tanggal)
-            ->sum('netto_kering'); // Sum netto kering yang valid (yg null diabaikan)
+            ->whereDate('tanggal', $tgl)
+            ->sum('netto_kering');
 
-        // 3. Update Log Harian Maturasi
-        $logHarian = PengolahanMaturasi::updateOrCreate(
-            ['id_maturasi' => $idMaturasi, 'tgl_laporan' => $tanggal],
-            ['masuk_hi' => $totalMasukHariIni, 'keterangan' => 'Auto-Sync dari Lab API']
-        );
+        $log->masuk_hi = $totalMasukHariIni;
+        
+        if (empty($log->keterangan)) {
+            $log->keterangan = 'Fisik Bokar Masuk dari API';
+        }
+        $log->save();
 
+        $stokAwalH1 = round(PengolahanMaturasi::where('id_maturasi', $idMaturasi)
+            ->whereDate('tgl_laporan', '<', $tgl)
+            ->sum(DB::raw('masuk_hi - diolah - mutasi')), 2);
+
+        $masuk  = $log->masuk_hi;
+        $keluar = $log->diolah + $log->mutasi;
         
-        // 4. Hitung Saldo Akhir Master (Snapshot saat ini)
-        // Rumus: Stok Awal + Masuk - Diolah - Mutasi = Stok Akhir
-        // Note: Stok awal idealnya statis per periode, tapi di sini kita update snapshot real-time
+        $maturasi->stok_awal  = $stokAwalH1;
+        $maturasi->stok_akhir = $stokAwalH1 + $masuk - $keluar;
+        $maturasi->updated_at = $tgl;
         
-        $maturasiMaster->masuk_hi = $logHarian->masuk_hi;
-        $maturasiMaster->stok_akhir = $maturasiMaster->stok_awal + $maturasiMaster->masuk_hi - $maturasiMaster->diolah - $maturasiMaster->mutasi;
-        
-        // Update Tanggal Masuk & Umur jika ada barang masuk
-        if ($totalMasukHariIni > 0) {
-            $maturasiMaster->tgl_masuk = $tanggal;
-            $maturasiMaster->umur = 0;
+        if ($maturasi->stok_akhir > 0) {
+            $listJenis = PengolahanBasah::where('id_maturasi', $idMaturasi)
+                        ->where('tanggal', $tanggal)
+                        ->pluck('jenis')
+                        ->filter(function ($value) { return !is_null($value) && $value !== '' && $value !== 'PENDING'; }) 
+                        ->unique()
+                        ->sort()
+                        ->values();
+
+            $labelAkhir = '';
+            if ($listJenis->count() > 1) {
+                $rincian = $listJenis->implode(', ');
+                $labelAkhir = "CMP ($rincian)";
+            } 
+            elseif ($listJenis->count() == 1) {
+                $labelAkhir = $listJenis->first();
+            } 
+            else {
+                $labelAkhir = $maturasi->asal_bokar; 
+            }
+
+            $maturasi->asal_bokar = $labelAkhir; 
+            
+            // 🔥 PERBAIKAN: Update keterangan langsung di hari H
+            if ($masuk > 0) {
+                $maturasi->keterangan = strtoupper($tgl->translatedFormat('d M Y'));
+                // ❌ DILARANG update tgl_masuk dan umur di sini! (Biar Web Admin yang handle simulasinya)
+            }
+
+        } else {
+            $maturasi->keterangan = 'KOSONG'; 
+            $maturasi->asal_bokar = null;
         }
 
-        $maturasiMaster->save();
+        $maturasi->save();
     }
 }

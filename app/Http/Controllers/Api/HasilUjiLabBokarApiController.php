@@ -5,11 +5,23 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\HasilUjiLabBokar;
+use Carbon\Carbon;
 
 class HasilUjiLabBokarApiController extends Controller
 {
-    public function index() {
-        return response()->json(['success' => true, 'data' => HasilUjiLabBokar::latest()->get()]);
+    // 🔥 PERBAIKAN: Menangkap Request dan mem-filter berdasarkan tanggal
+    public function index(Request $request) {
+        $query = HasilUjiLabBokar::query();
+
+        // Jika Android mengirimkan parameter 'date', filter datanya!
+        if ($request->has('date')) {
+            $date = Carbon::parse($request->query('date'))->format('Y-m-d');
+            $query->whereDate('tanggal', $date);
+        }
+
+        $data = $query->orderBy('tanggal', 'desc')->get();
+
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     public function store(Request $request) {
@@ -43,7 +55,6 @@ class HasilUjiLabBokarApiController extends Controller
         $validated = $request->validate([
             'tanggal'   => 'required|date',
             'suplier'   => 'required|string',
-            // 🔥 PERBAIKAN: Sebutkan nama kolom PK di parameter ke-3 unique
             'no_sampel' => 'required|string|unique:hasil_uji_lab_bokar,no_sampel,' . $id . ',id_hasil_uji_lab_bokar',
             'k3'        => 'required|numeric',
             'dirt'      => 'required|numeric',

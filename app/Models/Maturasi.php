@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\HasilUjiLabMaturasi;
+use App\Models\PengolahanBasah;
+use App\Models\PengolahanMaturasi;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;

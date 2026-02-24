@@ -68,6 +68,7 @@
 
                         <form action="{{ route('laporan.index') }}" method="GET">
                             <div class="row mb-3 align-items-end">
+                                {{-- Filter Tanggal Harian --}}
                                 <div class="col-auto">
                                     <label for="filter_tanggal" class="form-label small fw-bold mb-1">Pilih Tanggal:</label>
                                     <input type="text" id="filter_tanggal" name="tanggal" class="form-control form-control-sm" value="{{ $tanggal->format('Y-m-d') }}" style="width: 140px;">
@@ -76,6 +77,19 @@
                                     <button type="submit" class="btn btn-primary btn-sm fw-bold mr-2"><i class="fas fa-filter mr-1"></i> Tampilkan</button>
                                     <a href="{{ route('laporan.index') }}" class="btn btn-secondary btn-sm fw-bold"><i class="fas fa-undo mr-1"></i> Reset</a>
                                 </div>
+
+                                {{-- Export Excel Bulanan 🚀 --}}
+                                <div class="col-auto border-left pl-3 ml-2">
+                                    <label for="filter_bulan_tahun" class="form-label small fw-bold mb-1">Export Excel 1 Bulan:</label>
+                                    <div class="d-flex">
+                                        <input type="month" id="filter_bulan_tahun" class="form-control form-control-sm mr-2" value="{{ $tanggal->format('Y-m') }}" style="width: 150px;">
+                                        <button type="button" onclick="downloadExcelBulanan()" class="btn btn-success btn-sm fw-bold">
+                                            <i class="fas fa-file-excel mr-1"></i> Download Bulanan
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- Badge Status --}}
                                 <div class="col text-right">
                                     <span class="badge badge-light border p-2 mt-2">
                                         <i class="far fa-calendar-check mr-1"></i> Data: {{ $tanggal->translatedFormat('d F Y') }}
@@ -121,7 +135,6 @@
                                             @foreach(['DS', 'PT', 'INHUT'] as $key)
                                                 @php 
                                                     $d = $rekapBokar[$key]; 
-                                                    // Hitung manual agar sinkron dengan controller
                                                     $jumlahStok = $d['stok_awal'] + $d['masuk_hi'];
                                                     $stokAkhir = $jumlahStok - $d['kering_hi'] + ($d['rektif'] ?? 0);
                                                     $label = $key == 'DS' ? 'Petani (DS)' : ($key == 'PT' ? 'PTPN (PT)' : 'Inhutani');
@@ -129,14 +142,14 @@
                                                 <tr>
                                                     <td class="text-center">{{ $no++ }}</td>
                                                     <td class="text-left font-weight-bold">{{ $label }}</td>
-                                                    <td class="text-center">{{ number_format($d['stok_awal'], 0) }}</td>
-                                                    <td class="text-center font-weight-bold text-success">{{ number_format($d['masuk_hi'], 0) }}</td>
-                                                    <td class="text-center">{{ number_format($d['masuk_sdhi'], 0) }}</td>
-                                                    <td class="text-center font-weight-bold">{{ number_format($jumlahStok, 0) }}</td>
-                                                    <td class="text-center font-weight-bold text-primary">{{ number_format($d['kering_hi'], 0) }}</td>
-                                                    <td class="text-center">{{ number_format($d['kering_sdhi'], 0) }}</td>
-                                                    <td class="text-center">{{ number_format($d['rektif'] ?? 0, 0) }}</td>
-                                                    <td class="text-center font-weight-bold">{{ number_format($stokAkhir, 0) }}</td>
+                                                    <td class="text-center">{{ number_format($d['stok_awal'], 0, ',', '.') }}</td>
+                                                    <td class="text-center font-weight-bold text-success">{{ number_format($d['masuk_hi'], 0, ',', '.') }}</td>
+                                                    <td class="text-center">{{ number_format($d['masuk_sdhi'], 0, ',', '.') }}</td>
+                                                    <td class="text-center font-weight-bold">{{ number_format($jumlahStok, 0, ',', '.') }}</td>
+                                                    <td class="text-center font-weight-bold text-primary">{{ number_format($d['kering_hi'], 0, ',', '.') }}</td>
+                                                    <td class="text-center">{{ number_format($d['kering_sdhi'], 0, ',', '.') }}</td>
+                                                    <td class="text-center">{{ number_format($d['rektif'] ?? 0, 0, ',', '.') }}</td>
+                                                    <td class="text-center font-weight-bold">{{ number_format($stokAkhir, 0, ',', '.') }}</td>
                                                     <td class="text-center">-</td>
                                                 </tr>
                                             @endforeach
@@ -144,17 +157,17 @@
                                         <tfoot class="bg-light font-weight-bold">
                                             <tr>
                                                 <td colspan="2" class="text-center">Total</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('stok_awal'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('masuk_hi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('masuk_sdhi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('stok_awal') + collect($rekapBokar)->sum('masuk_hi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('kering_hi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('kering_sdhi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('rektif'), 0) }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('stok_awal'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('masuk_hi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('masuk_sdhi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('stok_awal') + collect($rekapBokar)->sum('masuk_hi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('kering_hi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('kering_sdhi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($rekapBokar)->sum('rektif'), 0, ',', '.') }}</td>
                                                 <td class="text-center">
                                                     {{ number_format(
                                                         (collect($rekapBokar)->sum('stok_awal') + collect($rekapBokar)->sum('masuk_hi')) - 
-                                                        collect($rekapBokar)->sum('kering_hi') + collect($rekapBokar)->sum('rektif'), 0
+                                                        collect($rekapBokar)->sum('kering_hi') + collect($rekapBokar)->sum('rektif'), 0, ',', '.'
                                                     ) }}
                                                 </td>
                                                 <td class="text-center">-</td>
@@ -192,16 +205,25 @@
                                             <tr>
                                                 <td class="text-center">{{ $index + 1 }}</td>
                                                 <td class="text-left font-weight-bold">{{ $m->no_bak ?? $m->uraian }}</td>
-                                                <td class="text-center">{{ number_format($m->kering ?? 0, 0) }}</td>
-                                                <td class="text-center">{{ $m->tgl_isi ? \Carbon\Carbon::parse($m->tgl_isi)->format('d-m-Y') : '-' }}</td>
+                                                <td class="text-center">{{ number_format($m->kering ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ $m->tgl_isi ? strtoupper(\Carbon\Carbon::parse($m->tgl_isi)->translatedFormat('d M Y')) : '-' }}</td>
                                                 <td class="text-center">{{ $m->umur ?? 0 }}</td>
-                                                <td class="text-center">{{ number_format($m->diolah ?? 0, 0) }}</td>
-                                                <td class="text-center">{{ number_format($m->mutasi ?? 0, 0) }}</td>
-                                                <td class="text-center font-weight-bold text-primary">{{ number_format($m->masuk_hi ?? 0, 0) }}</td>
-                                                <td class="text-center">{{ number_format($m->k3 ?? 0, 2) }}</td>
+                                                <td class="text-center">{{ number_format($m->diolah ?? 0, 0, ',', '.') }}</td>
+                                                {{-- 🔥 PERBAIKAN FORMAT MUTASI SESUAI GAMBAR 🔥 --}}
+                                                <td class="text-center font-weight-bold {{ $m->mutasi > 0 ? 'text-danger' : ($m->mutasi < 0 ? 'text-success' : '') }}">
+                                                    @if($m->mutasi > 0)
+                                                        ({{ number_format($m->mutasi, 0, ',', '.') }})
+                                                    @elseif($m->mutasi < 0)
+                                                        {{ number_format(abs($m->mutasi), 0, ',', '.') }}
+                                                    @else
+                                                        0
+                                                    @endif
+                                                </td>
+                                                <td class="text-center font-weight-bold text-primary">{{ number_format($m->masuk_hi ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format($m->k3 ?? 0, 2, ',', '.') }}</td>
                                                 <td class="text-center">{{ $m->po ?? '-' }}</td>
                                                 <td class="text-center">{{ $m->pri ?? '-' }}</td>
-                                                <td class="text-center font-weight-bold">{{ number_format($m->stok_akhir ?? 0, 0) }}</td>
+                                                <td class="text-center font-weight-bold">{{ number_format($m->stok_akhir ?? 0, 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ $m->jenis ?? '-' }}</td>
                                                 <td class="text-center">{{ $m->keterangan ?? '-' }}</td>
                                             </tr>
@@ -210,13 +232,23 @@
                                         <tfoot class="bg-light font-weight-bold">
                                             <tr>
                                                 <td class="text-center" colspan="2">Jumlah</td>
-                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('kering'), 0) }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('kering'), 0, ',', '.') }}</td>
                                                 <td colspan="2"></td>
-                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('diolah'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('mutasi'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('masuk_hi'), 0) }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('diolah'), 0, ',', '.') }}</td>
+                                                {{-- 🔥 PERBAIKAN FORMAT TOTAL MUTASI DI FOOTER 🔥 --}}
+                                                <td class="text-center">
+                                                    @php $totMutasi = collect($dataMaturasi)->sum('mutasi'); @endphp
+                                                    @if($totMutasi > 0.1)
+                                                        <span class="text-danger">({{ number_format($totMutasi, 0, ',', '.') }})</span>
+                                                    @elseif($totMutasi < -0.1)
+                                                        <span class="text-success">{{ number_format(abs($totMutasi), 0, ',', '.') }}</span>
+                                                    @else
+                                                        0
+                                                    @endif
+                                                </td>
+                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('masuk_hi'), 0, ',', '.') }}</td>
                                                 <td colspan="3"></td>
-                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('stok_akhir'), 0) }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataMaturasi)->sum('stok_akhir'), 0, ',', '.') }}</td>
                                                 <td colspan="2"></td>
                                             </tr>
                                         </tfoot>
@@ -251,12 +283,12 @@
                                                 <td class="text-center">{{ $index + 1 }}</td>
                                                 <td class="text-center">{{ $tanggal->format('d-m-Y') }}</td>
                                                 <td class="text-left font-weight-bold">{{ $w->uraian }}</td>
-                                                <td class="text-center">{{ number_format($w->stok_awal, 0) }}</td>
-                                                <td class="text-center text-success">{{ number_format($w->masuk, 0) }}</td>
-                                                <td class="text-center text-danger">{{ number_format($w->keluar, 0) }}</td>
-                                                <td class="text-center">{{ number_format($w->produksi_sir20 ?? 0, 0) }}</td>
-                                                <td class="text-center">{{ number_format($w->rektif ?? 0, 0) }}</td>
-                                                <td class="text-center font-weight-bold">{{ number_format($w->stok_akhir, 0) }}</td>
+                                                <td class="text-center">{{ number_format($w->stok_awal, 0, ',', '.') }}</td>
+                                                <td class="text-center text-success">{{ number_format($w->masuk, 0, ',', '.') }}</td>
+                                                <td class="text-center text-danger">{{ number_format($w->keluar, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format($w->produksi_sir20 ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format($w->rektif ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold">{{ number_format($w->stok_akhir, 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ $w->keterangan ?? '-' }}</td>
                                             </tr>
                                             @endforeach
@@ -264,12 +296,12 @@
                                         <tfoot class="bg-light font-weight-bold">
                                             <tr>
                                                 <td colspan="3" class="text-center">Total</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_awal'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('masuk'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('keluar'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('produksi_sir20'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('rektif'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_akhir'), 0) }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_awal'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('masuk'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('keluar'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('produksi_sir20'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('rektif'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_akhir'), 0, ',', '.') }}</td>
                                                 <td></td>
                                             </tr>
                                         </tfoot>
@@ -300,26 +332,26 @@
                                             <tr>
                                                 <td class="text-center font-weight-bold">{{ $loop->iteration }}</td>
                                                 <td class="text-left font-weight-bold">{{ $g->uraian }}</td>
-                                                <td class="text-center">{{ number_format($g->stok_awal, 2) }}</td>
-                                                <td class="text-center font-weight-bold text-primary">{{ number_format($g->prod_hi, 2) }}</td>
-                                                <td class="text-center">{{ number_format(($g->stok_awal + $g->prod_hi), 2) }}</td>
-                                                <td class="text-center">{{ number_format($g->prod_bln_lalu ?? 0, 2) }}</td>
-                                                <td class="text-center">{{ number_format($g->prod_sdhi, 2) }}</td>
-                                                <td class="text-center font-weight-bold text-danger">{{ number_format($g->pengiriman ?? 0, 2) }}</td>
-                                                <td class="text-center font-weight-bold">{{ number_format($g->stok_akhir, 2) }}</td>
+                                                <td class="text-center">{{ number_format($g->stok_awal, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold text-primary">{{ number_format($g->prod_hi, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(($g->stok_awal + $g->prod_hi), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format($g->prod_bln_lalu ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format($g->prod_sdhi, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold text-danger">{{ number_format($g->pengiriman ?? 0, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold">{{ number_format($g->stok_akhir, 0, ',', '.') }}</td>
                                                 <td class="text-center">-</td>
                                             </tr>
                                             @endforeach
                                             {{-- Baris Jumlah --}}
                                             <tr class="bg-light font-weight-bold">
                                                 <td colspan="2" class="text-center">Total</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_awal'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_hi'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_awal') + collect($dataGudang)->sum('prod_hi'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_bln_lalu'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_sdhi'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('pengiriman'), 2) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_akhir'), 2) }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_awal'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_hi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_awal') + collect($dataGudang)->sum('prod_hi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_bln_lalu'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_sdhi'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('pengiriman'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_akhir'), 0, ',', '.') }}</td>
                                                 <td></td>
                                             </tr>
                                         </tbody>
@@ -343,7 +375,7 @@
                                             <tr>
                                                 <td class="text-center font-weight-bold">{{ $idx + 1 }}</td>
                                                 <td class="text-left font-weight-bold">{{ $r[0] }}</td>
-                                                <td class="text-center">{{ number_format($r[1], 2) }}</td>
+                                                <td class="text-center">{{ number_format($r[1], 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ $r[2] }}</td>
                                                 <td class="text-center">-</td>
                                             </tr>
@@ -377,23 +409,23 @@
                                             <tr>
                                                 <td class="text-center font-weight-bold">{{ $loop->iteration }}</td>
                                                 <td class="text-left font-weight-bold">{{ $p->uraian }}</td>
-                                                <td class="text-center">{{ number_format($p->sd_bulan_lalu, 0) }}</td>
-                                                <td class="text-center bg-highlight">{{ number_format($p->bln_ini_lalu, 0) }}</td>
-                                                <td class="text-center font-weight-bold text-success">{{ number_format($p->hari_ini, 0) }}</td>
-                                                <td class="text-center font-weight-bold">{{ number_format($p->total_bln_ini, 0) }}</td>
-                                                <td class="text-center font-weight-bold">{{ number_format($p->total_sd_hari_ini, 0) }}</td>
+                                                <td class="text-center">{{ number_format($p->sd_bulan_lalu, 0, ',', '.') }}</td>
+                                                <td class="text-center bg-highlight">{{ number_format($p->bln_ini_lalu, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold text-success">{{ number_format($p->hari_ini, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold">{{ number_format($p->total_bln_ini, 0, ',', '.') }}</td>
+                                                <td class="text-center font-weight-bold">{{ number_format($p->total_sd_hari_ini, 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ $p->keterangan ?? '-' }}</td>
                                             </tr>
                                             @endforeach
                                         </tbody>
                                         <tfoot class="bg-light font-weight-bold">
                                             <tr>
-                                                <td colspan="3" class="text-center text-uppercase">Total Ringkasan</td>
-                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('sd_bulan_lalu'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('bln_ini_lalu'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('hari_ini'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('total_bln_ini'), 0) }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('total_sd_hari_ini'), 0) }}</td>
+                                                <td colspan="2" class="text-center text-uppercase">Total Ringkasan</td>
+                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('sd_bulan_lalu'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('bln_ini_lalu'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('hari_ini'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('total_bln_ini'), 0, ',', '.') }}</td>
+                                                <td class="text-center">{{ number_format(collect($dataPenjualan)->sum('total_sd_hari_ini'), 0, ',', '.') }}</td>
                                                 <td class="text-center">-</td>
                                             </tr>
                                         </tfoot>
@@ -514,6 +546,25 @@ function downloadExcel() {
     var baseUrl = "{{ route('laporan.exportExcel') }}";
     window.location.href = baseUrl + "?tanggal=" + tanggalDipilih;
 }
+
+// ==========================================================
+// 🔥 5. TAMBAHKAN FUNGSI INI AGAR TOMBOL EXCEL UNTUK BULANAN 🔥
+// ==========================================================
+function downloadExcelBulanan() {
+        const input = document.getElementById('filter_bulan_tahun').value;
+        if (!input) {
+            alert('Silakan pilih bulan dan tahun!');
+            return;
+        }
+        
+        // Pecah YYYY-MM
+        const parts = input.split('-');
+        const tahun = parts[0];
+        const bulan = parts[1];
+
+        // Redirect ke route export (pastikan route name ini sudah terdaftar di web.php)
+        window.location.href = `{{ route('laporan.exportBulanan') }}?bulan=${bulan}&tahun=${tahun}`;
+    }
 </script>
 </body>
 </html>

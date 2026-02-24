@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use Carbon\Carbon;
+use App\Models\Pallet;
 use Illuminate\Http\Request;
 use App\Models\ProduksiSir20;
 use App\Models\HasilUjiLabSir20;
@@ -9,8 +11,15 @@ use App\Http\Controllers\Controller;
 
 class HasilUjiSir20ApiController extends Controller
 {
-    public function index() {
-        return response()->json(['success' => true, 'data' => HasilUjiLabSir20::latest('tanggal')->get()]);
+    public function index(Request $request) {
+        $query = HasilUjiLabSir20::orderBy('tanggal', 'desc');
+
+        // 🔥 TAMBAHAN FILTER TANGGAL
+        if ($request->has('date') && !empty($request->date)) {
+            $query->whereDate('tanggal', $request->date);
+        }
+
+        return response()->json(['success' => true, 'data' => $query->get()]);
     }
 
     public function store(Request $request) {
@@ -72,42 +81,34 @@ class HasilUjiSir20ApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Dihapus']);
     }
 
-    // 🔥 API BARU: Mendapatkan Daftar Pallet yang Tersedia (Belum Diuji)
+    // 🔥 API BARU: Mendapatkan Daftar Pallet yang Tersedia (Belum Diuji) SINKRON WEB
     public function getAvailablePallets()
     {
-        // 1. Ambil semua nomor pallet yang SUDAH diuji (pluck biar ringan)
-        $sudahDiuji = HasilUjiLabSIR20::pluck('no_palet')->toArray();
+        // 1. Ambil SEMUA nomor palet yang sudah pernah diuji
+        $palletSudahDiuji = HasilUjiLabSIR20::pluck('no_palet')->toArray();
 
-        // 2. Ambil data produksi (Misal: 2 bulan terakhir, urut dari yang terbaru)
-        // Kita tidak filter by date request lagi.
-        $produksi = ProduksiSir20::orderBy('tanggal_produksi', 'desc')
-            ->take(60) // Limit biar server gak meledak kalau data ribuan
-            ->get();
+        // 2. Ambil data Pallet Fisik dari Tabel Pallet
+        $palletTersedia = Pallet::whereNull('tanggal_penjualan')
+                            ->orderBy('id_pallet', 'asc') // Urutkan berdasarkan ID
+                            ->get(['id_pallet', 'no_pallet', 'tanggal_produksi']);
 
         $daftarPalet = [];
-
-        foreach ($produksi as $prod) {
-            $start = (int) $prod->nomor_start;
-            $end = (int) $prod->nomor_end;
-            $tglProduksi = $prod->tanggal_produksi; // Info tambahan buat label
-
-            // Loop nomor dalam batch produksi ini
-            for ($i = $start; $i <= $end; $i++) {
-                $nomorStr = (string) $i;
-
-                // 3. Cek apakah nomor ini sudah ada di array $sudahDiuji?
-                if (!in_array($nomorStr, $sudahDiuji)) {
-                    $daftarPalet[] = [
-                        'nomor' => $nomorStr,
-                        // Tampilkan info tanggal biar user tau ini stok kapan
-                        'label' => "Palet No. $nomorStr ($tglProduksi)" 
-                    ];
-                }
+        
+        foreach ($palletTersedia as $p) {
+            // 3. Hanya masukkan palet yang BELUM ada di tabel hasil uji
+            if (!in_array($p->no_pallet, $palletSudahDiuji)) {
+                
+                $daftarPalet[] = [
+                    // VALUE: Tetap 'no_pallet' string agar Controller Store tidak Error Validasi
+                    'nomor' => $p->no_pallet, 
+                    
+                    // LABEL: Tampilkan ID Pallet sesuai format Web Admin
+                    'label' => $p->no_pallet,
+                    
+                    'tanggal_prod' => $p->tanggal_produksi
+                ];
             }
         }
-
-        // Sortir biar nomor urut (opsional, bisa sort by nomor asc)
-        // usort($daftarPalet, function($a, $b) { return $a['nomor'] - $b['nomor']; });
 
         return response()->json($daftarPalet);
     }

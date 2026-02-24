@@ -10,6 +10,7 @@ use App\Models\PengolahanBasah;
 use App\Models\RektifikasiStok;
 use App\Models\TransaksiApiBokar;
 use App\Models\PengolahanMaturasi;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Models\HasilUjiLabBokarDiolah;
 use Illuminate\Support\Facades\Validator;
@@ -165,90 +166,102 @@ class PengolahanBasahController extends Controller
     }
 
     // Method baru untuk menangani proses Pecah Data
+    // Method baru untuk menangani proses Pecah Data
     public function pecahStore(Request $request)
     {
-        // 1. Cari Data Asal
+        // 1. Cari Data Referensi (Salah satu dari baris yang akan diedit/dipecah)
         $dataAsal = PengolahanBasah::find($request->id_asal);
         if (!$dataAsal) {
             return redirect()->back()->with('error', 'Data asal tidak ditemukan.');
         }
 
-        // CEK PENTING: Pastikan data asal sudah punya K3 & Netto Kering
-        // Karena kita mau mecah berdasarkan Kering, kalau Keringnya 0, error kan.
-        if ($dataAsal->netto_kering <= 0 || empty($dataAsal->k3)) {
-            return redirect()->back()->with('error', 'Data ini belum memiliki Nilai Netto Kering / Hasil Lab (K3). Tidak bisa dipecah.');
-        }
-
-        // 2. Ambil Inputan Pecahan (INI ADALAH NILAI KERING)
+        // 2. Ambil Inputan Pecahan Baru (NILAI KERING)
         $pt_kering    = (float) $request->split_pt;
         $ds_kering    = (float) $request->split_ds;
         $inhut_kering = (float) $request->split_inhut;
         
-        $totalInputKering = $pt_kering + $ds_kering + $inhut_kering;
+        $totalInputKering = round($pt_kering + $ds_kering + $inhut_kering);
 
-        // 3. Validasi: Total Input harus sama dengan Netto Kering Asal (Dibulatkan ke atas biar klop sama View)
-        // Kita pakai ceil() di sini karena di View tombolnya pakai ceil()
-        $targetKering = ceil($dataAsal->netto_kering); 
+        // 🔥 LOGIKA PENGAMBILAN TOTAL TARGET:
+        // Kita cari semua data yang satu group dengan data ini (Tanggal + Bak + Menit created_at sama)
+        // Lalu kita jumlahkan netto_kering-nya untuk menjadi target validasi.
+        $groupQuery = PengolahanBasah::where('tanggal', $dataAsal->tanggal)
+            ->where('id_maturasi', $dataAsal->id_maturasi)
+            ->where(DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d %H:%i')"), $dataAsal->created_at->format('Y-m-d H:i'));
 
+        $targetKering = round($groupQuery->sum('netto_kering')); 
+
+        // 3. Validasi: Total Input harus sama dengan Total Group Asal
         if (abs($totalInputKering - $targetKering) > 0.1) {
-            return redirect()->back()->withErrors(['msg' => 'Total pecahan (' . number_format($totalInputKering) . ') tidak sama dengan Netto Kering asal (' . number_format($targetKering) . ').'])->withInput();
+            return redirect()->back()->withErrors([
+                'msg' => 'Total pecahan (' . number_format($totalInputKering) . ') tidak sama dengan Target (' . number_format($targetKering) . ').'
+            ])->withInput();
         }
 
         try {
-            // Array Data (Nilai Kering)
+            DB::beginTransaction();
+
+            // Ambil info K3 dan Data Timbangan dari baris pertama (sebagai master proporsi)
+            $k3_persen = $dataAsal->k3; 
+            $berat_truck_master = $groupQuery->sum('berat_truck');
+            $berat_timbang_master = $groupQuery->sum('berat_timbang');
+            $netto_kering_master = $groupQuery->sum('netto_kering');
+
             $splits = [
                 'PT'    => $pt_kering, 
                 'DS'    => $ds_kering, 
                 'INHUT' => $inhut_kering
             ];
-
-            // Ambil K3 Asal (Persentase) untuk hitung mundur
-            $k3_persen = $dataAsal->k3; 
             
+            // Simpan ID group lama untuk dihapus di akhir proses
+            $oldGroupIds = $groupQuery->pluck('id_pengolahan_basah');
+
             foreach ($splits as $jenis => $nilaiKering) {
                 if ($nilaiKering > 0) {
                     
-                    // --- A. HITUNG MUNDUR NETTO BASAH ---
-                    // Rumus: Basah = Kering / (K3 / 100)
-                    // Contoh: Kering 500, K3 50% -> Basah = 500 / 0.5 = 1000
+                    // --- A. HITUNG PROPORSIONAL BERDASARKAN TOTAL MASTER ---
+                    $ratio = $nilaiKering / $netto_kering_master;
                     $nilaiBasah = $nilaiKering / ($k3_persen / 100);
 
-                    // --- B. LOGIKA PROPORSIONAL (BERAT TRUK & TIMBANG) ---
-                    // Kita pakai rasio dari Netto Kering
-                    // Rumus: (Nilai Kering Bagian / Total Kering Asal)
-                    $ratio = $nilaiKering / $dataAsal->netto_kering;
-
-                    $beratTruckBaru   = $dataAsal->berat_truck * $ratio;
-                    $beratTimbangBaru = $dataAsal->berat_timbang * $ratio;
-
-                    // --- C. SIMPAN DATA BARU ---
-                    PengolahanBasah::create([
+                    // --- B. SIMPAN DATA BARU ---
+                    $pengolahanBaru = PengolahanBasah::create([
                         'tanggal'       => $dataAsal->tanggal,
                         'id_maturasi'   => $dataAsal->id_maturasi,
                         'jenis'         => $jenis, 
-                        
-                        // Data Timbangan (Proporsional)
-                        'berat_truck'   => $beratTruckBaru,
-                        'berat_timbang' => $beratTimbangBaru,
-                        
-                        // Data Hasil Hitungan
-                        'netto_basah'   => $nilaiBasah,   // Hasil hitung mundur
-                        'k3'            => $k3_persen,    // COPY K3 DARI INDUK (JANGAN DI-NULL)
-                        'netto_kering'  => $nilaiKering,  // Inputan Admin
+                        'berat_truck'   => $berat_truck_master * $ratio,
+                        'berat_timbang' => $berat_timbang_master * $ratio,
+                        'netto_basah'   => $nilaiBasah,  
+                        'k3'            => $k3_persen,    
+                        'netto_kering'  => $nilaiKering,  
+                    ]);
+
+                    // --- C. SIMPAN KE TABEL LOG (HISTORY) ---
+                    HasilUjiLabBokarDiolah::create([
+                        'id_pengolahan_basah' => $pengolahanBaru->id_pengolahan_basah,
+                        'id_maturasi'         => $pengolahanBaru->id_maturasi,
+                        'tanggal'             => $pengolahanBaru->tanggal,
+                        'jenis'               => $pengolahanBaru->jenis,
+                        'netto_basah'         => $pengolahanBaru->netto_basah,
+                        'k3'                  => $pengolahanBaru->k3,
+                        'netto_kering'        => $pengolahanBaru->netto_kering,
                     ]);
                     
-                    // Update Trigger Maturasi
                     $this->updateMaturasiTrigger($dataAsal->id_maturasi, $jenis, $dataAsal->tanggal);
                 }
             }
 
-            // 4. Hapus Data Lama
-            $dataAsal->delete();
+            // 4. 🔥 PEMBERSIHAN TOTAL: Hapus rincian lama dan log lab-nya
+            HasilUjiLabBokarDiolah::whereIn('id_pengolahan_basah', $oldGroupIds)->delete();
+            PengolahanBasah::whereIn('id_pengolahan_basah', $oldGroupIds)->delete();
 
-            return redirect()->back()->with('success', 'Data berhasil dipecah berdasarkan Netto Kering.');
+            DB::commit();
+            // 🔥 TAMBAHKAN INI: Panggil fungsi sinkronisasi stok ke Maturasi
+            $this->syncMaturasiAfterDelete($dataAsal->id_maturasi, $dataAsal->tanggal);
+            return redirect()->back()->with('success', 'Rincian data berhasil diperbarui.');
 
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Gagal memecah data: ' . $e->getMessage());
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal memproses data: ' . $e->getMessage());
         }
     }
 
@@ -272,7 +285,7 @@ class PengolahanBasahController extends Controller
         // Validasi input agar aman (terutama id_maturasi dan jenis)
         $request->validate([
             'id_maturasi' => 'required|exists:maturasi,id_maturasi',
-            'jenis'       => 'required|string|in:PT,DS,INHUT',
+            'jenis'       => 'nullable|string|in:PT,DS,INHUT,PENDING',
         ]);
 
         $netto_basah = $request->berat_timbang - $request->berat_truck;
@@ -301,35 +314,57 @@ class PengolahanBasahController extends Controller
     public function destroy($id) 
     {
         $pengolahan = PengolahanBasah::find($id);
-        if($pengolahan) $pengolahan->delete();
         
-        return redirect()->route('pengolahan-basah.index')->with('success', 'Data dihapus.');
+        if($pengolahan) {
+            // Simpan info penting sebelum dihapus untuk trigger update
+            $id_maturasi = $pengolahan->id_maturasi;
+            $tanggal     = $pengolahan->tanggal;
+
+            // 1. Hapus Data Lab Terkait (Jika ada)
+            HasilUjiLabBokarDiolah::where('id_pengolahan_basah', $id)->delete();
+
+            // 2. Hapus Data Utama
+            $pengolahan->delete();
+
+            // 3. 🔥 TRIGGER SINKRONISASI STOK MATURASI (PENTING!)
+            // Hitung ulang 'Masuk HI' di Maturasi karena data sumber berkurang
+            $this->syncMaturasiAfterDelete($id_maturasi, $tanggal);
+            
+            // 4. Update Label Asal Bokar (CMP/DS/PT)
+            $this->updateMaturasiTrigger($id_maturasi, '', $tanggal);
+        }
+        
+        return redirect()->route('pengolahan-basah.index')->with('success', 'Data dihapus dan Stok Maturasi telah disesuaikan.');
     }
 
     // Hapus Banyak Data Sekaligus (Group)
     public function destroyGroup(Request $request)
     {
-        $ids = json_decode($request->group_ids, true); // Terima array ID dari view
+        $ids = json_decode($request->group_ids, true); 
         
         if (!empty($ids) && is_array($ids)) {
-            // Ambil sample data untuk trigger (ambil data pertama sebelum dihapus)
+            // Ambil sample untuk tahu ID Bak & Tanggal (Asumsi 1 grup = 1 bak & 1 tanggal)
             $sample = PengolahanBasah::find($ids[0]);
             
             if ($sample) {
                 $maturasiId = $sample->id_maturasi;
                 $tanggal = $sample->tanggal;
 
-                // Hapus Semua Data berdasarkan ID array
+                // 1. Hapus Data Lab (Bulk Delete)
+                HasilUjiLabBokarDiolah::whereIn('id_pengolahan_basah', $ids)->delete();
+
+                // 2. Hapus Data Utama
                 PengolahanBasah::whereIn('id_pengolahan_basah', $ids)->delete();
 
-                // 🔥 PENTING: Jalankan Trigger untuk update Status Bak
-                // Kita kirim jenisBaru = '' (kosong) karena kita sedang menghapus, bukan menambah.
-                // Trigger akan otomatis scan ulang sisa data di database.
+                // 3. 🔥 TRIGGER SINKRONISASI STOK MATURASI
+                $this->syncMaturasiAfterDelete($maturasiId, $tanggal);
+
+                // 4. Update Label Asal Bokar
                 $this->updateMaturasiTrigger($maturasiId, '', $tanggal);
             }
         }
 
-        return redirect()->back()->with('success', 'Seluruh data pecahan dalam grup berhasil dihapus.');
+        return redirect()->back()->with('success', 'Seluruh data pecahan dihapus dan Stok Maturasi disesuaikan.');
     }
 
     public function updateRektif(Request $request) 
@@ -506,6 +541,70 @@ class PengolahanBasahController extends Controller
             // 🔥 PERBAIKAN DI SINI: Simpan ke kolom 'asal_bokar'
             $bak->asal_bokar = $labelAkhir; 
             $bak->save();
+        }
+    }
+
+    // =========================================================================
+    // HELPER: SINKRONISASI STOK MATURASI SAAT HAPUS DATA
+    // =========================================================================
+    // =========================================================================
+    // HELPER: SINKRONISASI STOK MATURASI SAAT HAPUS DATA (DIPERBARUI)
+    // =========================================================================
+    private function syncMaturasiAfterDelete($id_maturasi, $tanggal)
+    {
+        // 1. Hitung Ulang Total Netto Kering yang TERSISA di tanggal & bak tersebut
+        $sisaNettoKering = PengolahanBasah::where('id_maturasi', $id_maturasi)
+            ->where('tanggal', $tanggal)
+            ->sum('netto_kering'); // Jika kosong otomatis 0
+
+        // 2. Cari Log Pengolahan Maturasi
+        $logMaturasi = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+            ->whereDate('tgl_laporan', $tanggal)
+            ->first();
+
+        if ($logMaturasi) {
+            
+            // 🔥 PERBAIKAN FATAL:
+            // Jika sisaNettoKering 0 (Artinya SEMUA data masuk_hi hari ini dihapus habis)
+            // DAN hari itu tidak ada aktivitas 'diolah' atau 'mutasi' sama sekali
+            // MAKA: HAPUS TOTAL LOG TERSEBUT! Jangan disisakan 'masuk_hi = 0'.
+            if ($sisaNettoKering <= 0.01 && $logMaturasi->diolah <= 0.01 && $logMaturasi->mutasi == 0) {
+                $logMaturasi->delete();
+            } else {
+                // Jika masih ada sisa (atau ada aktivitas lain), cukup update angkanya
+                $logMaturasi->masuk_hi = $sisaNettoKering;
+                $logMaturasi->save();
+            }
+
+            // 3. Hitung Ulang Stok Akhir Master Maturasi
+            // A. Stok Awal (H-1)
+            $stokAwal = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+                ->whereDate('tgl_laporan', '<', $tanggal)
+                ->sum(DB::raw('masuk_hi - diolah - mutasi')); 
+
+            // B. Hitung Stok Akhir Baru (Ambil ulang dari log setelah di-delete/update)
+            $logBaru = PengolahanMaturasi::where('id_maturasi', $id_maturasi)->whereDate('tgl_laporan', $tanggal)->first();
+            $masukBaru = $logBaru ? $logBaru->masuk_hi : 0;
+            $keluarBaru = $logBaru ? ($logBaru->diolah + $logBaru->mutasi) : 0;
+            
+            $stokAkhirBaru = $stokAwal + $masukBaru - $keluarBaru;
+
+            // C. Update Master Maturasi
+            $masterBak = Maturasi::find($id_maturasi);
+            if ($masterBak) {
+                $masterBak->stok_akhir = max(0, $stokAkhirBaru); // Cegah minus
+                
+                // Jika stok habis karena dihapus, reset status
+                if ($masterBak->stok_akhir <= 0.01) {
+                    $masterBak->stok_akhir = 0;
+                    $masterBak->keterangan = 'KOSONG';
+                    $masterBak->asal_bokar = null;
+                    $masterBak->umur = 0;
+                    $masterBak->tgl_masuk = null;
+                }
+                
+                $masterBak->save();
+            }
         }
     }
 }

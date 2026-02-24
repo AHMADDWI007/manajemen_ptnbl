@@ -155,7 +155,7 @@
                                         
                                         {{-- Stock Awal --}}
                                         <td>{{ number_format($item->stok_awal, 0, ',', '.') }}</td>
-                                        <td>{{ $item->tgl_masuk ? \Carbon\Carbon::parse($item->tgl_masuk)->format('d-m-Y') : '-' }}</td>
+                                        <td>{{ $item->tgl_masuk ? strtoupper(\Carbon\Carbon::parse($item->tgl_masuk)->translatedFormat('d M Y')) : '-' }}</td>
                                         <td>{{ $item->umur ?? 0 }}</td>
                                         
                                         {{-- Diproses --}}
@@ -194,23 +194,26 @@
                                                     Aksi
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $item->id_maturasi }}">
+                                                    {{-- Detail --}}
                                                     <a class="dropdown-item btn-detail" href="javascript:void(0)"
-                                                       data-uraian="{{ $item->uraian }}"
-                                                       data-tanggal="{{ $selected_date }}">
+                                                    data-uraian="{{ $item->uraian }}"
+                                                    data-tanggal="{{ $selected_date }}">
                                                         <i class="fas fa-eye text-info mr-2"></i> Detail
                                                     </a>
-                                                   <a class="dropdown-item btn-edit"
+
+                                                    {{-- 🔥 Edit (Sekarang sudah pakai href agar kursor jadi telunjuk) --}}
+                                                    <a class="dropdown-item btn-edit" href="javascript:void(0)"
                                                     data-id="{{ $item->id_maturasi }}"
                                                     data-id-log="{{ $item->id_log }}">
-
                                                         <i class="fas fa-edit text-warning mr-2"></i> Edit
                                                     </a>
-                                                    <form action="{{ route('maturasi.reset', $item->id_maturasi) }}" method="POST"
-                                                    class="reset-form" style="display:inline;">
-                                                    @csrf 
+
+                                                    {{-- Reset --}}
+                                                    <form action="{{ route('maturasi.reset', $item->id_maturasi) }}" method="POST" class="reset-form" style="display:inline;">
+                                                        @csrf 
                                                         <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="fas fa-undo mr-2"></i> Reset
-                                                         </button>
+                                                            <i class="fas fa-undo mr-2"></i> Reset
+                                                        </button>
                                                     </form>
                                                 </div>
                                             </div>
@@ -226,10 +229,22 @@
                                         <td class="text-center">{{ number_format($footer_data['total_stok_awal'], 0, ',', '.') }}</td>
                                         <td></td> <td></td>
                                         <td class="text-center">{{ number_format($footer_data['total_diolah'], 0, ',', '.') }}</td>
-                                      {{-- ✅ FOOTER MUTASI (SUM BERSIH MUTASI KELUAR) --}}
+                                        {{-- ✅ FOOTER MUTASI (LOGIKA NETTO: KELUAR + MASUK) --}}
                                         <td class="text-center">
-                                            @php $totalMutasiKeluar = $data_maturasi->where('mutasi', '>', 0)->sum('mutasi'); @endphp
-                                            {{ $totalMutasiKeluar > 0 ? '(' . number_format($totalMutasiKeluar, 0, ',', '.') . ')' : '0' }}
+                                            @php 
+                                                $nettoMutasi = $footer_data['total_mutasi']; 
+                                            @endphp
+
+                                            @if($nettoMutasi > 0.1)
+                                                {{-- Jika ada barang keluar dari sistem --}}
+                                                ({{ number_format($nettoMutasi, 0, ',', '.') }})
+                                            @elseif($nettoMutasi < -0.1)
+                                                {{-- Jika ada barang masuk ke sistem --}}
+                                                {{ number_format(abs($nettoMutasi), 0, ',', '.') }}
+                                            @else
+                                                {{-- Jika perpindahan antar bak murni --}}
+                                                0
+                                            @endif
                                         </td>
                                         <td class="text-center">{{ number_format($footer_data['total_masuk_hi'], 0, ',', '.') }}</td>
                                         <td colspan="3"></td>
@@ -318,7 +333,9 @@
 
                         <div class="col-md-6 mb-3">
                             <label class="font-weight-bold text-success">Mutasi (Kg)</label>
-                            <input type="number" name="mutasi" id="mutasi" class="form-control form-control-sm border-success" value="0" step="0.01" min="0">
+                            {{-- Ubah id menjadi editMutasi agar sinkron dengan JS --}}
+                            <input type="number" name="mutasi" class="form-control form-control-sm border-success" id="editMutasi" step="any" required>
+                            <small class="text-muted">Masukkan angka positif saja.</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -339,12 +356,7 @@
 
                         <div class="col-md-6 mb-3">
                             <label class="font-weight-bold">Asal Bokar</label>
-                            <select name="asal_bokar" id="asal_bokar" class="form-control form-control-sm">
-                                <option value="INHUT">INHUT</option>
-                                <option value="PT">PT</option>
-                                <option value="CMP">CMP</option>
-                                <option value="Petani" selected>Petani</option>
-                            </select>
+                            <input type="text" name="asal_bokar" id="asal_bokar" class="form-control form-control-sm bg-light font-weight-bold text-primary" readonly placeholder="Otomatis dari sistem...">
                         </div>
 
                         <div class="col-md-12 mb-3">
@@ -367,7 +379,6 @@
     </div>
 </div>
 
-{{-- MODAL EDIT --}}
 {{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEdit" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
@@ -410,9 +421,10 @@
 
                         <hr class="col-12 my-2">
 
-                        <div class="col-md-6 mb-3">
+                       <div class="col-md-6 mb-3">
                             <label class="font-weight-bold text-success">Mutasi (Kg)</label>
-                            <input type="number" name="mutasi" id="editMutasi" class="form-control form-control-sm border-success" step="0.01" min="0">
+                            <input type="number" name="mutasi" class="form-control form-control-sm border-success" id="editMutasi" step="any" required>
+                            <small class="text-muted">Masukkan angka positif saja.</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -584,60 +596,111 @@ $(document).ready(function() {
         }
     }
 
-   function fetchPreviousData() {
-    const selectedUraian = $('#uraian').val();
-    const selectedDate = $('#tanggal_input_tambah').val();
-    
-    if (selectedUraian && selectedDate) {
-        $.ajax({
-            url: "{{ route('maturasi.getPreviousData') }}", 
-            type: 'GET',
-            data: { 
-                uraian: selectedUraian, 
-                tanggal_filter: selectedDate 
-            },
-            dataType: 'json',
-            success: function(data) {
-                // 1. ISI DATA STOK BERJALAN
-                // 🔥 Ambil STOK AKHIR saat ini sebagai STOK AWAL di form
-                $('#stok_awal').val(formatNumber(data.stok_akhir, 2));
-                
-                // Set UMUR sesuai data lab
-                $('#umur').val(data.umur !== null ? data.umur : 0);
-                
-                // 🔥 Set MASUK HI ke 0 karena nilainya sudah masuk di stok_akhir di atas
-                $('#masuk_hi').val('0,00');
-                
-                // 2. UPDATE DROPDOWN ASAL BOKAR
-                let asal = data.asal_bokar;
-                if (asal && asal.includes('CMP')) {
-                    $('#asal_bokar').val('CMP');
-                } else if (asal && (asal === 'PT' || asal === 'INHUT' || asal === 'Petani')) {
-                    $('#asal_bokar').val(asal);
-                } else {
-                    $('#asal_bokar').val('Petani'); 
-                }
+    function fetchPreviousData() {
+        const selectedUraian = $('#uraian').val();
+        const selectedDate = $('#tanggal_input_tambah').val();
+        
+        if (selectedUraian && selectedDate) {
+            $.ajax({
+                url: "{{ route('maturasi.getPreviousData') }}", 
+                type: 'GET',
+                data: { 
+                    uraian: selectedUraian, 
+                    tanggal_filter: selectedDate 
+                },
+                dataType: 'json',
+                success: function(data) {
+                    // 1. CEK STOK KOSONG (Fitur SweetAlert Peringatan Mutasi)
+                    let currentStok = parseFloat(data.stok_akhir) || 0;
+                    
+                    if (currentStok <= 0) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Bak Kosong!',
+                            text: 'Bak ' + selectedUraian + ' saat ini tidak memiliki stok. Anda tidak bisa melakukan mutasi atau pengolahan dari bak ini.',
+                            confirmButtonColor: '#ffc107'
+                        });
+                        
+                        // Kunci input mutasi agar tidak bisa diisi
+                        $('#editMutasi').prop('readonly', true).val('');
+                    } else {
+                        // Buka kunci input jika stok ada
+                        $('#editMutasi').prop('readonly', false);
+                    }
 
-                // 3. HITUNG ULANG PREVIEW STOK AKHIR DI FORM
-                calculateStokAkhirDisplay();
-            },
-            error: function() {
-                // Reset form jika terjadi error
-                $('#stok_awal').val('0,00'); 
-                $('#umur').val(0); 
-                $('#masuk_hi').val('0,00');
-                $('#asal_bokar').val('Petani');
-                calculateStokAkhirDisplay();
-            }
-        });
+                    // 2. ISI DATA STOK BERJALAN
+                    $('#stok_awal').val(formatNumber(data.stok_akhir, 2));
+                    $('#umur').val(data.umur !== null ? data.umur : 0);
+                    $('#masuk_hi').val('0,00');
+                    
+                    // 3. UPDATE INPUT ASAL BOKAR (String Murni dari Server)
+                    // Langsung masukkan string dari controller (misal: "CMP (DS, PT)" atau "-")
+                    let asal = data.asal_bokar ? data.asal_bokar : '-';
+                    $('#asal_bokar').val(asal);
+
+                    // 4. HITUNG ULANG PREVIEW STOK AKHIR DI FORM
+                    calculateStokAkhirDisplay();
+                },
+                error: function() {
+                    $('#stok_awal').val('0,00'); 
+                    $('#umur').val(0); 
+                    $('#masuk_hi').val('0,00');
+                    $('#asal_bokar').val('-');
+                    $('#editMutasi').prop('readonly', false);
+                    calculateStokAkhirDisplay();
+                }
+            });
+        }
     }
-}
+
+    // =========================================================================
+    // 🔥 PENCEGAT MUTASI: CEK BAK TUJUAN HARUS KOSONG
+    // Berlaku untuk form Tambah (#tujuan_mutasi) dan Edit (#editTujuanMutasi)
+    // =========================================================================
+    $('#tujuan_mutasi, #editTujuanMutasi').on('change', function() {
+        let dropdown = $(this);
+        let selectedText = dropdown.find('option:selected').text();
+        
+        // Tentukan ambil tanggal dari form mana (Tambah atau Edit)
+        let isEdit = dropdown.attr('id') === 'editTujuanMutasi';
+        let dateVal = isEdit ? $('#editTanggalInput').val() : $('#tanggal_input_tambah').val();
+        
+        if (dropdown.val() !== "") { 
+            $.ajax({
+                url: "{{ route('maturasi.getPreviousData') }}",
+                type: 'GET',
+                data: { 
+                    uraian: selectedText, 
+                    tanggal_filter: dateVal 
+                },
+                dataType: 'json',
+                success: function(data) {
+                    let stokTujuan = parseFloat(data.stok_akhir) || 0;
+                    
+                    // Jika Bak Tujuan ternyata masih ada isinya
+                    if (stokTujuan > 0) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Bak Tujuan Tidak Kosong!',
+                            text: 'Bak ' + selectedText + ' masih berisi stok ' + formatNumber(stokTujuan) + ' Kg. Sesuai SOP, mutasi harus diarahkan ke bak yang kosong.',
+                            confirmButtonColor: '#d33'
+                        });
+                        
+                        // Reset pilihan bak tujuan kembali ke default (kosong)
+                        dropdown.val('');
+                    }
+                }
+            });
+        }
+    });
+
     $('#uraian').on('change', fetchPreviousData);
     $('#tanggal_input_tambah').on('change', function() { fetchPreviousData(); });
     $('#diolah, #mutasi').on('input keyup', calculateStokAkhirDisplay);
+
     $('#modalTambah').on('show.bs.modal', function () {
          $('#formTambah')[0].reset();
-         $('#asal_bokar').val('Petani');
+         $('#asal_bokar').val('-');
          $('#diolah, #mutasi').val('0');
          $('#masuk_hi').val('0,00');
          $('#stok_awal, #umur').val('');
@@ -662,7 +725,11 @@ $(document).on('click', '.btn-detail', function () {
             const formatTanggal = (tgl) => {
                 if (!tgl) return 'KOSONG';
                 const d = new Date(tgl);
-                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                const day = ('0' + d.getDate()).slice(-2);
+                const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+                const month = monthNames[d.getMonth()];
+                const year = d.getFullYear();
+                return `${day} ${month} ${year}`;
             };
 
             $('#detailUraian').text(uraian);
@@ -718,25 +785,18 @@ $(document).on('click', '.btn-detail', function () {
         type: 'GET',
         data: { filter_tanggal: filterTanggal },
         success: function(data) {
-            // 1. Isi data identitas dasar
-            $('#editTanggalInput').val(data.updated_at);
-            $('#editUraian').val(data.uraian);
-            
-            // 2. 🔥 Ambil Stok Akhir sebagai referensi "Stok Saat Ini"
-            $('#editStokAkhirDisplay').val(formatNumber(data.stok_akhir, 2));
-            $('#editUmur').val(data.umur || 0);
-            $('#editMasukHi').val(formatNumber(data.masuk_hi, 2));
-            
-            // 3. Nilai mutasi yang akan diedit
-            $('#editMutasi').val(parseFloat(data.mutasi || 0));
+        $('#editTanggalInput').val(data.updated_at);
+        $('#editUraian').val(data.uraian);
+        $('#editStokAkhirDisplay').val(formatNumber(data.stok_akhir, 2));
+        
+        // GUNAKAN ID #editMutasi
+        $('#editMutasi').val(Math.abs(parseFloat(data.mutasi || 0)));
 
-            // 4. 🔥 Set Bak Tujuan jika ada pasangan mutasi
-            // Catatan: Pastikan Controller mengirimkan 'id_tujuan' jika ada
-            if(data.tujuan_mutasi_id) {
-                $('#editTujuanMutasi').val(data.tujuan_mutasi_id);
-            } else {
-                $('#editTujuanMutasi').val('');
-            }
+        if(data.tujuan_mutasi_id) {
+            $('#editTujuanMutasi').val(data.tujuan_mutasi_id);
+        } else {
+            $('#editTujuanMutasi').val('');
+        }
 
             $('#editKeterangan').val(data.keterangan);
 

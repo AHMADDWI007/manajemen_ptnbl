@@ -68,7 +68,9 @@ class BahanProsesController extends Controller
             'grandTotalKeterangan'=> $grandTotalKeterangan,
             'detail_bokar'        => $stokAkhirBokar,
             'detail_maturasi'     => $stokAkhirMaturasi,
-            'detail_wip'          => $totals['saldo_akhir']
+            'detail_wip'          => $totals['saldo_akhir'],
+            // 🔥 TAMBAHKAN BARIS INI:
+            'masterUraian'        => $this->masterUraian
         ]);
     }
 
@@ -100,7 +102,12 @@ class BahanProsesController extends Controller
             $lastData = BahanProses::where('uraian', $uraian)
                 ->whereDate('tanggal', '<', $date)
                 ->orderBy('tanggal', 'desc')->first();
-            $saldoAwal = $lastData ? $lastData->saldo_akhir : 0;
+            // 🔥 PERBAIKAN: Jika H-1 tidak ada (Sistem baru digunakan), ambil saldo awal dari inputan manual
+            if ($lastData) {
+                $saldoAwal = $lastData->saldo_akhir;
+            } else {
+                $saldoAwal = $existingRow ? $existingRow->saldo_awal : 0;
+            }
 
             // C. WIP Masuk (Estafet)
             if ($index === 0) {
@@ -181,49 +188,81 @@ class BahanProsesController extends Controller
 
     public function store(Request $request)
     {
+        // Validasi array input
         $validator = Validator::make($request->all(), [
             'tanggal_input' => 'required|date',
-            'uraian'        => 'required|string',
-            // 🔥 PERUBAHAN: Wajib input WIP Keluar (Barang yang dipindah)
-            'wip_keluar'    => 'required|numeric|min:0', 
-            'rekfif'        => 'nullable|numeric',
-            'keterangan'    => 'nullable|string',
+            'wip_keluar'    => 'required|array',
+            'wip_keluar.*'  => 'nullable|numeric|min:0', // Boleh kosong, jika diisi harus angka
+            'rekfif'        => 'nullable|array',
+            'rekfif.*'      => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) return redirect()->back()->withErrors($validator);
 
-        // Simpan Inputan User
-        BahanProses::updateOrCreate(
-            ['tanggal' => $request->tanggal_input, 'uraian' => $request->uraian],
-            [
-                'wip_keluar' => $request->wip_keluar, // User yang menentukan ini
-                'rekfif'     => $request->rekfif ?? 0,
-                'keterangan' => $request->keterangan
-            ]
-        );
+        // Looping semua inputan uraian
+        foreach ($request->wip_keluar as $uraian => $nilaiWip) {
+            // Hanya proses jika user mengisi angkanya (tidak dikosongkan)
+            if ($nilaiWip !== null) {
+                BahanProses::updateOrCreate(
+                    ['tanggal' => $request->tanggal_input, 'uraian' => $uraian],
+                    [
+                        'wip_keluar' => round($nilaiWip), // Sekalian dipasang round()
+                        'rekfif'     => round($request->rekfif[$uraian] ?? 0),
+                        // Keterangan kita hapus dari form massal agar tidak memakan tempat,
+                        // atau bisa diisi default null dulu
+                    ]
+                );
+            }
+        }
 
         // Hitung ulang saldo akhir berdasarkan input baru
         $this->recalculateAndSaveFlow(Carbon::parse($request->tanggal_input));
 
-        return redirect()->back()->with('success', 'Data proses berhasil disimpan.');
+        return redirect()->back()->with('success', 'Data proses berhasil disimpan & diperbarui.');
     }
 
     public function destroy($id)
     {
-        // [PERBAIKAN PK] Cari berdasarkan id_bahan_proses
+        // Cari data berdasarkan ID
         $data = BahanProses::where('id_bahan_proses', $id)->firstOrFail();
         $date = Carbon::parse($data->tanggal);
 
-        // Reset rektif user jadi 0
+        // 🔥 PERBAIKAN: Kembalikan SEMUA inputan user ke 0
         $data->update([
-            'rekfif'     => 0,
+            'wip_keluar' => 0, // Reset barang yang diproses ke 0
+            'rekfif'     => 0, // Reset rektif ke 0
             'keterangan' => null
         ]);
 
-        // Hitung ulang
+        // Hitung ulang seluruh aliran pabrik di tanggal tersebut
         $this->recalculateAndSaveFlow($date);
         
-        return redirect()->back()->with('success', 'Data Rektifikasi di-reset ke default sistem.');
+        return redirect()->back()->with('success', 'Data proses berhasil di-reset ke 0.');
+    }
+
+    public function update(Request $request, $id)
+    {
+        $data = BahanProses::where('id_bahan_proses', $id)->firstOrFail();
+        
+        $saldoAwalBaru = round($request->saldo_awal);
+        $saldoAkhirTarget = round($request->saldo_akhir);
+
+        // 1. Set Saldo Awal Baru (Sangat berguna untuk inisialisasi hari pertama)
+        $data->saldo_awal = $saldoAwalBaru;
+
+        // 2. Sesuaikan Rektif agar Saldo Akhir pas dengan inputan user
+        // Rumus Asli: Saldo Akhir = Saldo Awal + Masuk + Rektif - Keluar
+        // Rumus Rektif: Rektif = Saldo Akhir - Saldo Awal - Masuk + Keluar
+        $rektif_baru = $saldoAkhirTarget - $saldoAwalBaru - $data->wip_masuk + $data->wip_keluar;
+        
+        $data->rekfif = $rektif_baru;
+        $data->keterangan = 'Setup Awal / Opname Manual';
+        $data->save();
+
+        // Hitung ulang alirannya agar nyambung ke proses di bawahnya
+        $this->recalculateAndSaveFlow(Carbon::parse($data->tanggal));
+
+        return redirect()->back()->with('success', 'Saldo Awal dan Akhir berhasil disesuaikan.');
     }
 
     // --- Helper Functions ---

@@ -173,14 +173,14 @@
         {{-- 2. KARTU STATISTIK (WARNA SINKRON) --}}
         <div class="row mb-4">
             
-            {{-- Stok Bokar (Hijau Tua) --}}
+            {{-- Stok Bokar Masuk (Hijau Tua) --}}
             <div class="col-xl-3 col-md-6 mb-3">
                 <div class="card stat-card border-left-primary h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="stat-label text-primary-custom mb-1">Stok Bokar</div>
-                                <div class="stat-value">150 <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                                <div class="stat-label text-primary-custom mb-1">Bokar Masuk (Bln Ini)</div>
+                                <div class="stat-value">{{ number_format($statBokar, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-cubes fa-2x text-gray-300"></i>
@@ -197,11 +197,8 @@
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="stat-label text-success-custom mb-1">Maturasi</div>
-                                <div class="stat-value">53 <small class="text-muted" style="font-size: 1rem">%</small></div>
-                                <div class="progress progress-sm mr-2 mt-2">
-                                    <div class="progress-bar" role="progressbar" style="width: 53%; background-color: #3BB143;" aria-valuenow="53" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
+                                <div class="stat-label text-success-custom mb-1">Stok Maturasi</div>
+                                <div class="stat-value">{{ number_format($statMaturasi, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-flask fa-2x text-gray-300"></i>
@@ -218,8 +215,8 @@
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="stat-label text-warning-custom mb-1">SIR 20 (Jadi)</div>
-                                <div class="stat-value">44 <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                                <div class="stat-label text-warning-custom mb-1">Gudang SIR 20</div>
+                                <div class="stat-value">{{ number_format($statGudang, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-box-open fa-2x text-gray-300"></i>
@@ -237,7 +234,7 @@
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="stat-label text-danger-custom mb-1">Total Karyawan</div>
-                                <div class="stat-value">65</div>
+                                <div class="stat-value">{{ $statKaryawan }} <small class="text-muted" style="font-size: 1rem">Orang</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-users fa-2x text-gray-300"></i>
@@ -322,14 +319,18 @@
     $(function () {
         var ctx = document.getElementById('productionChart').getContext('2d');
         
+        // Ambil data array dari PHP ke Javascript
+        var chartLabels = {!! json_encode($chartLabels) !!};
+        var dataBokar = {!! json_encode($chartBokar) !!};
+        var dataProduksi = {!! json_encode($chartProduksi) !!};
+
         var productionChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'],
+                labels: chartLabels, // <-- Menggunakan Array Hari
                 datasets: [{
                     label: 'Produksi SIR 20 (Kg)',
-                    data: [1200, 1900, 3000, 5000, 2300, 1800, 1000], 
-                    // Warna Emas/Kuning untuk Produk Jadi
+                    data: dataProduksi, // <-- Menggunakan Array Data Produksi
                     backgroundColor: 'rgba(255, 215, 0, 0.1)', 
                     borderColor: '#FFD700', 
                     pointBackgroundColor: '#FFD700',
@@ -341,8 +342,7 @@
                 },
                 {
                     label: 'Penerimaan Bokar (Kg)',
-                    data: [1500, 2100, 2800, 4800, 2500, 2000, 1200],
-                    // Warna Hijau Tua untuk Bahan Baku
+                    data: dataBokar, // <-- Menggunakan Array Data Bokar
                     backgroundColor: 'rgba(11, 102, 35, 0.05)',
                     borderColor: '#0B6623',
                     borderDash: [5, 5],

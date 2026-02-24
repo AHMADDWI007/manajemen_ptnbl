@@ -2,85 +2,157 @@
 
 namespace App\Http\Controllers\DataProduksi;
 
-use Carbon\Carbon;
-use App\Models\User;
-use App\Models\Pallet;
-use App\Models\Maturasi;
-use App\Models\RemahanSir20;
-use Illuminate\Http\Request;
-use App\Models\ProduksiSir20;
-use App\Models\BahanBakarSir20;
-use App\Models\PengolahanMaturasi;
-use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Models\AktualTemperatureSir20;
+use App\Models\BahanBakarSir20;
+use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\KondisiPallet;
+use App\Models\Lokasi;
+use App\Models\LokasiPallet;
+use App\Models\Maturasi;
+use App\Models\Mutu;
+use App\Models\Pallet;
+use App\Models\PengolahanMaturasi;
+use App\Models\ProduksiSir20;
+use App\Models\ProduksiSir;
+use App\Models\RemahanSir20;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProduksiSir20Controller extends Controller
 {
-    public function index()
+    // =========================================================================
+    // 🔥 HELPER BARU: TARIK STOK & UMUR KHUSUS UNTUK TANGGAL TERTENTU
+    // =========================================================================
+    private function getBakAktifUntukTanggal(Carbon $hari_ini)
     {
-        // 1. Ambil History Produksi
-        $history = ProduksiSir20::with(['remahan'])->orderBy('tanggal_produksi', 'desc')->get();
-        
-        // 2. Ambil Bak Maturasi Aktif
-        $bak_aktif = Maturasi::where('stok_akhir', '>', 0)
-                            ->orderBy('uraian', 'asc')
-                            ->get();
+        $bak_aktif_raw = Maturasi::orderBy('uraian', 'asc')->get();
+        $bak_aktif = collect(); 
 
-        $hari_ini = Carbon::today()->startOfDay();
+        foreach ($bak_aktif_raw as $bak) {
+            // 1. HITUNG STOK MURNI SIAP GILING (H-1)
+            $sums = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                ->whereDate('tgl_laporan', '<', $hari_ini->toDateString())
+                ->select(
+                    DB::raw('COALESCE(SUM(masuk_hi),0) as sum_masuk'),
+                    DB::raw('COALESCE(SUM(diolah),0) as sum_diolah'),
+                    DB::raw('COALESCE(SUM(mutasi),0) as sum_mutasi')
+                )->first();
 
-        // 3. Logika Hitung Umur Maturasi
-        foreach ($bak_aktif as $bak) {
-            $lastLog = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
-                ->where('masuk_hi', '>', 0)
-                ->whereDate('tgl_laporan', '<=', $hari_ini)
-                ->orderBy('tgl_laporan', 'desc')
-                ->first();
-
-            $tgl_acuan = null;
-
-            // Tentukan tanggal dasar perhitungan (dari log terakhir atau tanggal masuk awal)
-            if ($lastLog) {
-                $tgl_acuan = Carbon::parse($lastLog->tgl_laporan)->startOfDay();
-            } elseif (!empty($bak->tgl_masuk)) {
-                $tgl_acuan = Carbon::parse($bak->tgl_masuk)->startOfDay();
+            $stok_kemarin = ($sums->sum_masuk ?? 0) - ($sums->sum_diolah ?? 0) - ($sums->sum_mutasi ?? 0);
+            
+            if (!PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->exists()) {
+                $stok_kemarin = $bak->stok_awal;
             }
 
-            // 🔥 PERBAIKAN DISINI 🔥
-            if ($tgl_acuan) {
-                // A. Hitung Umur Real (Untuk Tampilan Teks di Dropdown PHP)
-                // Ini yang tadi KETINGGALAN, makanya umur awalnya ga muncul/0
-                $bak->umur_real = abs($tgl_acuan->diffInDays($hari_ini)); 
+            if ($stok_kemarin > 0.01) {
+                // 2. LOGIKA UMUR (SINKRON 100% DENGAN MATURASI)
+                $tgl_basis = null;
+                $logsBeforeToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                    ->whereDate('tgl_laporan', '<', $hari_ini->toDateString())
+                    ->orderBy('tgl_laporan', 'asc')->get();
+
+                $running_stock = 0;
+                foreach($logsBeforeToday as $log) {
+                    $logDate = Carbon::parse($log->tgl_laporan);
+                    $in_fresh = $log->masuk_hi;
+                    $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
+                    $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
+
+                    // 🔥 PERBAIKAN: Pokoknya setiap ada MASUK FRESH, umur untuk besok otomatis reset!
+                    if ($in_fresh > 0.01) {
+                        $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
+                            ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
+                        $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
+                    } 
+                    elseif ($running_stock <= 0.01 && $mutasi_in > 0.01) {
+                        $tgl_basis = $logDate;
+                    }
+
+                    $running_stock = $running_stock + $in_fresh + $mutasi_in - $out;
+                    if ($running_stock <= 0.01) $tgl_basis = null;
+                }
+
+                if (!$tgl_basis) {
+                    $historyDate = $this->getHistoryDateFromLog($bak->id_maturasi, $hari_ini);
+                    $tgl_basis = $historyDate ? $historyDate : (!empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at));
+                }
+
+                $tgl_basis = $tgl_basis->startOfDay();
                 
-                // B. Simpan Tanggal Acuan (Untuk Logika JavaScript Dinamis)
-                $bak->tgl_dasar_hitung = $tgl_acuan->format('Y-m-d'); 
-            } else {
-                $bak->umur_real = 0;
-                $bak->tgl_dasar_hitung = null;
+                // 3. SET DATA FINAL
+                $bak->umur = (int) $tgl_basis->diffInDays($hari_ini); 
+                $bak->stok_akhir = round($stok_kemarin, 2);
+                $bak_aktif->push($bak);
             }
         }
+        return $bak_aktif;
+    }
 
-        // 4. Ambil Nomor Terakhir & User
+    public function index(Request $request)
+    {
+        // 🔥 JIKA INI PANGGILAN AJAX DARI FORM UBAH TANGGAL, KEMBALIKAN JSON!
+        if ($request->has('ajax_date')) {
+            $hari_ini = Carbon::parse($request->ajax_date)->startOfDay();
+            return response()->json($this->getBakAktifUntukTanggal($hari_ini));
+        }
+
+        $filter_tgl = $request->input('filter_tanggal');
+        $hari_ini = $filter_tgl ? Carbon::parse($filter_tgl)->startOfDay() : Carbon::today()->startOfDay();
+
+        $history = ProduksiSir20::with(['remahan'])
+            ->when($filter_tgl, fn($q) => $q->whereDate('tanggal_produksi', $hari_ini))
+            ->orderBy('tanggal_produksi', 'desc')
+            ->get();
+            
+        $bak_aktif = $this->getBakAktifUntukTanggal($hari_ini);
+
         $lastProduction = ProduksiSir20::orderBy('id_produksi_sir20', 'desc')->first();
         $users = User::orderBy('fullname', 'asc')->get();
         $lastNomorAkhir = $lastProduction ? $lastProduction->total_nomor_akhir : 0;
         
-        // 5. Kirim ke View
-        return view('DataProduksi.produksi-sir20', compact('history', 'bak_aktif', 'lastNomorAkhir', 'users'));
+        return view('DataProduksi.produksi-sir20', [
+            'history' => $history, 'bak_aktif' => $bak_aktif, 'lastNomorAkhir' => $lastNomorAkhir, 'users' => $users, 'selected_date' => $hari_ini->format('Y-m-d')
+        ]);
     }
 
     public function show($id)
     {
-        // 🔥 [PERBAIKAN] find($id) otomatis cari di PK 'id_produksi_sir20'
-        $data = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])
-                ->findOrFail($id);
-
+        $data = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])->findOrFail($id);
+        // 🔥 PENTING: Saat Edit, load opsi bak KHUSUS untuk tanggal produksi data tersebut!
+        $tgl_produksi = Carbon::parse($data->tanggal_produksi)->startOfDay();
+        $data->opsi_maturasi = $this->getBakAktifUntukTanggal($tgl_produksi);
+        
         return response()->json($data);
     }
 
     // =========================================================================
-    // 🔥 STORE (SIMPAN BARU + TRIGGER STOK MATURASI)
+    // HELPER DARI MATURASI (DITAMBAHKAN AGAR UMUR SINKRON 100%)
     // =========================================================================
+    protected function getHistoryDateFromLog(int $id_maturasi, Carbon $reportDate)
+    {
+        $lastEntry = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+            ->whereDate('tgl_laporan', '<', $reportDate->toDateString())
+            ->where(function($q) {
+                $q->where('masuk_hi', '>', 0.01)->orWhere('mutasi', '<', -0.01); 
+            })->orderBy('tgl_laporan', 'desc')->first();
+
+        if ($lastEntry) {
+            if ($lastEntry->masuk_hi > 0.01) {
+                $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $id_maturasi)
+                    ->whereDate('tanggal', '<=', $lastEntry->tgl_laporan)->orderBy('tanggal', 'desc')->first();
+                return $lab ? Carbon::parse($lab->tanggal) : Carbon::parse($lastEntry->tgl_laporan);
+            }
+            return Carbon::parse($lastEntry->tgl_laporan);
+        }
+
+        $logLab = HasilUjiLabBokarDiolah::where('id_maturasi', $id_maturasi)
+            ->whereDate('tanggal', '<', $reportDate->toDateString())->orderBy('tanggal', 'desc')->first();
+        return $logLab ? Carbon::parse($logLab->tanggal) : null;
+    }
+
     // =========================================================================
     // 🔥 STORE FINAL (SIMPAN DATA PABRIK + GENERATE PALLET GUDANG)
     // =========================================================================
@@ -98,25 +170,21 @@ class ProduksiSir20Controller extends Controller
             $produksi = ProduksiSir20::create([
                 'tanggal_produksi'      => $request->tanggal_produksi,
                 'shift_kerja'           => $request->shift_kerja,
-                
                 'jam_start_dryer'       => $request->jam_start_dryer,
                 'jumlah_trolly_masuk'   => $this->cleanNumber($request->trolly_masuk),
                 'jumlah_trolly_keluar'  => $this->cleanNumber($request->trolly_keluar),
                 'jam_stop_dryer'        => $request->jam_stop_dryer,
                 'jumlah_jam_dryer'      => $this->cleanNumber($request->jam_jalan_dryer),
-
                 'jumlah_bales_dipress'  => $this->cleanNumber($request->jumlah_bales),
                 'kg_yang_dipress'       => $this->cleanNumber($request->kg_press),
                 'capacity_per_jam'      => $this->cleanNumber($request->input('capacity_per_jam', 0)),
                 'jam_kerja'             => $this->cleanNumber($request->jam_kerja),
                 'produktivitas'         => $this->cleanNumber($request->input('produktivitas', 0)),
-
                 'kg_cake'               => $this->cleanNumber($request->kg_sir20),
                 'bales_terkontaminasi'  => $this->cleanNumber($request->bales_kontamin),
                 'berat_kontaminan'      => $this->cleanNumber($request->berat_kontaminan),
                 'jam_operasional_genset'=> $this->cleanNumber($request->jam_genset),
                 'pemakaian_listrik_pln' => $this->cleanNumber($request->pln_kwh),
-
                 'jumlah_pallet'         => $this->cleanNumber($request->jml_pallet),
                 'total_nomor'           => $this->cleanNumber($request->total_nomor),
                 'mc_val'                => $this->cleanNumber($request->mc_val),
@@ -139,7 +207,6 @@ class ProduksiSir20Controller extends Controller
                             'umur'              => $this->cleanNumber($item['umur']),
                         ]);
 
-                        // Update Stok Maturasi
                         $this->triggerUpdateMaturasi($item['ruang'], $request->tanggal_produksi, $beratBersih, 'tambah');
                     }
                 }
@@ -182,13 +249,14 @@ class ProduksiSir20Controller extends Controller
             }
 
             // -----------------------------------------------------------------
-            // 🔥 PANGGIL HELPER GENERATE PALLET 🔥
-            // Bagian ini yang membuat data otomatis masuk ke Gudang SIR & Mutu Prima
+            // 🔥 PERBAIKAN: PANGGIL HELPER DENGAN PARAMETER NOMOR START & END 🔥
             // -----------------------------------------------------------------
             $this->generatePalletsOtomatis(
                 $request->tanggal_produksi, 
                 $this->cleanNumber($request->kg_press), 
-                $this->cleanNumber($request->jml_pallet)
+                $this->cleanNumber($request->jml_pallet),
+                $request->nomor_start,
+                $request->nomor_end
             );
 
             DB::commit();
@@ -201,67 +269,50 @@ class ProduksiSir20Controller extends Controller
     }
 
     // =========================================================================
-    // 🔥 HELPER BARU: GENERATE PALLET OTOMATIS KE GUDANG 🔥
+    // 🔥 HELPER BARU: GENERATE PALLET SESUAI NOMOR START & END INPUTAN OPERATOR 🔥
     // =========================================================================
-    private function generatePalletsOtomatis($tanggal, $totalKg, $totalPallet)
+    private function generatePalletsOtomatis($tanggal, $totalKg, $totalPallet, $nomorStart, $nomorEnd)
     {
-        // Validasi sederhana agar tidak error bagi 0
         if ($totalPallet <= 0) return;
 
-        // 1. Buat atau Update Header Laporan Harian (Table: produksi_sir)
-        // Ini menggabungkan semua shift pada tanggal tersebut menjadi satu rekap harian
-        $header = \App\Models\ProduksiSir::firstOrCreate(
+        // 1. Buat atau Update Header Laporan Harian
+        $header = ProduksiSir::firstOrCreate(
             ['tanggal_produksi' => $tanggal],
             ['kg' => 0, 'pallet' => 0, 'keterangan' => 'Generate Otomatis dari Laporan Pabrik']
         );
 
-        // Update akumulasi header (Menambah nilai yang baru diinput)
         $header->increment('kg', $totalKg);
         $header->increment('pallet', $totalPallet);
 
         // 2. Ambil Default Lokasi & Mutu
-        // Pastikan nama ini SAMA PERSIS dengan di database (tabel lokasi & mutu)
-        $lokasiAwal = \App\Models\Lokasi::where('nama', 'Di Gudang SIR')->first(); 
-        
-        // Fallback jika belum di-seed (safety)
-        if (!$lokasiAwal) {
-            $lokasiAwal = \App\Models\Lokasi::create(['nama' => 'Di Gudang SIR']);
-        }
+        $lokasiAwal = Lokasi::firstOrCreate(['nama' => 'Di Gudang SIR']);
+        $mutuPrima  = Mutu::firstOrCreate(['uraian' => 'Mutu Prima (siap jual)']);
 
-        $mutuPrima = \App\Models\Mutu::where('uraian', 'LIKE', '%Prima%')->first();
-        if (!$mutuPrima) {
-            $mutuPrima = \App\Models\Mutu::create(['uraian' => 'Mutu Prima (siap jual)']);
-        }
-
-        // 3. Hitung Berat Rata-rata per Pallet (Untuk data awal)
+        // 3. Hitung Berat Rata-rata per Pallet
         $kgPerPallet = $totalKg / $totalPallet;
+        
+        // Ambil 2 digit tahun (Contoh: "26" dari 2026)
+        $tahunSingkat = Carbon::parse($tanggal)->format('y'); 
 
-        // 4. Generate Nomor Pallet Unik
-        // Format: YYYYMMDD-XXXX (Misal: 20260205-0001)
-        // Cek dulu sudah ada berapa pallet hari ini di DB Tracking untuk melanjutkan urutan
-        $existingCount = Pallet::whereDate('tanggal_produksi', $tanggal)->count();
+        // 4. 🔥 LOOPING DARI NOMOR START SAMPAI NOMOR END! 🔥
+        for ($i = $nomorStart; $i <= $nomorEnd; $i++) {
+            // Hasil: PLT-26-0001
+            $noPalletFix = 'PLT-' . $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
-        for ($i = 1; $i <= $totalPallet; $i++) {
-            $sequence = $existingCount + $i;
-            $noPallet = Carbon::parse($tanggal)->format('Ymd') . '-' . str_pad($sequence, 4, '0', STR_PAD_LEFT);
-
-            // A. Create Data Pallet (Identitas Fisik)
             $pallet = Pallet::create([
-                'id_produksi_sir' => $header->id_produksi_sir,
-                'no_pallet'       => $noPallet,
-                'berat'           => $kgPerPallet,
-                'tanggal_produksi'=> $tanggal,
+                'id_produksi_sir'  => $header->id_produksi_sir,
+                'no_pallet'        => $noPalletFix,
+                'berat'            => $kgPerPallet,
+                'tanggal_produksi' => $tanggal,
             ]);
 
-            // B. Set Lokasi Awal (Otomatis Masuk Gudang SIR)
-            \App\Models\LokasiPallet::create([
+            LokasiPallet::create([
                 'id_lokasi' => $lokasiAwal->id_lokasi,
                 'id_pallet' => $pallet->id_pallet,
                 'tanggal'   => $tanggal
             ]);
 
-            // C. Set Mutu Awal (Otomatis Mutu Prima)
-            \App\Models\KondisiPallet::create([
+            KondisiPallet::create([
                 'id_mutu'   => $mutuPrima->id_mutu,
                 'id_pallet' => $pallet->id_pallet,
                 'tanggal'   => $tanggal
@@ -269,8 +320,8 @@ class ProduksiSir20Controller extends Controller
         }
     }
 
-    // =========================================================================
-    // 🔥 UPDATE (EDIT DATA + SINKRONISASI STOK MATURASI)
+   // =========================================================================
+    // 🔥 UPDATE (EDIT DATA + SINKRONISASI STOK MATURASI + REGENERATE PALLET)
     // =========================================================================
     public function update(Request $request, $id)
     {
@@ -283,9 +334,15 @@ class ProduksiSir20Controller extends Controller
 
         try {
             $produksi = ProduksiSir20::findOrFail($id);
-            $oldDate = $produksi->tanggal_produksi; // Simpan tanggal lama utk revert
+            
+            // 🔥 1. AMBIL DATA LAMA SEBELUM DI-UPDATE 🔥
+            $oldDate      = $produksi->tanggal_produksi; 
+            $oldKgPress   = $produksi->kg_yang_dipress;
+            $oldJmlPallet = $produksi->jumlah_pallet;
+            $oldStart     = $produksi->nomor_start;
+            $oldEnd       = $produksi->nomor_end;
 
-            // 1. Update Header
+            // 2. Update Header Laporan Pabrik
             $produksi->update([
                 'tanggal_produksi'      => $request->tanggal_produksi,
                 'shift_kerja'           => $request->shift_kerja,
@@ -310,40 +367,32 @@ class ProduksiSir20Controller extends Controller
                 'nomor_start'           => $request->nomor_start,
                 'nomor_end'             => $request->nomor_end,
                 'total_nomor_akhir'     => $this->cleanNumber($request->total_nomor_akhir),
-                // 🔥 TAMBAHAN: Simpan Petugas 🔥
                 'petugas'               => $request->petugas,
             ]);
 
-            // 2. Update Remahan & 🔥 TRIGGER MATURASI (Revert & Add)
-            
-            // A. REVERT STOK LAMA (Kembalikan stok seolah produksi lama batal)
+            // 3. Update Remahan & TRIGGER MATURASI (Revert & Add)
             $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
             foreach($oldRemahan as $old) {
-                // 'kurang' = Kurangi nilai 'Diolah' di log Maturasi -> Stok Maturasi bertambah kembali
                 $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
             }
             RemahanSir20::where('id_produksi_sir20', $id)->delete();
 
-            // B. INSERT DATA BARU & POTONG STOK
             if ($request->has('maturasi')) {
                 foreach ($request->maturasi as $item) {
                     if (!empty($item['ruang']) || !empty($item['berat'])) {
                         $beratBersih = $this->cleanNumber($item['berat']);
-                        
                         RemahanSir20::create([
                             'id_produksi_sir20' => $id, 
                             'ruang_maturasi'    => $item['ruang'],
                             'berat'             => $beratBersih,
                             'umur'              => $this->cleanNumber($item['umur']),
                         ]);
-
-                        // 'tambah' = Tambah nilai 'Diolah' -> Stok Maturasi berkurang
                         $this->triggerUpdateMaturasi($item['ruang'], $request->tanggal_produksi, $beratBersih, 'tambah');
                     }
                 }
             }
 
-            // 3. Update Lainnya (Temp & BB) - Hapus & Insert Ulang
+            // 4. Update Lainnya (Temp & BB)
             AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
             $tempData = [
                 ['jenis' => 'Burner 1',   'start' => $request->temp_b1_start, 'end' => $request->temp_b1_end],
@@ -378,8 +427,47 @@ class ProduksiSir20Controller extends Controller
                 }
             }
 
+            // =========================================================================
+            // 🔥 5. SINKRONISASI GUDANG (REGENERATE PALLET JIKA ADA PERUBAHAN FISIK) 🔥
+            // =========================================================================
+            
+            $newDate      = $produksi->tanggal_produksi;
+            $newKgPress   = $produksi->kg_yang_dipress;
+            $newJmlPallet = $produksi->jumlah_pallet;
+            $newStart     = $produksi->nomor_start;
+            $newEnd       = $produksi->nomor_end;
+
+            // 🔥 RADAR: Format Nomor PLT-YY-XXXX
+            $tahunLama = Carbon::parse($oldDate)->format('y');
+            $prefixLama  = 'PLT-' . $tahunLama . '-';
+            $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
+            $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
+            $palletFisikAda = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->exists();
+
+            if (!$palletFisikAda || $oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || $oldStart != $newStart || $oldEnd != $newEnd) {
+
+                // A. Kurangi Rekap Header
+                $oldHeader = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
+                if ($oldHeader) {
+                    $oldHeader->decrement('kg', $oldKgPress);
+                    $oldHeader->decrement('pallet', $oldJmlPallet);
+                    if ($oldHeader->pallet <= 0) $oldHeader->delete();
+                }
+
+                // B. Hapus Fisik Pallet LAMA
+                $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->get();
+                foreach($palletsLama as $pLama) {
+                    LokasiPallet::where('id_pallet', $pLama->id_pallet)->delete();
+                    KondisiPallet::where('id_pallet', $pLama->id_pallet)->delete();
+                    $pLama->delete();
+                }
+
+                // C. Generate Ulang Pallet BARU
+                $this->generatePalletsOtomatis($newDate, $newKgPress, $newJmlPallet, $newStart, $newEnd);
+            }
+
             DB::commit();
-            return redirect()->back()->with('success', 'Data Produksi Diperbarui & Stok Maturasi Disesuaikan!');
+            return redirect()->back()->with('success', 'Data Produksi Diperbarui & Gudang Tersinkronisasi!');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -390,32 +478,63 @@ class ProduksiSir20Controller extends Controller
     // =========================================================================
     // 🔥 DELETE (HAPUS DATA + KEMBALIKAN STOK MATURASI)
     // =========================================================================
-    // public function destroy($id)
-    // {
-    //     DB::beginTransaction();
-    //     try {
-    //         $produksi = ProduksiSir20::findOrFail($id);
-    //         $oldDate = $produksi->tanggal_produksi;
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+        try {
+            $produksi = ProduksiSir20::findOrFail($id);
+            $oldDate  = $produksi->tanggal_produksi;
 
-    //         // Kembalikan Stok Maturasi (Revert)
-    //         $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
-    //         foreach($oldRemahan as $old) {
-    //             $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
-    //         }
+            // 1. Kembalikan Stok Maturasi (Revert)
+            $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
+            foreach ($oldRemahan as $old) {
+                // Aksi 'kurang' akan menambah stok master dan mengurangi kolom diolah di log
+                $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
+            }
 
-    //         // Hapus Data (Cascade delete di DB biasanya handle child, tapi manual lebih aman)
-    //         RemahanSir20::where('id_produksi_sir20', $id)->delete();
-    //         AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
-    //         BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
-    //         $produksi->delete();
+            // 2. 🔥 BERSIHKAN DATA GUDANG (PALLET) 🔥
+            // Kita cari Pallet berdasarkan range nomor yang ada di data produksi ini
+            $tahunPallet = Carbon::parse($oldDate)->format('y');
+            $prefix      = 'PLT-' . $tahunPallet . '-';
+            $noStart     = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
+            $noEnd       = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
 
-    //         DB::commit();
-    //         return redirect()->back()->with('success', 'Data Dihapus & Stok Maturasi Dikembalikan!');
-    //     } catch (\Exception $e) {
-    //         DB::rollBack();
-    //         return redirect()->back()->with('error', 'Gagal Hapus: ' . $e->getMessage());
-    //     }
-    // }
+            // Cari Header Produksi Gudang (ProduksiSir) untuk sinkronisasi rekap
+            $headerGudang = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
+            if ($headerGudang) {
+                $headerGudang->decrement('kg', $produksi->kg_yang_dipress);
+                $headerGudang->decrement('pallet', $produksi->jumlah_pallet);
+                // Jika setelah dikurangi jadi 0, hapus headernya
+                if ($headerGudang->pallet <= 0) $headerGudang->delete();
+            }
+
+            // Ambil pallet fisik untuk dihapus riwayatnya
+            $pallets = Pallet::whereBetween('no_pallet', [$noStart, $noEnd])
+                        ->where('tanggal_produksi', $oldDate)
+                        ->get();
+
+            foreach ($pallets as $p) {
+                // Hapus riwayat lokasi dan kondisi sebelum hapus palletnya
+                LokasiPallet::where('id_pallet', $p->id_pallet)->delete();
+                KondisiPallet::where('id_pallet', $p->id_pallet)->delete();
+                $p->delete();
+            }
+
+            // 3. Hapus Data Detail Produksi Pabrik
+            RemahanSir20::where('id_produksi_sir20', $id)->delete();
+            AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
+            BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
+            
+            // 4. Hapus Header Produksi Pabrik
+            $produksi->delete();
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Produksi Dibatalkan: Stok kembali ke Maturasi & Pallet dihapus dari Gudang!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal Membatalkan Produksi: ' . $e->getMessage());
+        }
+    }
 
     // =========================================================================
     // HELPER FUNCTIONS
@@ -444,38 +563,122 @@ class ProduksiSir20Controller extends Controller
     private function triggerUpdateMaturasi($namaRuang, $tanggal, $berat, $aksi)
     {
         if ($berat <= 0) return;
-
-        // 1. Cari ID Maturasi berdasarkan Nama Ruang
         $maturasi = Maturasi::where('uraian', $namaRuang)->first();
         
         if ($maturasi) {
-            // 2. Cari Log Harian / Buat Baru (PengolahanMaturasi)
             $log = PengolahanMaturasi::firstOrCreate(
                 ['id_maturasi' => $maturasi->id_maturasi, 'tgl_laporan' => $tanggal],
                 ['masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0, 'keterangan' => 'Auto Produksi']
             );
 
-            // 3. Update Kolom 'Diolah' pada Log & 'Stok Akhir' pada Master
             if ($aksi === 'tambah') {
-                // Produksi Baru: Diolah bertambah, Stok Master berkurang
                 $log->increment('diolah', $berat);
                 $maturasi->decrement('stok_akhir', $berat); 
             } else {
-                // Edit/Hapus (Revert): Diolah berkurang (dikembalikan), Stok Master bertambah
-                if ($log->diolah >= $berat) {
-                    $log->decrement('diolah', $berat);
-                } else {
-                    $log->update(['diolah' => 0]); // Cegah minus di log
-                }
+                $log->decrement('diolah', min($log->diolah, $berat));
                 $maturasi->increment('stok_akhir', $berat); 
             }
-            
-            // 4. Update status master jika stok habis/ada
+
+            // 🔥 RESET TOTAL HANYA JIKA BAK KOSONG
             if ($maturasi->stok_akhir <= 0.01) {
-                $maturasi->update(['stok_akhir' => 0, 'keterangan' => 'KOSONG', 'asal_bokar' => null]);
-            } else {
-                $maturasi->touch(); // Update timestamp updated_at
+                $maturasi->update([
+                    'stok_akhir' => 0, 
+                    'keterangan' => 'KOSONG', 
+                    'asal_bokar' => null,
+                    'tgl_masuk'  => null
+                ]);
+            } 
+            else {
+                // Update string identitas (Bisa berubah jadi CMP jika ada Masuk HI baru)
+                $newIdentitas = $this->getDetailedAsalBokarString($maturasi, $maturasi->stok_akhir, $maturasi->stok_akhir, Carbon::parse($tanggal));
+                $maturasi->update(['asal_bokar' => $newIdentitas]);
+                
+                // 🔥 JANGAN reset tgl_masuk ke hari ini di sini agar umur Batch Lama tidak hilang
             }
+        }
+    }
+
+    // =========================================================================
+    // HELPER: HITUNG SALDO AWAL (SEBELUM TANGGAL TERTENTU)
+    // =========================================================================
+    protected function getNetBeforeDate(int $id_maturasi, Carbon $date): float
+    {
+        $sums = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+            ->whereDate('tgl_laporan', '<', $date->toDateString())
+            ->select(
+                DB::raw('COALESCE(SUM(masuk_hi),0) as sum_masuk'),
+                DB::raw('COALESCE(SUM(diolah),0) as sum_diolah'),
+                DB::raw('COALESCE(SUM(mutasi),0) as sum_mutasi')
+            )->first();
+
+        if (!$sums) return 0;
+        
+        $net = ($sums->sum_masuk - $sums->sum_diolah - $sums->sum_mutasi);
+        return (float) $net;
+    }
+
+    private function getDetailedAsalBokarString($maturasi, float $stokAkhir, float $stokAwal, Carbon $filterDate)
+    {
+        // Jika Stok Awal KOSONG DAN Stok Akhir KOSONG, baru return '-'
+        if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
+
+        try {
+            $realBatchStartDate = $filterDate->copy();
+            
+            // Ambil log mundur
+            $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tgl_laporan', '<=', $filterDate)
+                ->orderBy('tgl_laporan', 'desc')
+                ->get();
+
+            $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
+            $hasKeluar = false; // 🔥 Penanda apakah sudah ada barang yang digiling
+
+            foreach ($logs as $log) {
+                $realBatchStartDate = Carbon::parse($log->tgl_laporan);
+                
+                $masuk  = $log->masuk_hi;
+                $keluar = $log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0); 
+                $mutasiMasuk = ($log->mutasi < 0) ? abs($log->mutasi) : 0;
+                
+                $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
+
+                // Tandai jika kita menemukan aktivitas KELUAR (Diolah/Mutasi Keluar)
+                // Ini berarti barang lama sudah mulai dikuras
+                if ($keluar > 0.01) {
+                    $hasKeluar = true;
+                }
+
+                // 🔥 LOGIKA RESET MUTLAK (TERBARU)
+                // Jika kita mundur dan menemukan hari dimana ada MASUK BARU,
+                // DAN sejak hari itu (atau pada hari itu) sudah ada KELUAR (Diolah),
+                // Maka SISA STOK LAMA DIABAIKAN! Sistem berhenti melacak masa lalu.
+                if (($masuk + $mutasiMasuk) > 0.01 && $hasKeluar) {
+                    break; 
+                }
+
+                // Reset pelacakan jika stok benar-benar habis
+                if ($prevStock <= 0.01) break;
+                
+                $currentTracingStock = $prevStock;
+            }
+
+            // Cari Jenis di Lab Bokar berdasarkan Range Tanggal yang ditemukan
+            $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tanggal', '>=', $realBatchStartDate)
+                ->whereDate('tanggal', '<=', $filterDate)
+                ->pluck('jenis')
+                ->map(function($v) { return strtoupper(trim($v)); })
+                ->unique()->filter()->sort()->values()->toArray();
+
+            if (!empty($jenisList)) {
+                return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
+            }
+
+            return $maturasi->asal_bokar ?? '-';
+
+        } catch (\Exception $e) {
+            return $maturasi->asal_bokar ?? '-';
         }
     }
 }

@@ -1,19 +1,20 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\MaturasiApiController;
-use App\Http\Controllers\Api\GudangSirApiController;
 use App\Http\Controllers\Api\BahanProsesApiController;
-use App\Http\Controllers\Api\PenjualanSirApiController;
-use App\Http\Controllers\Api\TimbangBokarApiController;
-use App\Http\Controllers\Api\HasilUjiSir20ApiController;
-use App\Http\Controllers\Api\HasilUjiTroliApiController;
-use App\Http\Controllers\Api\ProduksiSir20ApiController;
+use App\Http\Controllers\Api\GudangSirApiController;
+use App\Http\Controllers\Api\HasilUjiBokarOlahApiController;
 use App\Http\Controllers\Api\HasilUjiLabBokarApiController;
 use App\Http\Controllers\Api\HasilUjiMaturasiApiController;
-use App\Http\Controllers\Api\HasilUjiBokarOlahApiController;
+use App\Http\Controllers\Api\HasilUjiSir20ApiController;
+use App\Http\Controllers\Api\HasilUjiTroliApiController;
+use App\Http\Controllers\Api\LaporanApiController;
+use App\Http\Controllers\Api\MaturasiApiController;
+use App\Http\Controllers\Api\PenjualanSirApiController;
+use App\Http\Controllers\Api\ProduksiSir20ApiController;
+use App\Http\Controllers\Api\TimbangBokarApiController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -130,22 +131,32 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ✅ PERBAIKAN: Tambahkan rute STORE untuk Olah Harian
     Route::post('/pengolahan-maturasi/store', [MaturasiApiController::class, 'store']);
+    // 🔥 TAMBAHKAN 2 RUTE INI UNTUK EDIT MUTASI
+    Route::get('/pengolahan-maturasi/{id}/edit', [MaturasiApiController::class, 'edit']);
+    Route::put('/pengolahan-maturasi/{id}', [MaturasiApiController::class, 'update']);
     // ✅ AKHIR PERBAIKAN
 
     // ✅ PERBAIKAN: Rute BAHAN DALAM PROSES (WIP)
     Route::get('/bahan-proses', [BahanProsesApiController::class, 'index']);
     Route::post('/bahan-proses', [BahanProsesApiController::class, 'store']);
+    // 🔥 TAMBAHAN WAJIB AGAR EDIT BERJALAN:
+    Route::put('/bahan-proses/{id}', [BahanProsesApiController::class, 'update']);
     // ✅ AKHIR PERBAIKAN
 
     // [GUDANG SIR]
     Route::get('gudang-sir', [GudangSirApiController::class, 'index']);
     Route::post('gudang-sir', [GudangSirApiController::class, 'store']);
+    // 🔥 TAMBAHKAN 3 ROUTE INI 🔥
+    Route::get('gudang-sir/pallets', [GudangSirApiController::class, 'getPalletsByLocation']);
+    Route::post('gudang-sir/pindah-lokasi', [GudangSirApiController::class, 'pindahLokasi']);
+    Route::post('gudang-sir/update-mutu', [GudangSirApiController::class, 'updateStatusMutu']);
 
     // [PENJUALAN SIR]
     Route::get('penjualan-sir20/available-stock', [PenjualanSirApiController::class, 'getAvailableStock']);
     Route::get('penjualan-sir20', [PenjualanSirApiController::class, 'index']);
     Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);
     Route::get('penjualan-sir20/cek-gudang', [PenjualanSirApiController::class, 'getPengirimanGudang']);
+    Route::delete('penjualan-sir20/{id}', [PenjualanSirApiController::class, 'destroy']);
 
     // ==========================================
     // [PRODUKSI SIR 20] - MODUL BARU
@@ -165,5 +176,16 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // 5. Tambahan: Ambil Nomor Batch Terakhir (Untuk Auto Number di Android)
     Route::get('/produksi-sir20/last-number', [ProduksiSir20ApiController::class, 'getLastNumber']);
+
+    // Route untuk mengambil daftar maturasi aktif di form input mobile
+    Route::get('/produksi-sir20/maturasi-aktif', [ProduksiSir20ApiController::class, 'getActiveMaturasi']);
+
+    // Route API untuk Cetak PDF Laporan
+    
 });
 // ✅ AKHIR GROUP MIDDLEWARE
+
+    // ==========================================
+    // 🔥 ROUTE LAPORAN HARIAN (ANDROID)
+    // ==========================================
+    Route::get('laporan-harian', [LaporanApiController::class, 'index']);

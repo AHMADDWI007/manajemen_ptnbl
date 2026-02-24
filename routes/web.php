@@ -1,36 +1,37 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiBokarController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiBokarDiolahController;
+use App\Http\Controllers\DataLaboratorium\HasilUjiMaturasiController;
 
 // ==============================================================================
 //  IMPORT CONTROLLERS
 // ==============================================================================
 
 // --- UTAMA ---
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\LoginController;
-use App\Http\Controllers\PengaturanController;
-use App\Http\Controllers\LaporanController;
-
-// --- DATA PENGOLAHAN ---
-use App\Http\Controllers\DataPengolahan\MaturasiController;
-use App\Http\Controllers\DataPengolahan\BahanProsesController;
-use App\Http\Controllers\DataPengolahan\PengolahanBasahController;
-
-// --- DATA LABORATORIUM ---
-use App\Http\Controllers\DataLaboratorium\HasilUjiBokarController;
 use App\Http\Controllers\DataLaboratorium\HasilUjiSir20Controller;
 use App\Http\Controllers\DataLaboratorium\HasilUjiTroliController;
-use App\Http\Controllers\DataLaboratorium\HasilUjiMaturasiController;
-use App\Http\Controllers\DataLaboratorium\HasilUjiBokarDiolahController;
+use App\Http\Controllers\DataPengolahan\BahanProsesController;
+use App\Http\Controllers\DataPengolahan\MaturasiController;
+
+// --- DATA PENGOLAHAN ---
+use App\Http\Controllers\DataPengolahan\PengolahanBasahController;
+use App\Http\Controllers\DataProduksi\DataProduksiSir20Controller; // Gudang & Mutu
+use App\Http\Controllers\DataProduksi\PenjualanSir20Controller;    // Penjualan
+
+// --- DATA LABORATORIUM ---
+use App\Http\Controllers\DataProduksi\ProduksiSir20Controller;     // Proses Produksi
+use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\PengaturanController;
+use App\Http\Controllers\UserController;
 
 // --- DATA PRODUKSI ---
-use App\Http\Controllers\DataProduksi\PenjualanSir20Controller;    // Penjualan
-use App\Http\Controllers\DataProduksi\DataProduksiSir20Controller; // Gudang & Mutu
-use App\Http\Controllers\DataProduksi\ProduksiSir20Controller;     // Proses Produksi
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 
 /*
@@ -60,9 +61,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::middleware(['auth'])->group(function () {
 
     // --- DASHBOARD ---
-    Route::get('/beranda', function () {
-        return view('HalamanDepan.beranda');
-    })->name('beranda');
+    Route::get('/beranda', [BerandaController::class, 'index'])->name('beranda');
 
     // --- USER MANAGEMENT ---
     Route::resource('users', UserController::class);
@@ -140,8 +139,10 @@ Route::middleware(['auth'])->group(function () {
     // 📊 LAPORAN HARIAN (PUSAT DATA)
     // ====================================================
     Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
-    Route::get('/laporan/preview-cetak', [LaporanController::class, 'previewCetak'])->name('laporan.previewCetak');
+    // Route untuk Export Harian 
     Route::get('/laporan/export-excel', [LaporanController::class, 'exportExcel'])->name('laporan.exportExcel');
+    // Route untuk Export Bulanan
+    Route::get('/laporan/export-bulanan', [LaporanController::class, 'exportExcelBulanan'])->name('laporan.exportBulanan');
 
 
     // ====================================================
@@ -169,3 +170,5 @@ Route::middleware(['auth'])->group(function () {
     })->name('bokar.sync.manual');
 
 });
+
+    Route::get('/laporan/preview-cetak', [LaporanController::class, 'previewCetak'])->name('laporan.previewCetak');

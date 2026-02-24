@@ -22,7 +22,7 @@ return new class extends Migration
         // Insert data awal (Seeder langsung di sini biar praktis)
         DB::table('pengaturan')->insert([
             'kunci' => 'url_api_bokar',
-            'nilai' => 'https://bokar.ptnb.co.id/get_bokar.php',
+            'nilai' => 'https://test.ideclouds.com/api/get_bokar.php',
             'deskripsi' => 'Endpoint API untuk sinkronisasi data Bokar',
             'created_at' => now(),
             'updated_at' => now(),

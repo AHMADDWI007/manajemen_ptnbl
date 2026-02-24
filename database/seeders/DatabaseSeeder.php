@@ -32,6 +32,9 @@ class DatabaseSeeder extends Seeder
 
             // 6. Data Awal Sistem SIR (Lokasi, Mutu, Saldo Awal)
             DataAwalSirSeeder::class,
+
+            // 7. Pengolahan Basah (Saldo Awal Bokar)
+            PengolahanBasahSeeder::class,
         ]);
     }
 }

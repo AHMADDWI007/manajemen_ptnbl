@@ -5,7 +5,6 @@ namespace App\Http\Controllers\DataProduksi;
 use Carbon\Carbon;
 use App\Models\Mutu;
 use App\Models\Pallet;
-use App\Models\ProduksiSir; 
 use Illuminate\Http\Request;
 use App\Models\KondisiPallet;
 use App\Models\PenjualanSir20;
@@ -191,16 +190,33 @@ class PenjualanSir20Controller extends Controller
         }
     }
 
+    // =========================================================================
+    // 🔥 FUNGSI RECALCULATE (Sinkronisasi Tabel V) 🔥
+    // =========================================================================
     public function recalculateAndSave($tgl, $uraian, $hari_ini, $keterangan = null)
     {
         $tglCarbon = Carbon::parse($tgl);
-        $lastMonthDate = $tglCarbon->copy()->subMonth()->endOfMonth();
-        $dataBulanLalu = PenjualanSir20::where('uraian', $uraian)->whereDate('tanggal', $lastMonthDate)->where('is_summary', 1)->first();
-        $sd_bulan_lalu = $dataBulanLalu ? $dataBulanLalu->total_sd_hari_ini : 0;
-        $yesterday = $tglCarbon->copy()->subDay();
-        $dataKemarin = PenjualanSir20::where('uraian', $uraian)->whereDate('tanggal', $yesterday)->where('is_summary', 1)->first();
-        $bln_ini_lalu = ($tglCarbon->day == 1) ? 0 : ($dataKemarin ? ($dataKemarin->bln_ini_lalu + $dataKemarin->hari_ini) : 0);
         
+        // 1. Ambil Total s/d Bulan Lalu (Dari hari terakhir bulan sebelumnya)
+        $lastMonthDate = $tglCarbon->copy()->subMonth()->endOfMonth();
+        $dataBulanLalu = PenjualanSir20::where('uraian', $uraian)
+            ->whereDate('tanggal', $lastMonthDate)
+            ->where('is_summary', 1)
+            ->first();
+        
+        $sd_bulan_lalu = $dataBulanLalu ? $dataBulanLalu->total_sd_hari_ini : 0;
+
+        // 2. 🔥 PERBAIKAN: Hitung Ulang Total Penjualan Bulan Ini secara Murni!
+        // Alih-alih bergantung pada H-1 yang rawan putus saat dihapus,
+        // Kita jumlahkan langsung SEMUA invoice (is_summary = 0) dari tgl 1 sampai sebelum HARI INI.
+        $startOfMonth = $tglCarbon->copy()->startOfMonth();
+        
+        $bln_ini_lalu = PenjualanSir20::where('uraian', $uraian)
+            ->where('is_summary', 0)
+            ->whereBetween('tanggal', [$startOfMonth->format('Y-m-d'), $tglCarbon->copy()->subDay()->format('Y-m-d')])
+            ->sum('hari_ini');
+
+        // 3. Simpan atau Update Baris Summary (Tabel V) HARI INI
         PenjualanSir20::updateOrCreate(
             ['tanggal' => $tglCarbon->format('Y-m-d'), 'uraian' => $uraian, 'is_summary' => 1],
             [
@@ -209,14 +225,80 @@ class PenjualanSir20Controller extends Controller
                 'hari_ini'          => $hari_ini,
                 'total_bln_ini'     => $bln_ini_lalu + $hari_ini,
                 'total_sd_hari_ini' => $sd_bulan_lalu + ($bln_ini_lalu + $hari_ini),
+                'keterangan'        => $keterangan ?? '-'
             ]
         );
     }
 
+    // =========================================================================
+    // 🔥 FUNGSI UPDATE (Hanya untuk mengedit Info Administratif) 🔥
+    // =========================================================================
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'no_kontrak' => 'required',
+            'no_invoice' => 'required',
+            'harga'      => 'required|numeric',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $penjualan = PenjualanSir20::findOrFail($id);
+            
+            // Kita hanya update info administratifnya saja
+            $penjualan->update([
+                'no_kontrak' => $request->no_kontrak,
+                'no_invoice' => $request->no_invoice,
+                'harga'      => $request->harga,
+            ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Data Penjualan berhasil diperbarui!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal update data: ' . $e->getMessage());
+        }
+    }
+
+    // =========================================================================
+    // 🔥 FUNGSI HAPUS (Membatalkan Penjualan & Mengembalikan Stok Pallet) 🔥
+    // =========================================================================
     public function destroy($id)
     {
-        $data = PenjualanSir20::find($id);
-        if ($data) { $data->delete(); return back()->with('success', 'Data berhasil dihapus.'); }
-        return back();
+        DB::beginTransaction();
+        try {
+            $data = PenjualanSir20::findOrFail($id);
+            
+            $palletsToRestore = explode(',', $data->no_palet_list);
+            
+            // 1. Kembalikan status pallet di gudang menjadi 'Belum Terjual'
+            if (!empty($palletsToRestore) && $data->no_palet_list != null) {
+                Pallet::whereIn('no_pallet', $palletsToRestore)->update([
+                    'tanggal_penjualan' => null
+                ]);
+            }
+
+            // 2. Simpan info untuk di-recalculate sebelum data dihapus
+            $tgl = $data->tanggal;
+            $uraian = $data->uraian;
+            
+            // 3. Hapus data penjualan (invoice) tersebut
+            $data->delete();
+
+            // 4. 🔥 PERBAIKAN: Hitung ulang sisa penjualan murni HARI INI
+            $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
+                ->where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->sum('hari_ini');
+            
+            // Panggil fungsi sinkronisasi
+            $this->recalculateAndSave($tgl, $uraian, $totalKgHariIni);
+
+            DB::commit();
+            return back()->with('success', 'Penjualan dibatalkan! Pallet telah dikembalikan ke stok gudang.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+        }
     }
 }

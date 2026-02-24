@@ -5,11 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\HasilUjiLabTroli;
+use Carbon\Carbon;
 
 class HasilUjiTroliApiController extends Controller
 {
-    public function index() {
-        return response()->json(['success' => true, 'data' => HasilUjiLabTroli::latest('tanggal')->get()]);
+    // 🔥 PERBAIKAN: Menangkap Request dan mem-filter berdasarkan tanggal
+    public function index(Request $request) {
+        $query = HasilUjiLabTroli::query();
+
+        if ($request->has('date')) {
+            $date = Carbon::parse($request->query('date'))->format('Y-m-d');
+            $query->whereDate('tanggal', $date);
+        }
+
+        $data = $query->orderBy('tanggal', 'desc')->get();
+
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     public function store(Request $request) {
@@ -31,13 +42,13 @@ class HasilUjiTroliApiController extends Controller
         }
     }
 
-    // 🔥 TAMBAHAN: SHOW (Detail)
+    // 🔥 SHOW (Detail)
     public function show($id) {
         $data = HasilUjiLabTroli::where('id_hasil_uji_lab_troli', $id)->firstOrFail();
         return response()->json(['success' => true, 'data' => $data]);
     }
 
-    // 🔥 TAMBAHAN: UPDATE
+    // 🔥 UPDATE
     public function update(Request $request, $id) {
         $data = HasilUjiLabTroli::where('id_hasil_uji_lab_troli', $id)->firstOrFail();
 
@@ -55,7 +66,7 @@ class HasilUjiTroliApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Diperbarui']);
     }
 
-    // 🔥 TAMBAHAN: DESTROY (Hapus)
+    // 🔥 DESTROY (Hapus)
     public function destroy($id) {
         $data = HasilUjiLabTroli::where('id_hasil_uji_lab_troli', $id)->firstOrFail();
         $data->delete();

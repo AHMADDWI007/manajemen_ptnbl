@@ -6,7 +6,13 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; vertical-align: middle; padding: 6px 12px; }
-        .header-white th { text-align: center; font-weight: bold; background-color: #ffffff; color: #343a40; }
+        .header-white th { 
+            text-align: center !important; 
+            vertical-align: middle !important; /* 🔥 TAMBAHAN RATA TENGAH */
+            font-weight: bold; 
+            background-color: #f8f9fa; /* Ubah ke abu-abu terang */
+            color: #343a40; 
+        }
         .header-green th { text-align: center; font-weight: bold; background-color: #28a745; color: white; }
         .bg-highlight { background-color: #d4edda; color: #155724; } 
         .card-header { font-weight: bold; }
@@ -69,24 +75,26 @@
 
                 {{-- 1. TABEL RINGKASAN (TABEL V) --}}
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success d-flex align-items-center">
-                        <h3 class="card-title font-weight-bold text-white mb-0 judul-tabel">V. TELAH DIJUAL (KG SIR-20) - RINGKASAN</h3>
-                        <form action="{{ route('penjualan-sir20.index') }}" method="GET" class="form-inline ml-auto">
-                            <label for="filter_tanggal" class="mr-2 text-white font-weight-normal">Tanggal:</label>
+                    {{-- HEADER KARTU (Terpisah) --}}
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <strong class="my-auto">V. TELAH DIJUAL (KG SIR-20) - RINGKASAN</strong>
+                        <form action="{{ route('penjualan-sir20.index') }}" method="GET" class="form-inline ml-auto mb-0">
+                            <label for="filter_tanggal" class="mr-2 text-white font-weight-normal mb-0">Tanggal:</label>
                             <input type="date" name="filter_tanggal" id="filter_tanggal" 
-                                   class="form-control form-control-sm mr-2" 
+                                   class="form-control form-control-sm" 
                                    value="{{ $selected_date }}" 
                                    onchange="this.form.submit()" 
                                    style="max-width: 160px;">
                         </form>
                     </div>
 
-                    <div class="card-body p-0">
+                    {{-- CARD BODY (Tanpa class p-0 agar ada padding) --}}
+                    <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped mb-0 text-center">
+                            <table class="table table-bordered table-striped table-hover mb-0 text-center">
                                 <thead class="header-white">
                                     <tr>
-                                        <th rowspan="2" width="5%">V.</th>
+                                        {{-- 🔥 KOLOM ROMAWI 'V.' DIHAPUS AGAR SINKRON DENGAN YANG LAIN --}}
                                         <th rowspan="2" width="5%">No</th>
                                         <th rowspan="2">Telah Dijual (KG SIR-20)</th>
                                         <th rowspan="2" width="12%">s/d<br>{{ $headerBulanLalu }}</th>
@@ -103,27 +111,29 @@
                                 <tbody>
                                     @foreach ($tabelSummary as $item)
                                         <tr>
-                                            <td></td>
                                             <td class="font-weight-bold">{{ $item->no }}</td>
                                             <td class="text-left font-weight-bold">{{ $item->uraian }}</td>
+                                            {{-- 🔥 HAPUS KOMA DESIMAL (Ubah ke format 0) --}}
                                             <td>{{ number_format($item->sd_bulan_lalu, 0, ',', '.') }}</td>
                                             <td class="bg-highlight">{{ number_format($item->bln_ini_lalu, 0, ',', '.') }}</td>
-                                            <td class="font-weight-bold">{{ number_format($item->hari_ini, 0, ',', '.') }}</td>
+                                            <td class="font-weight-bold text-success">{{ number_format($item->hari_ini, 0, ',', '.') }}</td>
                                             <td class="font-weight-bold">{{ number_format($item->total_bln_ini, 0, ',', '.') }}</td>
                                             <td class="font-weight-bold">{{ number_format($item->total_sd_hari_ini, 0, ',', '.') }}</td>
                                             <td>{{ $item->keterangan }}</td>
                                         </tr>
                                     @endforeach
+                                </tbody>
+                                <tfoot>
                                     <tr class="row-jumlah">
-                                        <td colspan="3" class="text-uppercase">Total Ringkasan</td>
+                                        <td colspan="2" class="text-uppercase text-center">Total Ringkasan</td>
                                         <td>{{ number_format($tabelSummary->sum('sd_bulan_lalu'), 0, ',', '.') }}</td>
-                                        <td>{{ number_format($tabelSummary->sum('bln_ini_lalu'), 0, ',', '.') }}</td>
-                                        <td>{{ number_format($tabelSummary->sum('hari_ini'), 0, ',', '.') }}</td>
+                                        <td class="bg-highlight">{{ number_format($tabelSummary->sum('bln_ini_lalu'), 0, ',', '.') }}</td>
+                                        <td class="text-success">{{ number_format($tabelSummary->sum('hari_ini'), 0, ',', '.') }}</td>
                                         <td>{{ number_format($tabelSummary->sum('total_bln_ini'), 0, ',', '.') }}</td>
                                         <td>{{ number_format($tabelSummary->sum('total_sd_hari_ini'), 0, ',', '.') }}</td>
                                         <td>-</td>
                                     </tr>
-                                </tbody>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -131,13 +141,15 @@
 
                 {{-- 2. TABEL RIWAYAT PENJUALAN --}}
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success d-flex align-items-center">
-                        <h3 class="card-title font-weight-bold mb-0 judul-tabel">Riwayat Penjualan Per Kontrak</h3>
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <strong class="my-auto">RIWAYAT PENJUALAN PER KONTRAK</strong>
                     </div>
-                    <div class="card-body p-0">
+                    
+                    {{-- CARD BODY --}}
+                    <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped mb-0 text-center">
-                                <thead class="header-white bg-light">
+                            <table class="table table-bordered table-striped table-hover mb-0 text-center">
+                                <thead class="header-white">
                                     <tr>
                                         <th width="5%">No.</th>
                                         <th width="15%">Tgl Penjualan</th>
@@ -149,24 +161,51 @@
                                 <tbody>
                                     @forelse($riwayatKontrak as $index => $kontrak)
                                     <tr>
-                                        <td>{{ $index + 1 }}</td>
+                                        <td class="font-weight-bold">{{ $index + 1 }}</td>
                                         <td>{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}</td>
-                                        <td>{{ $kontrak->no_kontrak }}</td>
-                                        <td class="font-weight-bold text-success">{{ number_format($kontrak->hari_ini, 2, ',', '.') }} Kg</td>
+                                        <td class="text-primary font-weight-bold">{{ $kontrak->no_kontrak }}</td>
+                                        {{-- 🔥 HAPUS KOMA DESIMAL --}}
+                                        <td class="font-weight-bold text-success">{{ number_format($kontrak->hari_ini, 0, ',', '.') }} Kg</td>
                                         <td>
-                                            <div class="btn-group">
-                                                <button type="button" class="btn btn-info btn-xs btn-detail" 
-                                                    data-no_kontrak="{{ $kontrak->no_kontrak }}" data-no_invoice="{{ $kontrak->no_invoice }}"
-                                                    data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}" data-uraian="{{ $kontrak->uraian }}"
-                                                    data-pallet="{{ $kontrak->pallet }}" data-hari_ini="{{ number_format($kontrak->hari_ini, 2, ',', '.') }}"
+                                            <div class="d-flex justify-content-center align-items-center" style="gap: 5px;">
+    
+                                                {{-- 1. TOMBOL DETAIL --}}
+                                                <button type="button" class="btn btn-info btn-xs btn-detail" title="Lihat Detail"
+                                                    data-no_kontrak="{{ $kontrak->no_kontrak }}" 
+                                                    data-no_invoice="{{ $kontrak->no_invoice }}"
+                                                    data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}" 
+                                                    data-uraian="{{ $kontrak->uraian }}"
+                                                    data-pallet="{{ $kontrak->pallet }}" 
+                                                    data-hari_ini="{{ number_format($kontrak->hari_ini, 0, ',', '.') }}"
                                                     data-no_palet_list="{{ $kontrak->no_palet_list }}"
-                                                    data-harga="{{ number_format($kontrak->harga, 0, ',', '.') }}" data-keterangan="{{ $kontrak->keterangan }}">
+                                                    data-harga="{{ number_format($kontrak->harga, 0, ',', '.') }}" 
+                                                    data-keterangan="{{ $kontrak->keterangan }}">
                                                     <i class="fas fa-eye"></i> Detail
                                                 </button>
-                                                <form action="{{ route('penjualan-sir20.destroy', $kontrak->id_penjualan_sir20) }}" method="POST" onsubmit="return confirm('Hapus riwayat kontrak ini?');" style="display:inline;">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger btn-xs ml-1"><i class="fas fa-trash"></i></button>
+
+                                                {{-- 2. TOMBOL EDIT --}}
+                                                <button type="button" class="btn btn-warning btn-xs btn-edit text-white" title="Edit Administrasi"
+                                                    data-id_penjualan="{{ $kontrak->id_penjualan_sir20 }}"
+                                                    data-no_kontrak="{{ $kontrak->no_kontrak }}" 
+                                                    data-no_invoice="{{ $kontrak->no_invoice }}"
+                                                    data-harga_raw="{{ $kontrak->harga }}"
+                                                    data-uraian="{{ $kontrak->uraian }}"
+                                                    data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}"
+                                                    data-pallet="{{ $kontrak->pallet }}"
+                                                    data-hari_ini="{{ number_format($kontrak->hari_ini, 0, ',', '.') }}"
+                                                    data-no_palet_list="{{ $kontrak->no_palet_list }}">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+
+                                                {{-- 3. TOMBOL HAPUS --}}
+                                                <form action="{{ route('penjualan-sir20.destroy', $kontrak->id_penjualan_sir20) }}" method="POST" class="m-0 p-0 form-hapus">
+                                                    @csrf 
+                                                    @method('DELETE')
+                                                    <button type="button" class="btn btn-danger btn-xs btn-hapus" title="Hapus Data">
+                                                        <i class="fas fa-trash"></i> Hapus
+                                                    </button>
                                                 </form>
+
                                             </div>
                                         </td>
                                     </tr>
@@ -317,6 +356,77 @@
     </div>
 </div>
 
+{{-- 3. MODAL EDIT PENJUALAN ADMINISTRATIF --}}
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-warning">
+            <form action="#" method="POST" id="formEdit">
+                @csrf
+                @method('PUT')
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title font-weight-bold">Edit Data Penjualan</h5>
+                    <button type="button" class="close text-dark" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    
+                    <div class="alert alert-info small pb-2 pt-2 mb-3">
+                        <i class="fas fa-info-circle"></i> Info: Hanya nomor kontrak, invoice, dan harga yang dapat diubah. Jika salah pilih pallet, silakan hapus data ini.
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold">Jenis SIR</label>
+                        <select name="uraian" id="edit_uraian" class="form-control" readonly style="pointer-events: none; background-color: #e9ecef;">
+                            <option value="SIR20 PTNBL">SIR20 PTNBL</option>
+                            <option value="SIR20 PTPN4">SIR20 PTPN4</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6"><label>No. Kontrak</label><input type="text" name="no_kontrak" id="edit_no_kontrak" class="form-control" required></div>
+                        <div class="col-6"><label>No. Invoice</label><input type="text" name="no_invoice" id="edit_no_invoice" class="form-control" required></div>
+                    </div>
+
+                    <div class="form-group mt-3 mb-3">
+                        <label>Tanggal Penjualan</label>
+                        <input type="date" name="tanggal" id="edit_tanggal" class="form-control" readonly style="pointer-events: none; background-color: #e9ecef;">
+                    </div>
+
+                    <hr>
+
+                    {{-- FITUR PILIH PALET (READ ONLY MODE) --}}
+                    <div class="form-group mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="font-weight-bold mb-0 text-secondary"><i class="fas fa-box"></i> Pallet yang Terjual</label>
+                        </div>
+                        <div id="editPalletGrid" class="pallet-grid bg-light" style="pointer-events: none; opacity: 0.8;">
+                            </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6">
+                            <label>Jumlah Pallet</label>
+                            <input type="number" name="pallet" id="edit_pallet_count" class="form-control bg-light font-weight-bold text-secondary" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label>Total Berat (Kg)</label>
+                            <input type="text" name="hari_ini" id="edit_total_kg" class="form-control bg-light font-weight-bold text-secondary" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3 mb-0">
+                        <label>Harga Penjualan (Rp/Kg)</label>
+                        <input type="number" name="harga" id="edit_harga" class="form-control border-warning" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning font-weight-bold shadow-sm">Update Penjualan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
     @include('template.script')
 
   <script>
@@ -420,6 +530,83 @@
 
             // Menampilkan Modal Detail
             $('#modalDetail').modal('show');
+        });
+
+        // ==========================================
+        // 3. LOGIKA TOMBOL EDIT (SAMAKAN UI DGN TAMBAH)
+        // ==========================================
+        $('.btn-edit').click(function() {
+            var id = $(this).data('id_penjualan'); 
+            
+            var no_kontrak = $(this).data('no_kontrak');
+            var no_invoice = $(this).data('no_invoice');
+            var harga      = $(this).data('harga_raw'); 
+            var uraian     = $(this).data('uraian');
+            
+            // Format YYYY-MM-DD untuk input date
+            var rawTgl     = $(this).data('tanggal'); // Format asalnya d-m-Y
+            var parts      = rawTgl.split('-');
+            var tglFix     = parts[2] + '-' + parts[1] + '-' + parts[0];
+
+            var countPallet = $(this).data('pallet');
+            var totalKg     = $(this).data('hari_ini');
+            var listPallet  = $(this).data('no_palet_list');
+
+            // Set Action URL
+            var urlUpdate = "{{ url('penjualan-sir20') }}/" + id;
+            $('#formEdit').attr('action', urlUpdate);
+
+            // Isi Form Dasar
+            $('#edit_no_kontrak').val(no_kontrak);
+            $('#edit_no_invoice').val(no_invoice);
+            $('#edit_harga').val(harga);
+            $('#edit_uraian').val(uraian);
+            $('#edit_tanggal').val(tglFix);
+
+            $('#edit_pallet_count').val(countPallet);
+            $('#edit_total_kg').val(totalKg);
+
+            // Render Grid Pallet Terpilih
+            var grid = $('#editPalletGrid');
+            grid.empty();
+            
+            if(listPallet) {
+                var arrPallets = listPallet.toString().split(',');
+                $.each(arrPallets, function(i, val) {
+                    grid.append(`
+                        <label class="pallet-item selected" style="cursor: not-allowed;">
+                            <input type="checkbox" checked disabled>
+                            <span>#${val.trim()}</span>
+                        </label>
+                    `);
+                });
+            } else {
+                grid.html('<span class="text-muted small">Tidak ada data pallet tersimpan.</span>');
+            }
+
+            // Tampilkan Modal Edit
+            $('#modalEdit').modal('show');
+        });
+
+        // ==========================================
+        // 4. LOGIKA TOMBOL HAPUS (SWEETALERT)
+        // ==========================================
+        $('.btn-hapus').click(function() {
+            var form = $(this).closest('.form-hapus');
+            Swal.fire({
+                title: 'Batalkan Penjualan?',
+                text: "Data penjualan akan dihapus dan stok pallet akan dikembalikan ke Gudang!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
         });
 
         // Notifikasi SweetAlert

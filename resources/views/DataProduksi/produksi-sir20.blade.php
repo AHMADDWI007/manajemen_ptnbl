@@ -70,8 +70,8 @@
         <div class="content">
             <div class="container-fluid">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold">
-                        Riwayat Produksi
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <strong class="my-auto">Riwayat Produksi</strong>
                     </div>
                     <div class="card-body">
                         
@@ -136,14 +136,25 @@
                                         <td>{{ $item->petugas ?? '-' }}</td>
 
                                         <td>
-                                            <div class="action-buttons">
+                                            <div class="action-buttons d-flex" style="gap: 5px;">
+                                                {{-- Tombol Detail --}}
                                                 <button class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_produksi_sir20 }}" title="Lihat Detail">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                {{-- 🔥 TOMBOL EDIT --}}
+
+                                                {{-- Tombol Edit --}}
                                                 <button class="btn btn-warning btn-sm btn-edit text-white" data-id="{{ $item->id_produksi_sir20 }}" title="Edit Data">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
+
+                                                {{-- 🔥 TOMBOL HAPUS/BATAL --}}
+                                                <form action="{{ route('produksi-sir20.destroy', $item->id_produksi_sir20) }}" method="POST" class="delete-form" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan produksi ini? Stok akan dikembalikan ke Maturasi dan Pallet akan dihapus.')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger btn-sm" title="Hapus/Batalkan Produksi">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -865,82 +876,88 @@
         $('#reset-filter').on('click', function(e){ e.preventDefault(); fpMin.clear(); fpMax.clear(); table.draw(); });
 
         // ==========================================
-        // 🔥 2. LOGIKA INPUT LAPORAN (UMUR & BERAT)
+        // 🔥 2. LOGIKA SENSOR TANGGAL & UMUR (AJAX)
         // ==========================================
-
-        // Data Dropdown (Disiapkan dari Server)
-        // Pastikan Controller sudah mengirim 'tgl_dasar_hitung'
-        var optionsMaturasi = '<option value="">- Pilih Ruang -</option>';
-        @foreach($bak_aktif as $bak)
-            optionsMaturasi += `<option value="{{ $bak->uraian }}" 
-                                    data-berat="{{ (float)$bak->stok_akhir }}" 
-                                    data-tgl-masuk="{{ $bak->tgl_dasar_hitung }}">
-                                    {{ $bak->uraian }} (Stok: {{ number_format($bak->stok_akhir, 0, ",", ".") }})
-                                </option>`;
-        @endforeach
-
-        // 🔥 FUNGSI HITUNG UMUR DINAMIS (DIPERBAIKI)
-        function hitungUmurRow(row) {
-            // 1. Ambil Tanggal Produksi
-            var tglProduksiStr = $('input[name="tanggal_produksi"]').val(); 
-            
-            // 2. Ambil Tanggal Masuk dari Option terpilih
-            var tglMasukStr = row.find('.select-ruang option:selected').data('tgl-masuk');
-
-            // Debugging: Cek di Console Browser (F12) jika masih 0
-            // console.log("Prod:", tglProduksiStr, "Masuk:", tglMasukStr);
-
-            if (tglProduksiStr && tglMasukStr) {
-                // Konversi ke Date Object (Set jam ke 00:00:00 untuk akurasi hari)
-                var tglProd = new Date(tglProduksiStr);
-                tglProd.setHours(0,0,0,0);
-
-                var tglMasuk = new Date(tglMasukStr);
-                tglMasuk.setHours(0,0,0,0);
-
-                // Hitung selisih waktu (milidetik)
-                var diffTime = tglProd - tglMasuk;
-                
-                // Konversi ke Hari
-                var diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                // Jika tanggal produksi SEBELUM tanggal masuk, umur 0 (tidak valid minus)
-                if (diffDays < 0) diffDays = 0;
-
-                row.find('.input-umur').val(diffDays);
-            } else {
-                // Jika salah satu tanggal tidak ada, set 0
-                row.find('.input-umur').val(0);
-            }
+        
+        // Fungsi pembangun opsi dropdown
+        function buildOptions(dataArray) {
+            let html = '<option value="">- Pilih Ruang -</option>';
+            dataArray.forEach(function(bak) {
+                html += `<option value="${bak.uraian}" data-berat="${bak.stok_akhir}" data-umur="${bak.umur}">
+                            ${bak.uraian} (Stok: ${new Intl.NumberFormat('id-ID').format(bak.stok_akhir)} Kg)
+                        </option>`;
+            });
+            return html;
         }
 
-        // Event Listener: Saat Ruang Dipilih
-        $(document).on('change', '.select-ruang', function() {
+        // Init pertama kali dari server (Saat render awal)
+        var optionsMaturasi = buildOptions(@json($bak_aktif));
+
+        // 🔥 SENSOR 1: Saat Tanggal Input Baru Diganti
+        $('input[name="tanggal_produksi"]').on('change', function() {
+            var selectedDate = $(this).val();
+            if(selectedDate) {
+                $.ajax({
+                    url: window.location.pathname + '?ajax_date=' + selectedDate,
+                    type: 'GET',
+                    success: function(data) {
+                        optionsMaturasi = buildOptions(data);
+                        // Refresh semua dropdown di modal tambah
+                        $('.select-ruang').each(function() {
+                            var currentVal = $(this).val();
+                            $(this).html(optionsMaturasi);
+                            $(this).val(currentVal);
+                            $(this).trigger('change');
+                        });
+                    }
+                });
+            }
+        });
+
+        // 🔥 SENSOR 2: Saat Tanggal Edit Diganti
+        $('#edit_tanggal_produksi').on('change', function() {
+            var selectedDate = $(this).val();
+            if(selectedDate) {
+                $.ajax({
+                    url: window.location.pathname + '?ajax_date=' + selectedDate,
+                    type: 'GET',
+                    success: function(data) {
+                        var newEditOptions = buildOptions(data);
+                        // Refresh semua dropdown di modal edit
+                        $('.select-ruang-edit').each(function() {
+                            var currentVal = $(this).val();
+                            $(this).html(newEditOptions);
+                            $(this).val(currentVal);
+                            $(this).trigger('change');
+                        });
+                    }
+                });
+            }
+        });
+
+        // Event Listener: Saat Ruang Dipilih (Murni Mengambil Data Server)
+        $(document).on('change', '.select-ruang, .select-ruang-edit', function() {
             var selectedOption = $(this).find(':selected');
             var row = $(this).closest('tr');
 
             if(selectedOption.val() !== "") {
-                // Isi Berat
                 var beratRaw = selectedOption.data('berat');
                 var beratBersih = parseFloat(String(beratRaw).replace(',', '.'));
-                row.find('.input-berat').val(beratBersih);
                 
-                // 🔥 Hitung Umur
-                hitungUmurRow(row);
+                var inputBerat = row.find('.input-berat').length > 0 ? row.find('.input-berat') : row.find('.input-berat-edit');
+                var inputUmur = row.find('.input-umur').length > 0 ? row.find('.input-umur') : row.find('.input-umur-edit');
                 
+                inputBerat.val(beratBersih);
+                inputUmur.val(selectedOption.data('umur') || 0); // Ambil mutlak dari server
                 calculateTotals();
             } else {
-                row.find('.input-berat').val(''); 
-                row.find('.input-umur').val(''); 
+                var inputBerat = row.find('.input-berat').length > 0 ? row.find('.input-berat') : row.find('.input-berat-edit');
+                var inputUmur = row.find('.input-umur').length > 0 ? row.find('.input-umur') : row.find('.input-umur-edit');
+                
+                inputBerat.val(''); 
+                inputUmur.val(''); 
                 calculateTotals();
             }
-        });
-
-        // Event Listener: Saat Tanggal Produksi Berubah (Hitung Ulang Semua Baris)
-        $('input[name="tanggal_produksi"]').on('change', function() {
-            $('#maturasiContainer tr').each(function() {
-                hitungUmurRow($(this));
-            });
         });
 
         // Event Listener: Tambah Baris Maturasi
@@ -1168,12 +1185,13 @@
                     $('#edit_shift_kerja').val(data.shift_kerja);
 
                     // Isi Tabel Maturasi Edit
+                    var editOptions = buildOptions(data.opsi_maturasi); // 🔥 Pakai data khusus tgl edit
                     var htmlMaturasi = '';
                     maturasiEditIndex = 0;
                     if (data.remahan && data.remahan.length > 0) {
                         $.each(data.remahan, function(i, val) {
                             htmlMaturasi += `<tr>
-                                <td><select name="maturasi[${maturasiEditIndex}][ruang]" class="form-control form-control-sm select-ruang-edit" required>${optionsMaturasi}</select></td>
+                                <td><select name="maturasi[${maturasiEditIndex}][ruang]" class="form-control form-control-sm select-ruang-edit" required>${editOptions}</select></td>
                                 <td><input type="number" name="maturasi[${maturasiEditIndex}][berat]" class="form-control form-control-sm input-berat-edit" step="0.01" value="${val.berat}"></td>
                                 <td><input type="number" name="maturasi[${maturasiEditIndex}][umur]" class="form-control form-control-sm input-umur-edit" readonly value="${val.umur}"></td>
                                 <td><button type="button" class="btn btn-danger btn-xs btn-remove-maturasi"><i class="fas fa-trash"></i></button></td>
@@ -1181,7 +1199,7 @@
                             maturasiEditIndex++;
                         });
                     } else {
-                        htmlMaturasi += `<tr><td><select name="maturasi[0][ruang]" class="form-control form-control-sm select-ruang-edit" required>${optionsMaturasi}</select></td><td><input type="number" name="maturasi[0][berat]" class="form-control form-control-sm input-berat-edit" step="0.01"></td><td><input type="number" name="maturasi[0][umur]" class="form-control form-control-sm input-umur-edit" readonly></td><td><button type="button" class="btn btn-danger btn-xs btn-remove-maturasi"><i class="fas fa-trash"></i></button></td></tr>`;
+                        htmlMaturasi += `<tr><td><select name="maturasi[0][ruang]" class="form-control form-control-sm select-ruang-edit" required>${editOptions}</select></td><td><input type="number" name="maturasi[0][berat]" class="form-control form-control-sm input-berat-edit" step="0.01"></td><td><input type="number" name="maturasi[0][umur]" class="form-control form-control-sm input-umur-edit" readonly></td><td><button type="button" class="btn btn-danger btn-xs btn-remove-maturasi"><i class="fas fa-trash"></i></button></td></tr>`;
                         maturasiEditIndex = 1;
                     }
                     $('#maturasiContainerEdit').html(htmlMaturasi);

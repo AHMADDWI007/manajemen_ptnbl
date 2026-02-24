@@ -102,7 +102,8 @@
                                     @forelse ($data_produksi as $item)
                                         @php 
                                             // Cek apakah data virtual (belum disimpan ke DB)
-                                            $isVirtual = is_null($item->id); 
+                                            // 🔥 PERBAIKAN: Gunakan nama Primary Key yang benar (id_bahan_proses)
+                                            $isVirtual = is_null($item->id_bahan_proses);
                                             $jsonData = json_encode($item);
                                         @endphp
                                         
@@ -121,28 +122,39 @@
                                             {{-- DROPDOWN AKSI (HANYA DETAIL & RESET) --}}
                                             <td class="text-center">
                                                 <div class="dropdown">
-                                                    <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
+                                                    <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $loop->iteration }}" data-toggle="dropdown" aria-expanded="false">
                                                         Aksi
                                                     </button>
-                                                    <div class="dropdown-menu dropdown-menu-right">
+                                                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu{{ $loop->iteration }}">
                                                         
                                                         {{-- 1. DETAIL (Selalu Ada) --}}
-                                                        <a class="dropdown-item btn-detail" href="javascript:void(0)" data-item='{{ $jsonData }}'>
+                                                        <a class="dropdown-item btn-detail" href="javascript:void(0)" 
+                                                        data-item='{{ $jsonData }}'>
                                                             <i class="fas fa-eye text-info mr-2"></i> Detail
                                                         </a>
 
-                                                        {{-- 2. RESET (Hanya jika data sudah disimpan/bukan virtual) --}}
+                                                        {{-- HANYA MUNCUL JIKA DATA SUDAH TERSIMPAN DI DB --}}
                                                         @if(!$isVirtual)
-                                                            <div class="dropdown-divider"></div>
-                                                            <form action="{{ route('bahan-proses.destroy', $item->id_bahan_proses) }}" method="POST" onsubmit="return confirm('Yakin ingin mereset data rektifikasi ini?');">
-                                                                @csrf @method('DELETE')
+                                                            
+                                                            {{-- 2. EDIT SALDO AWAL / AKHIR --}}
+                                                            <a class="dropdown-item btn-edit-setup" href="javascript:void(0)" 
+                                                            data-item='{{ $jsonData }}'>
+                                                                <i class="fas fa-edit text-warning mr-2"></i> Edit Saldo
+                                                            </a>
+
+                                                            {{-- 3. RESET DATA KE 0 --}}
+                                                            <form action="{{ route('bahan-proses.destroy', $item->id_bahan_proses) }}" method="POST" 
+                                                                class="reset-form" style="display:inline;" 
+                                                                onsubmit="return confirm('Yakin ingin mereset data proses ini kembali ke 0?');">
+                                                                @csrf 
+                                                                @method('DELETE')
                                                                 <button type="submit" class="dropdown-item text-danger">
                                                                     <i class="fas fa-undo mr-2"></i> Reset
                                                                 </button>
                                                             </form>
+                                                            
                                                         @endif
                                                         
-                                                        {{-- TIDAK ADA TOMBOL INPUT DI SINI --}}
                                                     </div>
                                                 </div>
                                             </td>
@@ -192,6 +204,52 @@
     <footer class="main-footer"> @include('template.footer') </footer>
 </div>
 
+{{-- ================= MODAL EDIT SETUP SALDO ================= --}}
+<div class="modal fade" id="modalEditSetup" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            {{-- Action form akan diisi oleh JavaScript --}}
+            <form id="formEditSetup" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title font-weight-bold"><i class="fas fa-edit"></i> Setup Saldo (Opname)</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-secondary py-2" style="font-size: 0.9em;">
+                        Gunakan fitur ini <b>hanya untuk inisialisasi awal</b> atau koreksi stok fisik lapangan. Perbedaan Saldo Akhir akan otomatis dicatat sebagai <b>Rektifikasi</b>.
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tahapan Proses (Uraian)</label>
+                        <input type="text" id="setupUraian" class="form-control font-weight-bold bg-light" readonly>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label>Saldo Awal (Kg)</label>
+                                <input type="number" name="saldo_awal" id="setupSaldoAwal" class="form-control" step="1" required>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                <label class="text-success font-weight-bold">Target Saldo Akhir (Kg)</label>
+                                <input type="number" name="saldo_akhir" id="setupSaldoAkhir" class="form-control border-success" step="1" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning font-weight-bold">Update Saldo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {{-- ================= MODAL INPUT REKTIF (SATU-SATUNYA INPUT) ================= --}}
 <div class="modal fade" id="modalTambah" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">
@@ -203,54 +261,48 @@
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Input jumlah <b>WIP Keluar</b> (Barang dipindah). Saldo Akhir akan dihitung otomatis.
+                    <div class="alert alert-info py-2" style="font-size: 0.9em;">
+                        <i class="fas fa-info-circle"></i> Isi kolom <b>WIP Keluar</b> untuk memindahkan barang ke proses selanjutnya. Jika ada salah input sebelumnya, cukup ganti angkanya dan simpan ulang.
                     </div>
                     
                     <input type="hidden" name="tanggal_input" value="{{ $selectedDate->format('Y-m-d') }}">
                     
-                    {{-- 1. PILIH URAIAN --}}
-                    <div class="form-group mb-3">
-                        <label>Pilih Tahapan Proses (Uraian)</label>
-                        <select name="uraian" id="select_uraian" class="form-control font-weight-bold" required>
-                            <option value="" disabled selected>-- Pilih Uraian --</option>
-                            @foreach(['Lantai Umpan Kering', 'Di Blending Tank 4', 'Di Lump Breaker-2 (Di Blending Tank-4)', 'Di Pre Breaker-2 (Di Blending Tank-5)', 'Di Hammer Mill-2 (Di Blending Tank-6)', 'Di Blending Tank-7', 'Di Trolley', 'Di Dalam Dryer/Press Bale', 'Di Reproses Ex WS.'] as $u)
-                                <option value="{{ $u }}">{{ $u }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- 2. INPUT WIP KELUAR (YANG UTAMA) --}}
-                    <div class="form-group mb-3 bg-light p-3 rounded border">
-                        <div class="d-flex justify-content-between align-items-end mb-2">
-                            <label class="text-success font-weight-bold mb-0">Jumlah Diproses / Transfer Keluar (Kg)</label>
-                            {{-- Info Stok Tersedia --}}
-                            <span class="badge badge-info p-2" style="font-size: 0.9em;">
-                                Tersedia: <span id="label_stok_tersedia">0</span> Kg
-                            </span>
-                        </div>
-                        
-                        <div class="input-group">
-                            <input type="number" name="wip_keluar" id="input_wip_keluar" class="form-control font-weight-bold text-success form-control-lg" step="0.01" placeholder="0" required>
-                            <div class="input-group-append">
-                                <button type="button" class="btn btn-outline-success" id="btn_ambil_semua" title="Proses Semua Stok">
-                                    All
-                                </button>
-                            </div>
-                        </div>
-                        <small class="text-muted">Masukkan angka sesuai pengecekan fisik di lapangan.</small>
-                    </div>
-
-                    {{-- 3. INPUT REKTIF (OPSIONAL) --}}
-                    <div class="form-group mb-3">
-                        <label class="text-dark font-weight-bold">Koreksi / Rektif (Kg) <small class="text-muted font-weight-normal">(Opsional)</small></label>
-                        <input type="number" name="rekfif" class="form-control" step="0.01" placeholder="0">
-                        <small class="text-muted">Isi +/- jika ada selisih timbangan.</small>
-                    </div>
-
-                    <div class="form-group mt-3">
-                        <label>Keterangan</label>
-                        <textarea name="keterangan" class="form-control" rows="2"></textarea>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="bg-light text-center">
+                                <tr>
+                                    <th>Tahapan Proses (Uraian)</th>
+                                    <th width="30%">WIP Keluar (Kg)</th>
+                                    <th width="20%">Rektif (Kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($masterUraian as $u)
+                                    @php
+                                        // Cari apakah data ini sudah ada di database untuk tanggal tersebut
+                                        $existing = $data_produksi->firstWhere('uraian', $u);
+                                    @endphp
+                                    <tr>
+                                        <td class="align-middle font-weight-bold" style="font-size: 0.9em;">
+                                            {{ $u }}
+                                        </td>
+                                        <td>
+                                            {{-- Penamaan name menggunakan array: wip_keluar[Nama Uraian] --}}
+                                            <input type="number" name="wip_keluar[{{ $u }}]" 
+                                                   class="form-control form-control-sm text-center text-success font-weight-bold" 
+                                                   step="1" placeholder="Kosong..."
+                                                   value="{{ $existing && $existing->wip_keluar > 0 ? $existing->wip_keluar : '' }}">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="rekfif[{{ $u }}]" 
+                                                   class="form-control form-control-sm text-center" 
+                                                   step="1" placeholder="+/-"
+                                                   value="{{ $existing && $existing->rekfif != 0 ? $existing->rekfif : '' }}">
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -340,44 +392,21 @@ $(document).ready(function () {
         // User harus menghitung selisihnya manual berdasarkan data di tabel.
     }
 
-    // --- LOGIKA CEK STOK REALTIME ---
-    $('#select_uraian').on('change', function() {
-        var uraian = $(this).val();
-        var tanggal = $('input[name="tanggal_input"]').val();
-
-        // Tampilkan loading
-        $('#label_stok_tersedia').text('...');
-        $('#input_wip_keluar').val(''); // Reset input
-
-        $.ajax({
-            url: "{{ route('bahan-proses.check-stock') }}",
-            type: "POST",
-            data: {
-                _token: "{{ csrf_token() }}",
-                uraian: uraian,
-                tanggal: tanggal
-            },
-            success: function(response) {
-                // Format angka desimal Indonesia
-                var formatted = new Intl.NumberFormat('id-ID').format(response.stok_tersedia);
-                $('#label_stok_tersedia').text(formatted);
-                
-                // Simpan nilai asli di tombol "All"
-                $('#btn_ambil_semua').data('stok', response.stok_tersedia);
-            },
-            error: function() {
-                $('#label_stok_tersedia').text('Error');
-            }
-        });
+    // --- LOGIKA MODAL EDIT SETUP SALDO ---
+    $(document).on('click', '.btn-edit-setup', function() {
+        let data = $(this).data('item'); 
+        
+        $('#setupUraian').val(data.uraian);
+        $('#setupSaldoAwal').val(data.saldo_awal || 0);
+        $('#setupSaldoAkhir').val(data.saldo_akhir || 0);
+        
+        // Arahkan action form ke route update
+        let url = "{{ url('bahan-proses') }}/" + data.id_bahan_proses;
+        $('#formEditSetup').attr('action', url);
+        
+        $('#modalEditSetup').modal('show');
     });
-
-    // Tombol "All" (Proses Semua Stok)
-    $('#btn_ambil_semua').on('click', function() {
-        var stok = $(this).data('stok');
-        if(stok) {
-            $('#input_wip_keluar').val(stok);
-        }
-    });
+    
 });
 </script>
 </body>

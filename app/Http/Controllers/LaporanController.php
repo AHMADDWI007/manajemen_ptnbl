@@ -2,25 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Carbon\Carbon;
-use Illuminate\Support\Collection;
-
-// Import Model
-use App\Models\TransaksiApiBokar;
-use App\Models\PengolahanBasah;
-use App\Models\RektifikasiStok;
-use App\Models\Maturasi;
-use App\Models\PengolahanMaturasi;
+use App\Exports\LaporanBulananExport;
+use App\Exports\LaporanHarianExport;
+use App\Models\BahanProses;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\HasilUjiLabMaturasi;
-use App\Models\BahanProses;
-use App\Models\ProduksiSir; 
-use App\Models\ProduksiSir20; 
+use App\Models\Maturasi;
+use App\Models\PengolahanBasah;
+use App\Models\PengolahanMaturasi;
 use App\Models\PenjualanSir20;
-
-// Import Export Excel
-use App\Exports\LaporanHarianExport;
+use App\Models\ProduksiSir20; 
+use App\Models\RektifikasiStok;
+use App\Models\TransaksiApiBokar;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
 
 class LaporanController extends Controller
@@ -76,7 +72,7 @@ class LaporanController extends Controller
     // =========================================================================
     // 🔥 CORE LOGIC: PENGAMBILAN DATA (PUSAT DATA)
     // =========================================================================
-    private function getDataLaporan($tglInput)
+    public function getDataLaporan($tglInput)
     {
         $tanggal = $tglInput ? Carbon::parse($tglInput) : Carbon::today();
         
@@ -157,17 +153,22 @@ class LaporanController extends Controller
         $dataMaturasi = new Collection();
 
         foreach ($data_maturasi_db as $bak) {
-            $hasLog = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<=', $tglStr)->exists();
+            
+            // 1. Cek apakah pernah ada log s/d hari ini
+            $hasLog = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                ->whereDate('tgl_laporan', '<=', $tglStr)->exists();
             
             if (!$hasLog) {
-                $row = $this->createMaturasiObj($bak, 0, 0, 0, 0, 0, null, 0, '-');
+                // Jika belum pernah ada transaksi sama sekali
+                $row = $this->createMaturasiObj($bak, 0, 0, 0, 0, 0, null, 0, 'KOSONG');
+                $row->k3_olah = 0; $row->po = '-'; $row->pri = '-'; $row->asal_bokar = '-';
             } else {
-                // Logic Snapshot Stok Awal
-                $sums = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<', $tglStr)
+                // 2. Logic Snapshot Stok Awal
+                $sumsAwal = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<', $tglStr)
                     ->selectRaw('COALESCE(SUM(masuk_hi),0) as m, COALESCE(SUM(diolah),0) as d, COALESCE(SUM(mutasi),0) as u')->first();
-                $stok_awal = $sums ? ($sums->m - $sums->d - $sums->u) : 0;
+                $stok_awal = $sumsAwal ? ($sumsAwal->m - $sumsAwal->d - $sumsAwal->u) : 0;
 
-                // Transaksi Hari Ini
+                // 3. Logic Transaksi Hari Ini
                 $s = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', $tglStr)
                     ->selectRaw('COALESCE(SUM(masuk_hi),0) as m, COALESCE(SUM(diolah),0) as d, COALESCE(SUM(mutasi),0) as u')->first();
                 
@@ -179,53 +180,131 @@ class LaporanController extends Controller
                 $masuk_from_uji = (float) HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', $tglStr)->sum('netto_kering');
                 $masuk_hi_today = max($trans_masuk, $masuk_from_uji);
                 
+                // 4. Hitung Stok Akhir
                 $stok_akhir = $stok_awal + $masuk_hi_today - $trans_diolah - $trans_mutasi;
 
-                // 🔥 PERBAIKAN LOGIKA UMUR DISINI AGAR SINKRON 🔥
-                $tgl_masuk = null; $umur = 0; $keterangan = '-';
-                
-                if ($stok_akhir > 0) {
-                    // Cek history masuk sebelum hari ini dulu (Prioritas 1)
-                    $log = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<', $tglStr)
-                            ->where('masuk_hi', '>', 0)->orderBy('tgl_laporan', 'desc')->first();
+                // 5. Logika Umur
+                $tgl_basis = null;
+                $logsBeforeToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                    ->whereDate('tgl_laporan', '<', $tglStr)
+                    ->orderBy('tgl_laporan', 'asc')->get();
 
-                    if ($log) {
-                        // Jika ada history lama, gunakan tanggal itu agar umur lanjut
-                        $lastDate = Carbon::parse($log->tgl_laporan);
-                        $tgl_masuk = $lastDate->toDateString();
-                        $umur = $lastDate->diffInDays($tanggal);
-                        $keterangan = strtoupper($lastDate->format('d M Y'));
+                $running_stock = 0;
+                foreach($logsBeforeToday as $log) {
+                    $logDate = Carbon::parse($log->tgl_laporan);
+                    $in_fresh = $log->masuk_hi;
+                    $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
+                    $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
 
-                    } elseif ($masuk_hi_today > 0) {
-                        // Jika tidak ada history, tapi hari ini masuk -> Umur 0 (Batch Baru)
-                        $tgl_masuk = $tglStr;
-                        $umur = 0;
-                        $keterangan = strtoupper($tanggal->format('d M Y'));
+                    if ($in_fresh > 0.01) {
+                        $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
+                            ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
+                        $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
+                    } 
+                    elseif ($running_stock <= 0.01 && $mutasi_in > 0.01) {
+                        $tgl_basis = $logDate;
+                    }
 
-                    } elseif ($bak->tgl_masuk) {
-                        // Fallback ke data master manual
-                         $candidate = Carbon::parse($bak->tgl_masuk);
-                         if ($candidate->lte($tanggal)) {
-                            $tgl_masuk = $candidate->toDateString();
-                            $umur = $candidate->diffInDays($tanggal);
-                            $keterangan = strtoupper($candidate->format('d M Y'));
-                         }
+                    $running_stock = $running_stock + $in_fresh + $mutasi_in - $out;
+                    if ($running_stock <= 0.01) $tgl_basis = null;
+                }
+
+                if (!$tgl_basis && $stok_awal > 0.01) {
+                    $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at);
+                }
+
+                $tgl_masuk_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->toDateString() : null;
+                $umur_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->diffInDays($tanggal) : 0;
+
+                // 6. Logika Keterangan
+                $keterangan_visual = 'KOSONG';
+                if ($stok_akhir > 0.01) {
+                    if ($masuk_hi_today > 0.01) {
+                        $labToday = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', $tglStr)->first();
+                        $keterangan_date = $labToday ? Carbon::parse($labToday->tanggal) : $tanggal;
+                        $keterangan_visual = strtoupper($keterangan_date->format('d M Y'));
+                    } elseif ($trans_mutasi < -0.01) { // Mutasi masuk
+                        $keterangan_visual = strtoupper($tanggal->format('d M Y'));
+                    } else {
+                        $keterangan_visual = $tgl_basis ? strtoupper($tgl_basis->format('d M Y')) : '-';
                     }
                 }
+
+                // Masukkan ke Objek
+                $row = $this->createMaturasiObj($bak, $stok_awal, $trans_diolah, $trans_mutasi, $masuk_hi_today, $stok_akhir, $tgl_masuk_visual, $umur_visual, $keterangan_visual);
                 
-                $row = $this->createMaturasiObj($bak, $stok_awal, $trans_diolah, $trans_mutasi, $masuk_hi_today, $stok_akhir, $tgl_masuk, $umur, $keterangan);
+                // 7. Logika Asal Bokar CMP
+                $row->asal_bokar = $this->getDetailedAsalBokarStringLaporan($bak, $stok_akhir, $stok_awal, $tanggal);
+                if ($stok_akhir <= 0.01) {
+                    $row->asal_bokar = '-';
+                    $row->keterangan = 'KOSONG';
+                }
+
+                // 8. Quality Lab Maturasi
+                $ujiLab = HasilUjiLabMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', '<=', $tglStr)->orderBy('tanggal', 'desc')->first();
+                $row->k3_olah = $ujiLab->k3 ?? 0;
+                $row->po      = $ujiLab->po ?? '-';
+                $row->pri     = $ujiLab->pri ?? '-';
             }
             
-            // Quality Data
-            $ujiLab = HasilUjiLabMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', '<=', $tglStr)->orderBy('tanggal', 'desc')->first();
-            $row->k3_olah = $ujiLab->k3 ?? 0;
-            $row->po      = $ujiLab->po ?? '-';
-            $row->pri     = $ujiLab->pri ?? '-';
-            $row->asal_bokar = ($row->stok_akhir <= 0) ? '-' : ($bak->asal_bokar ?? '-');
-
             $dataMaturasi->push($row);
         }
         return $dataMaturasi;
+    }
+
+    // =========================================================================
+    // 🔥 HELPER BARU: TARIK LOGIKA ASAL BOKAR KHUSUS UNTUK LAPORAN
+    // =========================================================================
+    private function getDetailedAsalBokarStringLaporan($maturasi, float $stokAkhir, float $stokAwal, Carbon $filterDate)
+    {
+        if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
+
+        try {
+            $realBatchStartDate = $filterDate->copy();
+            
+            $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tgl_laporan', '<=', $filterDate)
+                ->orderBy('tgl_laporan', 'desc')
+                ->get();
+
+            $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
+            $akumulasiKeluar = 0; 
+
+            foreach ($logs as $log) {
+                $realBatchStartDate = Carbon::parse($log->tgl_laporan);
+                
+                $masuk  = $log->masuk_hi;
+                $keluar = $log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0); 
+                $mutasiMasuk = ($log->mutasi < 0) ? abs($log->mutasi) : 0;
+                
+                $akumulasiKeluar += $keluar; 
+                $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
+
+                // LOGIKA RESET ULTIMATE (SINKRON DENGAN MATURASI CONTROLLER)
+                if (($masuk + $mutasiMasuk) > 0.01 && $akumulasiKeluar > 0.01) {
+                    break; 
+                }
+
+                if ($prevStock <= 0.01) break;
+                $currentTracingStock = $prevStock;
+            }
+
+            $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tanggal', '>=', $realBatchStartDate)
+                ->whereDate('tanggal', '<=', $filterDate)
+                ->pluck('jenis')
+                ->map(function($v) { return strtoupper(trim($v)); })
+                ->unique()->filter()->sort()->values()->toArray();
+
+            if (!empty($jenisList)) {
+                return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
+            }
+
+            return $maturasi->asal_bokar ?? '-';
+
+        } catch (\Exception $e) {
+            return $maturasi->asal_bokar ?? '-';
+        }
     }
 
     // =========================================================================
@@ -258,7 +337,13 @@ class LaporanController extends Controller
 
             // 2. Ambil Saldo Awal
             $lastData = BahanProses::where('uraian', $uraian)->whereDate('tanggal', '<', $tglStr)->orderBy('tanggal', 'desc')->first();
-            $saldoAwal = $lastData ? $lastData->saldo_akhir : 0;
+            
+            // 🔥 PERBAIKAN LOGIKA SALDO AWAL (Sinkron dengan Fitur Setup Manual) 🔥
+            if ($lastData) {
+                $saldoAwal = $lastData->saldo_akhir;
+            } else {
+                $saldoAwal = $existingRow ? $existingRow->saldo_awal : 0;
+            }
 
             // 3. Tentukan Masuk (Estafet)
             $wipMasuk = ($index === 0) ? $inputDariMaturasi : $prevWipKeluar;
@@ -295,16 +380,10 @@ class LaporanController extends Controller
                 'keterangan' => $ketUser
             ];
 
-            // ======================================================
-            // 🔥🔥🔥 DISINI POSISI LOGIKA CUT-OFF NYA BANG 🔥🔥🔥
-            // ======================================================
-            // Logika ini menentukan nilai $prevWipKeluar untuk proses selanjutnya
-            
+            // 6. LOGIKA CUT-OFF
             if ($uraian == 'Di Dalam Dryer/Press Bale') {
-                // Jika ini Dryer, jangan oper ke 'Reproses'. Putus aliran.
                 $prevWipKeluar = 0; 
             } else {
-                // Selain Dryer, hasil keluar dioper ke proses berikutnya
                 $prevWipKeluar = $wipKeluar;
             }
 
@@ -512,6 +591,30 @@ class LaporanController extends Controller
         }
 
         return $tabelSummary;
+    }
+
+    // =========================================================================
+    // 4. EXPORT EXCEL BULANAN 📅
+    // =========================================================================
+    public function exportExcelBulanan(Request $request)
+    {
+        $bulan = $request->input('bulan');
+        $tahun = $request->input('tahun');
+
+        if (!$bulan || !$tahun) {
+            return back()->with('error', 'Bulan dan Tahun harus dipilih.');
+        }
+
+        // Format nama file: Laporan_Harian_Produksi_January_2026.xlsx
+        $namaBulan = Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F_Y');
+        $namaFile = "Laporan_Harian_Produksi_{$namaBulan}.xlsx";
+
+        // Bersihkan Buffer
+        if (ob_get_length()) { ob_end_clean(); }
+        while (ob_get_level() > 0) { ob_end_clean(); }
+
+        // Pastikan Maswi sudah punya file LaporanBulananExport di folder Exports
+        return Excel::download(new LaporanBulananExport($bulan, $tahun), $namaFile);
     }
 
     // Helper Object Creator untuk Maturasi

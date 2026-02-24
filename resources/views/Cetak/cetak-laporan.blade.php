@@ -47,7 +47,7 @@
     /* Definisi Lebar Kolom (Total 14 Kolom) */
     .main-table col:nth-child(1) { width: 3%; }   
     .main-table col:nth-child(2) { width: 16%; }  
-    .main-table col:nth-child(3) { width: 6%; }   
+    .main-table col:nth-child(3) { width: 7%; }   
     .main-table col:nth-child(4) { width: 7%; }   
     .main-table col:nth-child(5) { width: 5%; }   
     .main-table col:nth-child(6) { width: 6%; }   
@@ -57,7 +57,7 @@
     .main-table col:nth-child(10) { width: 4%; }  
     .main-table col:nth-child(11) { width: 4%; }  
     .main-table col:nth-child(12) { width: 6%; }  
-    .main-table col:nth-child(13) { width: 6%; }  
+    .main-table col:nth-child(13) { width: 10%; }  
     .main-table col:nth-child(14) { width: 10%; } 
 
     /* Garis & Padding Cell */
@@ -104,8 +104,8 @@
     .no-border { border: none !important; }
     
     /* Warna Background Sel */
-    .bg-yellow { background-color: #f8f805 !important; }
-    .bg-green  { background-color: #33d033 !important; } 
+    .bg-yellow { background-color: #FFFF00 !important; }
+    .bg-green  { background-color: #92D050 !important; } 
 
     table.main-table th.bg-grey, 
     table.main-table td.bg-grey { 
@@ -345,10 +345,19 @@
                         <td class="text-center">2.{{ $index+1 }}</td>
                         <td>{{ $m->no_bak }}</td>
                         <td class="text-right">{{ number_format($m->kering ?? 0, 0, ',', '.') }}</td>
-                        <td class="text-center">{{ $m->tgl_isi ? \Carbon\Carbon::parse($m->tgl_isi)->format('d-M-y') : 'KOSONG' }}</td>
+                        <td class="text-center font-weight-bold">{{ $m->tgl_isi ? strtoupper(\Carbon\Carbon::parse($m->tgl_isi)->translatedFormat('d M Y')) : 'KOSONG' }}</td>
                         <td class="text-center">{{ ($m->umur ?? 0) . ' hari' }}</td>
                         <td class="text-right">{{ $m->diolah > 0 ? number_format($m->diolah, 0, ',', '.') : '' }}</td>
-                        <td class="text-right">{{ $m->mutasi > 0 ? number_format($m->mutasi, 0, ',', '.') : '' }}</td>
+                        {{-- 🔥 PERBAIKAN FORMAT MUTASI SESUAI GAMBAR 🔥 --}}
+                        <td class="text-right">
+                            @if($m->mutasi > 0)
+                                <span>({{ number_format($m->mutasi, 0, ',', '.') }})</span>
+                            @elseif($m->mutasi < 0)
+                                <span>{{ number_format(abs($m->mutasi), 0, ',', '.') }}</span>
+                            @else
+                                
+                            @endif
+                        </td>
                         <td class="text-right">{{ $m->masuk_hi > 0 ? number_format($m->masuk_hi, 0, ',', '.') : '' }}</td>
                         <td class="text-center">{{ $m->k3_olah > 0 ? number_format($m->k3_olah, 2, ',', '.') : '' }}</td>
                         <td class="text-center">{{ ($m->po && $m->po != '-' && $m->po != 0) ? $m->po : '' }}</td>
@@ -364,7 +373,15 @@
                     <td class="text-right">{{ number_format(collect($dataMaturasi)->sum('kering'),0,',','.') }}</td>
                     <td></td><td></td>
                     <td class="text-right">{{ number_format(collect($dataMaturasi)->sum('diolah'),0,',','.') }}</td>
-                    <td class="text-right">{{ number_format(collect($dataMaturasi)->sum('mutasi'),0,',','.') }}</td>
+                    {{-- TOTAL MUTASI --}}
+                    <td class="text-right font-weight-bold">
+                        @php $totMutasi = collect($dataMaturasi)->sum('mutasi'); @endphp
+                        @if($totMutasi > 0.1)
+                            <span>({{ number_format($totMutasi, 0, ',', '.') }})</span>
+                        @elseif($totMutasi < -0.1)
+                            <span>{{ number_format(abs($totMutasi), 0, ',', '.') }}</span>
+                        @endif
+                    </td>
                     <td class="text-right">{{ number_format(collect($dataMaturasi)->sum('masuk_hi'),0,',','.') }}</td>
                     <td colspan="3"></td> 
                     <td class="text-right">{{ number_format(collect($dataMaturasi)->sum('stok_akhir'),0,',','.') }}</td>
@@ -452,9 +469,33 @@
                     <td class="text-right bg-green">{{ ribuan($w->stok_awal) }}</td>
                     <td class="text-right">{{ ribuan($w->masuk) }}</td>
                     <td class="text-right">{{ ribuan($w->keluar) }}</td>
-                    <td class="text-right {{ ($index+1) == 7 ? 'bg-green' : '' }}">{{ number_format($w->produksi_sir20,0,',','.') }}</td>
-                    <td class="text-center">{{ number_format($w->rektif,0,',','.') }}</td>
-                    <td class="text-right" colspan="2">{{ number_format($w->stok_akhir,0,',','.') }}</td>
+                    {{-- 🔥 Kolom Produksi SIR20 --}}
+                    <td class="text-right {{ ($index+1) == 8 ? 'bg-green' : '' }}">
+                        @if($w->uraian == 'Di Reproses Ex WS.')
+                            {{-- Kosongkan jika Di Reproses Ex WS. --}}
+                        @else
+                            {{ number_format($w->produksi_sir20, 0, ',', '.') }}
+                        @endif
+                    </td>
+                    
+                    {{-- 🔥 Kolom Rektif --}}
+                    <td class="text-center">
+                        @if($w->uraian == 'Di Reproses Ex WS.')
+                            -
+                        @else
+                            {{ number_format($w->rektif, 0, ',', '.') }}
+                        @endif
+                    </td>
+                    
+                    {{-- 🔥 Kolom Saldo Akhir --}}
+                    <td class="text-right" colspan="2">
+                        @if($w->uraian == 'Di Reproses Ex WS.')
+                            {{-- Kosongkan jika Di Reproses Ex WS. --}}
+                        @else
+                            {{ number_format($w->stok_akhir, 0, ',', '.') }}
+                        @endif
+                    </td>
+
                     <td class="text-center" colspan="4">{{ $w->keterangan }}</td>
                 </tr>
                 @endforeach
@@ -473,6 +514,7 @@
 
             <tbody><tr><td colspan="14" class="no-border" style="height:10px;"></td></tr></tbody>
 
+            {{-- 🔥 TABEL IV. GUDANG SIR (LOGIKA SESUAI EXCEL) 🔥 --}}
             <tbody>
                 <tr>
                     <th rowspan="2">NO.</th>
@@ -481,18 +523,20 @@
                     <th rowspan="2">Masuk</th>
                     <th rowspan="2">Total</th>
                     <th colspan="2">Produksi Bulan Ini</th> 
-                    <th rowspan="2" colspan="3">Pengiriman</th>
+                    <th rowspan="2" colspan="2">Pengiriman</th>
+                    <th rowspan="2">Rektif</th>
                     <th rowspan="2">Saldo Akhir</th>
                     <th rowspan="2">PTNB</th>
-                    <th rowspan="2">Total</th>
+                    <th rowspan="2" class="bg-yellow">TOTAL I SD IV</th>
                 </tr>
                 <tr>
                     <th>Yg lalu</th>
                     <th>s/d HI</th>
                 </tr>
 
+                {{-- Hitung Grand Total dulu --}}
                 @php
-                    $grandTotalSaldoAkhir = collect($rekapBokar)->sum(function($i){ return ($i['stok_awal']+$i['masuk_hi'])-$i['kering_hi']+$i['rektif']; }) 
+                    $grandTotalSaldoAkhir = collect($rekapBokar)->sum(function($i){ return ($i['stok_awal']+$i['masuk_hi'])-$i['kering_hi']+($i['rektif']??0); }) 
                                           + collect($dataMaturasi)->sum('stok_akhir')
                                           + collect($dataWip)->sum('stok_akhir')
                                           + collect($dataGudang)->sum('stok_akhir');
@@ -507,33 +551,43 @@
                     <td class="text-right">{{ ribuan($g->prod_hi) }}</td>
                     <td class="text-right">{{ number_format($g->stok_awal + $g->prod_hi,0,',','.') }}</td>
                     
-                    <td class="text-right {{ $loop->first ? 'bg-green' : '' }}">{{ number_format($g->prod_bln_lalu,0,',','.') }}</td> 
+                    <td class="text-right {{ $loop->first ? 'bg-green' : '' }}">{{ number_format($g->prod_bln_lalu ?? 0,0,',','.') }}</td> 
                     <td class="text-right">{{ number_format($g->prod_sdhi,0,',','.') }}</td>
                     
-                    <td class="text-right" colspan="3">{{ number_format($g->pengiriman,0,',','.') }}</td>
-                    <td class="text-right">{{ number_format($g->stok_akhir,0,',','.') }}</td>
+                    <td class="text-right" colspan="2">{{ ribuan($g->pengiriman) }}</td>
+                    <td class="text-center">-</td>
                     
-                    @if($loop->last)
+                    <td class="text-right font-weight-bold">{{ number_format($g->stok_akhir,0,',','.') }}</td>
+                    
+                    {{-- 🔥 LOGIKA PTNB: Hanya muncul di baris pertama (4.1) --}}
+                    @if($loop->first) 
                         <td class="text-right bold">{{ number_format($g->stok_akhir,0,',','.') }}</td>
-                        <td class="text-right bold">{{ number_format($grandTotalSaldoAkhir,0,',','.') }}</td>
                     @else
-                        <td class="text-right">0</td>
-                        <td class="text-right">0</td>
+                        <td class="text-center">-</td>
                     @endif
+
+                    {{-- 🔥 LOGIKA TOTAL I SD IV: Kosong di semua baris rincian (Hanya muncul di Footer) --}}
+                    <td class="text-center">-</td>
                 </tr>
                 @endforeach
 
-                <tr>
+                {{-- BARIS FOOTER JUMLAH --}}
+                <tr class="bg-light font-weight-bold">
                     <td colspan="3" class="text-center">Jumlah 4.1 - 4.{{ count($dataGudang) }}</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('stok_awal'),0,',','.') }}</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('prod_hi'),0,',','.') }}</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum(function($i){ return $i->stok_awal + $i->prod_hi; }),0,',','.') }}</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('prod_bln_lalu'),0,',','.') }}</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('prod_sdhi'),0,',','.') }}</td>
-                    <td class="text-right" colspan="3">{{ number_format(collect($dataGudang)->sum('pengiriman'),0,',','.') }}</td>
+                    <td class="text-right" colspan="2">{{ number_format(collect($dataGudang)->sum('pengiriman'),0,',','.') }}</td>
+                    <td class="text-center">-</td>
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('stok_akhir'),0,',','.') }}</td>
+                    
+                    {{-- Total PTNB (Jumlah Stok Akhir Gudang) --}}
                     <td class="text-right">{{ number_format(collect($dataGudang)->sum('stok_akhir'),0,',','.') }}</td>
-                    <td class="text-right">{{ number_format($grandTotalSaldoAkhir,0,',','.') }}</td>
+                    
+                    {{-- Total I SD IV (Grand Total hanya muncul disini) --}}
+                    <td class="text-right bg-yellow">{{ number_format($grandTotalSaldoAkhir,0,',','.') }}</td>
                 </tr>
             </tbody>
 

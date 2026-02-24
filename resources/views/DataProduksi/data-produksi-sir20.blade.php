@@ -5,10 +5,27 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; vertical-align: middle; white-space: nowrap; padding: 6px 12px; }
-        .header-white th { text-align: center; font-weight: bold; background-color: #ffffff; color: #343a40; }
-        .header-green th { text-align: center; font-weight: bold; background-color: #28a745; color: white; }
-        .row-jumlah { font-weight: bold; background-color: #f8f9fa; }
+        /* Styling standar tabel konsisten dengan halaman lain */
+        .table-bordered th, .table-bordered td { 
+            border: 1px solid #dee2e6; 
+            vertical-align: middle; 
+            white-space: nowrap; 
+            padding: 8px 12px; 
+        }
+        /* Warna header tabel (abu-abu terang) */
+        .header-white th { 
+            text-align: center !important; 
+            vertical-align: middle !important; /* 🔥 TAMBAHKAN INI AGAR RATA TENGAH ATAS BAWAH */
+            font-weight: bold; 
+            background-color: #f8f9fa; 
+            color: #343a40;
+        }
+        .row-jumlah td { 
+            font-weight: bold; 
+            background-color: #e9ecef; 
+        }
+        /* Rata tengah untuk isi sel tertentu */
+        .text-center { text-align: center !important; }
     </style>
 </head>
 
@@ -37,24 +54,25 @@
                 {{-- TABEL IV (GUDANG) --}}
                 <div class="card shadow-sm mb-4">
                     
-                    {{-- HEADER HIJAU DENGAN FILTER TANGGAL --}}
-                    <div class="card-header bg-success d-flex align-items-center">
-                        <h3 class="card-title font-weight-bold text-white">IV. PRODUKSI SIR 20</h3>
+                    {{-- HEADER KARTU (Terpisah dari tabel) --}}
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <strong class="my-auto">IV. PRODUKSI SIR 20</strong>
                         
                         {{-- FORM FILTER DI KANAN --}}
-                        <form action="{{ route('data-sir.index') }}" method="GET" class="form-inline ml-auto">
-                            <label for="filter_tanggal" class="mr-2 text-white font-weight-normal">Tanggal:</label>
+                        <form action="{{ route('data-sir.index') }}" method="GET" class="form-inline ml-auto mb-0">
+                            <label for="filter_tanggal" class="mr-2 text-white font-weight-normal mb-0">Tanggal:</label>
                             <input type="date" name="filter_tanggal" id="filter_tanggal" 
-                                   class="form-control form-control-sm mr-2" 
+                                   class="form-control form-control-sm" 
                                    value="{{ $selected_date }}" 
                                    onchange="this.form.submit()" 
                                    style="max-width: 160px;">
                         </form>
                     </div>
 
-                    <div class="card-body p-0">
+                    {{-- ISI KARTU DENGAN PADDING (Agar tidak nempel ke header) --}}
+                    <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped mb-0">
+                            <table class="table table-bordered table-striped table-hover mb-0">
                                 <thead class="header-white">
                                     <tr>
                                         <th rowspan="2">No</th>
@@ -68,25 +86,29 @@
                                         <th rowspan="2">TOTAL I SD IV</th>
                                         <th rowspan="2">Aksi</th>
                                     </tr>
-                                    <tr><th>Yg lalu</th><th>s/d HI</th></tr>
+                                    <tr>
+                                        <th>Yg lalu</th>
+                                        <th>s/d HI</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                 @foreach ($tabelIV as $item)
                                     <tr>
                                         <td class="text-center font-weight-bold">{{ $item->no }}</td>
                                         <td>{{ $item->uraian }}</td>
-                                        <td class="text-center">{{ number_format($item->saldo_awal, 2, ',', '.') }}</td>
-                                        <td class="text-center font-weight-bold text-primary">{{ number_format($item->masuk, 2, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($item->total, 2, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($item->prod_bln_lalu, 2, ',', '.') }}</td>
-                                        <td class="text-center">{{ number_format($item->prod_sd_hi, 2, ',', '.') }}</td>
-                                        <td class="text-center font-weight-bold text-danger">{{ number_format($item->pengiriman, 2, ',', '.') }}</td>
-                                        <td class="text-center font-weight-bold">{{ number_format($item->saldo_akhir, 2, ',', '.') }}</td>
+                                        {{-- 🔥 PERBAIKAN: Ubah angka 2 menjadi 0 pada number_format --}}
+                                        <td class="text-center">{{ number_format($item->saldo_awal, 0, ',', '.') }}</td>
+                                        <td class="text-center font-weight-bold text-primary">{{ number_format($item->masuk, 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($item->total, 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($item->prod_bln_lalu, 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($item->prod_sd_hi, 0, ',', '.') }}</td>
+                                        <td class="text-center font-weight-bold text-danger">{{ number_format($item->pengiriman, 0, ',', '.') }}</td>
+                                        <td class="text-center font-weight-bold">{{ number_format($item->saldo_akhir, 0, ',', '.') }}</td>
                                         <td class="text-center">-</td>
                                         <td class="text-center">
-                                        {{-- Jika ada stok, tampilkan tombol Pindah --}}
+                                        {{-- Jika ada stok, tampilkan tombol Edit Lokasi --}}
                                         @if($item->saldo_akhir > 0)
-                                            <button class="btn btn-sm btn-warning font-weight-bold btn-mutasi" 
+                                            <button class="btn btn-sm btn-warning btn-mutasi" 
                                                     data-id="{{ $item->id_lokasi }}" 
                                                     data-nama="{{ $item->uraian }}">
                                                 <i class="fas fa-edit"></i> Edit
@@ -94,22 +116,25 @@
                                         @else
                                             <span class="badge badge-secondary">Kosong</span>
                                         @endif
-                                    </td>
+                                        </td>
                                     </tr>
                                 @endforeach
-                                <tr class="row-jumlah">
-                                    <td colspan="2" class="text-center">Jumlah 4.1 - 4.4</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('saldo_awal'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('masuk'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('total'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('prod_bln_lalu'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('prod_sd_hi'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('pengiriman'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelIV->sum('saldo_akhir'), 2, ',', '.') }}</td>
-                                    <td class="text-center font-weight-bold">{{ number_format($grandTotal ?? 0, 2, ',', '.') }}</td>
-                                    <td></td>
-                                </tr>
                                 </tbody>
+                                <tfoot>
+                                    <tr class="row-jumlah">
+                                        <td colspan="2" class="text-center">Jumlah 4.1 - 4.4</td>
+                                        {{-- 🔥 PERBAIKAN: Ubah 2 jadi 0 pada tfoot --}}
+                                        <td class="text-center">{{ number_format($tabelIV->sum('saldo_awal'), 0, ',', '.') }}</td>
+                                        <td class="text-center text-primary">{{ number_format($tabelIV->sum('masuk'), 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($tabelIV->sum('total'), 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($tabelIV->sum('prod_bln_lalu'), 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($tabelIV->sum('prod_sd_hi'), 0, ',', '.') }}</td>
+                                        <td class="text-center text-danger">{{ number_format($tabelIV->sum('pengiriman'), 0, ',', '.') }}</td>
+                                        <td class="text-center">{{ number_format($tabelIV->sum('saldo_akhir'), 0, ',', '.') }}</td>
+                                        <td class="text-center font-weight-bold">{{ number_format($grandTotal ?? 0, 0, ',', '.') }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -117,19 +142,19 @@
 
                 {{-- TABEL VI (MUTU) --}}
                 <div class="card shadow-sm">
-                     <div class="card-header bg-success">
-                         <h3 class="card-title font-weight-bold text-white">VI. Rincian Mutu</h3>
+                     <div class="card-header bg-success text-white d-flex align-items-center">
+                         <strong class="my-auto">VI. RINCIAN MUTU</strong>
                      </div>
-                    <div class="card-body p-0">
+                    <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped mb-0">
+                            <table class="table table-bordered table-striped table-hover mb-0">
                                 <thead class="header-white">
                                     <tr>
-                                        <th>No</th>
-                                        <th>Uraian</th>
-                                        <th>Kg</th>
-                                        <th>Pallet</th>
-                                        <th>Keterangan</th>
+                                        <th width="5%">No</th>
+                                        <th width="40%">Uraian</th>
+                                        <th width="20%">Kg</th>
+                                        <th width="15%">Pallet</th>
+                                        <th width="20%">Keterangan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -137,18 +162,21 @@
                                     <tr>
                                         <td class="text-center font-weight-bold">{{ $item->no }}</td>
                                         <td>{{ $item->uraian }}</td>
-                                        <td class="text-center">{{ number_format($item->kg, 2, ',', '.') }}</td>
+                                        {{-- 🔥 HILANGKAN KOMA (Ubah 2 jadi 0) --}}
+                                        <td class="text-center font-weight-bold">{{ number_format($item->kg, 0, ',', '.') }}</td>
                                         <td class="text-center">{{ number_format($item->pallet, 0, ',', '.') }}</td>
                                         <td class="text-center">{{ $item->keterangan }}</td>
                                     </tr>
                                 @endforeach
-                                <tr class="row-jumlah">
-                                    <td colspan="2" class="text-center">Total</td>
-                                    <td class="text-center">{{ number_format($tabelVI->sum('kg'), 2, ',', '.') }}</td>
-                                    <td class="text-center">{{ number_format($tabelVI->sum('pallet'), 0, ',', '.') }}</td>
-                                    <td></td>
-                                </tr>
                                 </tbody>
+                                <tfoot>
+                                    <tr class="row-jumlah">
+                                        <td colspan="2" class="text-center">Total</td>
+                                        <td class="text-center font-weight-bold text-success">{{ number_format($tabelVI->sum('kg'), 0, ',', '.') }}</td>
+                                        <td class="text-center text-success">{{ number_format($tabelVI->sum('pallet'), 0, ',', '.') }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -266,7 +294,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalMutasi" tabindex="-1" data-backdrop="static">
+<div class="modal fade" id="modalMutasi" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             {{-- Form ID diberi nama agar bisa dimanipulasi JS --}}
@@ -369,18 +397,18 @@
                     {{-- [KANAN] Tombol Aksi --}}
                     <div id="actionButtonsStep1">
                         {{-- AKSI 1: SIMPAN MUTU SAJA --}}
-                        <button type="button" class="btn btn-success font-weight-bold mr-2" id="btnSaveMutuOnly">
+                        <button type="button" class="btn btn-success" id="btnSaveMutuOnly">
                             <i class="fas fa-save mr-1"></i> Simpan Mutu Saja
                         </button>
                         {{-- AKSI 2: LANJUT PINDAH --}}
-                        <button type="button" class="btn btn-primary font-weight-bold" id="btnNextStep">
+                        <button type="button" class="btn btn-primary" id="btnNextStep">
                             Pindah Lokasi <i class="fas fa-arrow-right ml-1"></i>
                         </button>
                     </div>
 
                     <div id="actionButtonsStep2" style="display: none;">
                         {{-- AKSI 3: KONFIRMASI PINDAH --}}
-                        <button type="submit" class="btn btn-warning font-weight-bold px-4" id="btnSubmitPindah">
+                        <button type="submit" class="btn btn-warning" id="btnSubmitPindah">
                             <i class="fas fa-dolly-flatbed mr-1"></i> Konfirmasi Pindah
                         </button>
                     </div>
