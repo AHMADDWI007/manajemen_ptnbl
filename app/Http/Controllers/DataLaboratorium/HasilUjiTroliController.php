@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
+use App\Exports\HasilUjiTroliExport;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\HasilUjiLabTroli; // 🔥 [PERBAIKAN 1] Gunakan Model Baru
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HasilUjiTroliController extends Controller
 {
@@ -118,5 +121,18 @@ class HasilUjiTroliController extends Controller
         
         return redirect()->route('hasil-uji-troli.index')
                          ->with('error', 'Data gagal dihapus / tidak ditemukan.');
+    }
+
+    // Tambahkan fungsi ini di dalam class
+    public function exportExcel(Request $request)
+    {
+        if (ob_get_length()) { ob_end_clean(); }
+        
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        $namaFile = "Laporan_Uji_Troli_" . ($startDate ? Carbon::parse($startDate)->format('d-m-Y') : 'Semua') . ".xlsx";
+
+        return Excel::download(new HasilUjiTroliExport($startDate, $endDate), $namaFile);
     }
 }

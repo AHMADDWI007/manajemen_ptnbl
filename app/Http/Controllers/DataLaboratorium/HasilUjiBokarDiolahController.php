@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
+use App\Exports\HasilUjiBokarDiolahExport;
 use App\Http\Controllers\Controller;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\PengolahanBasah;
 use App\Traits\MaturasiSyncTrait;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HasilUjiBokarDiolahController extends Controller
 {
@@ -152,5 +155,19 @@ class HasilUjiBokarDiolahController extends Controller
             return redirect()->route('hasil-uji-bokar-diolah.index')->with('success', 'Data K3 dihapus dan Stok Maturasi telah diperbarui.');
         }
         return redirect()->route('hasil-uji-bokar-diolah.index')->withErrors(['error' => 'Data tidak ditemukan.']);
+    }
+
+    // Tambahkan fungsi ini di dalam class
+    public function exportExcel(Request $request)
+    {
+        if (ob_get_length()) { ob_end_clean(); }
+        while (ob_get_level() > 0) { ob_end_clean(); }
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        $namaFile = "Laporan_Uji_Bokar_Diolah_" . ($startDate ? Carbon::parse($startDate)->format('d-m-Y') : 'Semua') . ".xlsx";
+
+        return Excel::download(new HasilUjiBokarDiolahExport($startDate, $endDate), $namaFile);
     }
 }

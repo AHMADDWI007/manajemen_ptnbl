@@ -92,6 +92,7 @@
                                                     'pengolahan' => 'warning',
                                                     'produksi' => 'danger',
                                                     'penjualan' => 'purple', // Anda bisa ganti 'purple' dengan 'dark' jika 'purple' tidak ada di BS4
+                                                    'petugas' => 'orange', // 🔥 TAMBAHKAN WARNA UNTUK PETUGAS
                                                     'user' => 'secondary'
                                                 ];
                                                 $color = $roleColors[$user->role] ?? 'secondary'; // Default ke secondary jika role tidak terdaftar
@@ -182,6 +183,7 @@
                             <option value="pengolahan">Pengolahan</option>
                             <option value="produksi">Produksi</option>
                             <option value="penjualan">Penjualan</option>
+                            <option value="petugas">Petugas</option>
                             <option value="user">User</option>
                         </select>
                         </div>

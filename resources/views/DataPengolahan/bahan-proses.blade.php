@@ -55,9 +55,12 @@
                 <h3 class="mb-0 text-success fw-bold">Bahan Dalam Proses (WIP)</h3>
                 
                 {{-- TOMBOL INPUT KHUSUS DI ATAS (SESUAI PERMINTAAN) --}}
+                {{-- 🔥 SEMBUNYIKAN TOMBOL INPUT JIKA ROLE USER --}}
+                @if(auth()->user()->role != 'user')
                 <button class="btn btn-success btn-sm fw-bold shadow-sm" data-toggle="modal" data-target="#modalTambah">
                     <i class="fas fa-plus-circle"></i> Input / Koreksi Data
                 </button>
+                @endif
             </div>
         </div>
 
@@ -91,7 +94,10 @@
                                         <th rowspan="2">Rektif</th>
                                         <th rowspan="2">Saldo Akhir</th>
                                         <th rowspan="2">Keterangan</th>
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th rowspan="2" width="8%">Aksi</th>
+                                        @endif
                                     </tr>
                                     <tr>
                                         <th>Masuk</th>
@@ -120,6 +126,8 @@
                                             <td class="text-center pl-2">{{ $item->keterangan != '-' ? $item->keterangan : '-' }}</td>
                                             
                                             {{-- DROPDOWN AKSI (HANYA DETAIL & RESET) --}}
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td class="text-center">
                                                 <div class="dropdown">
                                                     <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $loop->iteration }}" data-toggle="dropdown" aria-expanded="false">
@@ -158,6 +166,7 @@
                                                     </div>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @empty
                                         <tr><td colspan="11" class="text-center text-muted py-3">Belum ada data untuk tanggal ini.</td></tr>
@@ -166,15 +175,27 @@
                                 @if($data_produksi->isNotEmpty())
                                 <tfoot>
                                     <tr class="bg-light">
+                                        {{-- 🔥 Logika Colspan Dinamis: Jika User maka colspan 3 (No, Tgl, Uraian) --}}
+                                        {{-- Jika Admin maka tetap sama, tapi kita sesuaikan agar total kolom di body pas --}}
                                         <td colspan="3" class="text-center font-weight-bold">Jumlah</td>
+                                        
                                         <td class="text-center font-weight-bold">{{ number_format($totals['saldo_awal'], 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($totals['wip_masuk'], 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($totals['wip_keluar'], 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($totals['produksi_sir20'], 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($totals['rekfif'], 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($totals['saldo_akhir'], 0, ',', '.') }}</td>
-                                        <td colspan="2"></td>
+                                        
+                                        {{-- Kolom Keterangan --}}
+                                        <td></td>
+
+                                        {{-- 🔥 KUNCI PERBAIKAN: Sembunyikan sel Aksi jika role User --}}
+                                        @if(auth()->user()->role != 'user')
+                                            <td></td>
+                                        @endif
                                     </tr>
+
+                                    {{-- Baris Total Persediaan --}}
                                     <tr style="border-top: 2px solid #dee2e6; background-color: #e8f5e9;">
                                         <td colspan="8" class="text-center font-weight-bold align-middle">
                                             TOTAL PERSEDIAAN (Bokar + Maturasi + WIP):<br>
@@ -187,10 +208,11 @@
                                         <td class="text-center font-weight-bold align-middle" style="font-size: 1.1em; color: #0f5132;">
                                             {{ number_format($grandTotalSaldoAkhir, 0, ',', '.') }}
                                         </td>
-                                        <td class="text-center font-weight-bold align-middle" style="font-size: 0.9em; color: #664d03;">
+                                        
+                                        {{-- 🔥 Gunakan colspan dinamis untuk sisa kolom (Keterangan + Aksi) --}}
+                                        <td colspan="{{ (auth()->user()->role == 'user') ? 1 : 2 }}" class="text-center font-weight-bold align-middle" style="font-size: 0.9em; color: #664d03;">
                                             {{ number_format($grandTotalKeterangan, 0, ',', '.') }}
                                         </td>
-                                        <td></td>
                                     </tr>
                                 </tfoot>
                                 @endif

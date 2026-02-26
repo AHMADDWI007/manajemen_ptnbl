@@ -66,9 +66,12 @@
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Pengolahan Basah (Bokar)</h1>
                 {{-- Tombol untuk memicu Modal Tambah Data --}}
+                {{-- 🔥 SEMBUNYIKAN TOMBOL TAMBAH JIKA ROLE USER --}}
+                @if(auth()->user()->role != 'user')
                 <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
                     <i class="fas fa-plus-circle"></i> Tambah Data
                 </button>
+                @endif
             </div>
         </div>
 
@@ -77,7 +80,8 @@
                 
                 {{-- Card 1: Ringkasan Stok --}}
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white fw-bold"> Ringkasan Stok </div>
+                    <div class="card-header bg-success text-white fw-bold">
+                        <strong class="my-auto">Ringkasan Stok</strong></div>
                     <div class="card-body">
                         
                         {{-- Form Filter Tanggal untuk Ringkasan Stok --}}
@@ -90,6 +94,8 @@
                                 </button>
                                 
                                 {{-- ✅ TAMBAHAN: Tombol untuk memicu Modal Input Rektif --}}
+                                {{-- 🔥 SEMBUNYIKAN TOMBOL REKTIF & SYNC JIKA ROLE USER --}}
+                                @if(auth()->user()->role != 'user')
                                 <button type="button" class="btn btn-warning btn-sm ml-2 fw-bold" id="btnInputRektif">
                                     <i class="fas fa-redo-alt"></i> Input Rektif
                                 </button>
@@ -98,6 +104,7 @@
                                 <button type="button" class="btn btn-primary btn-sm ml-2 fw-bold" id="btnSyncApi">
                                     <i class="fas fa-sync-alt"></i> Sync API
                                 </button>
+                                @endif
                             </div>
                         </form>
 
@@ -142,7 +149,8 @@
 
                 {{-- Card 2: Daftar Pengolahan Basah (DataTables) --}}
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold"> Daftar Pengolahan Basah </div>
+                    <div class="card-header bg-success text-white fw-bold"> 
+                        <strong class="my-auto">Daftar Pengolahan Basah</strong></div>
                     <div class="card-body">
                         {{-- Menampilkan Error Validasi --}}
                         @if ($errors->any())
@@ -188,7 +196,10 @@
                                         <th>Netto Basah (Kg)</th>
                                         <th>K3%</th> 
                                         <th>Netto Kering (Kg)</th> 
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -240,61 +251,64 @@
                                             {{-- Netto Kering (Hijau) --}}
                                             <td class="font-weight-bold text-success">{{ $total_kering > 0 ? number_format(round($total_kering), 0, ',', '.') : '-' }}</td>
 
-                                            <td>
-                                                <div class="action-buttons">
-                                                    {{-- Data JSON tersembunyi untuk keperluan JavaScript --}}
-                                                    <textarea class="d-none group-data-json">{{ $group->toJson() }}</textarea>
-                                                    
-                                                    {{-- 1. Tombol Preview (Melihat rincian) --}}
-                                                    <button type="button" class="btn btn-info btn-sm btn-detail-group" 
-                                                            data-bak="{{ $head->maturasi->uraian ?? '-' }}"
-                                                            title="Lihat Rincian"> 
-                                                        <i class="fas fa-eye"></i> 
-                                                    </button>
-
-                                                    @if($jumlah_pecahan > 1)
-                                                        {{-- 🔥 TOMBOL EDIT RINCIAN (Diletakkan di Luar) --}}
-                                                        <button type="button" class="btn btn-warning btn-sm btn-edit-pecahan-group" 
-                                                                data-id-asal="{{ $head->id_pengolahan_basah }}"
-                                                                data-netto="{{ number_format(round($total_kering), 0, '.', '') }}"
-                                                                title="Edit Pembagian PT/DS/INHUT">
-                                                            <i class="fas fa-edit"></i> Edit Rincian
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        {{-- Data JSON tersembunyi untuk keperluan JavaScript --}}
+                                                        <textarea class="d-none group-data-json">{{ $group->toJson() }}</textarea>
+                                                        
+                                                        {{-- 1. Tombol Preview (Melihat rincian) --}}
+                                                        <button type="button" class="btn btn-info btn-sm btn-detail-group" 
+                                                                data-bak="{{ $head->maturasi->uraian ?? '-' }}"
+                                                                title="Lihat Rincian"> 
+                                                            <i class="fas fa-eye"></i> 
                                                         </button>
 
-                                                        {{-- Tombol Hapus Group --}}
-                                                        <form action="{{ route('pengolahan-basah.destroy-group') }}" method="POST" class="form-hapus-group" style="display:inline;">
-                                                            @csrf @method('DELETE')
-                                                            <input type="hidden" name="group_ids" value="{{ json_encode($group->pluck('id_pengolahan_basah')) }}">
-                                                            <button type="submit" class="btn btn-danger btn-sm" title="Hapus Group"><i class="fas fa-trash-alt"></i></button>
-                                                        </form>
-                                                    @else
-                                                        {{-- Aksi untuk Data Tunggal --}}
-                                                        @if($head->jenis == 'PENDING' && $head->netto_kering > 0)
-                                                            <button type="button" class="btn btn-primary btn-sm btn-pecah" 
-                                                                    data-id="{{ $head->id_pengolahan_basah }}" 
+                                                        @if($jumlah_pecahan > 1)
+                                                            {{-- 🔥 TOMBOL EDIT RINCIAN (Diletakkan di Luar) --}}
+                                                            <button type="button" class="btn btn-warning btn-sm btn-edit-pecahan-group" 
+                                                                    data-id-asal="{{ $head->id_pengolahan_basah }}"
                                                                     data-netto="{{ number_format(round($total_kering), 0, '.', '') }}"
-                                                                    title="Pecah Data Menjadai Rincian"> 
-                                                                <i class="fas fa-project-diagram"></i> Pecah Data
+                                                                    title="Edit Pembagian PT/DS/INHUT">
+                                                                <i class="fas fa-edit"></i> Edit Rincian
                                                             </button>
-                                                        @endif
 
-                                                        {{-- Tombol Edit Timbangan Utama (Pending Only) --}}
-                                                        @if($head->jenis == 'PENDING')
-                                                            <button type="button" class="btn btn-warning btn-sm btn-edit" 
-                                                                    data-id="{{ $head->id_pengolahan_basah }}" 
-                                                                    data-maturasi-id="{{ $head->id_maturasi }}" 
-                                                                    title="Edit Timbangan Utama"> 
-                                                                <i class="fas fa-edit"></i> 
-                                                            </button>
-                                                        @endif
+                                                            {{-- Tombol Hapus Group --}}
+                                                            <form action="{{ route('pengolahan-basah.destroy-group') }}" method="POST" class="form-hapus-group" style="display:inline;">
+                                                                @csrf @method('DELETE')
+                                                                <input type="hidden" name="group_ids" value="{{ json_encode($group->pluck('id_pengolahan_basah')) }}">
+                                                                <button type="submit" class="btn btn-danger btn-sm" title="Hapus Group"><i class="fas fa-trash-alt"></i></button>
+                                                            </form>
+                                                        @else
+                                                            {{-- Aksi untuk Data Tunggal --}}
+                                                            @if($head->jenis == 'PENDING' && $head->netto_kering > 0)
+                                                                <button type="button" class="btn btn-primary btn-sm btn-pecah" 
+                                                                        data-id="{{ $head->id_pengolahan_basah }}" 
+                                                                        data-netto="{{ number_format(round($total_kering), 0, '.', '') }}"
+                                                                        title="Pecah Data Menjadai Rincian"> 
+                                                                    <i class="fas fa-project-diagram"></i> Pecah Data
+                                                                </button>
+                                                            @endif
 
-                                                        <form action="{{ route('pengolahan-basah.destroy', $head->id_pengolahan_basah) }}" method="POST" class="form-hapus-single" style="display:inline;">
-                                                            @csrf @method('DELETE')
-                                                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                            </td>
+                                                            {{-- Tombol Edit Timbangan Utama (Pending Only) --}}
+                                                            @if($head->jenis == 'PENDING')
+                                                                <button type="button" class="btn btn-warning btn-sm btn-edit" 
+                                                                        data-id="{{ $head->id_pengolahan_basah }}" 
+                                                                        data-maturasi-id="{{ $head->id_maturasi }}" 
+                                                                        title="Edit Timbangan Utama"> 
+                                                                    <i class="fas fa-edit"></i> 
+                                                                </button>
+                                                            @endif
+
+                                                            <form action="{{ route('pengolahan-basah.destroy', $head->id_pengolahan_basah) }}" method="POST" class="form-hapus-single" style="display:inline;">
+                                                                @csrf @method('DELETE')
+                                                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
+                                                </td>
+                                            @endif
                                         </tr>
                                     @empty
                                         <tr><td colspan="10" class="text-center text-muted">Belum ada data.</td></tr>
@@ -304,24 +318,27 @@
                                 {{-- ✅ PERBAIKAN KRITIS: Sembunyikan TFOOT jika data kosong untuk mencegah DataTables error --}}
                                 <tfoot class="bg-light">
                                     <tr>
-                                        <td colspan="8"></td> 
+                                        {{-- 🔥 Gunakan PHP untuk menghitung colspan agar dinamis --}}
+                                        @php $footerColspan = (auth()->user()->role == 'user') ? 7 : 8; @endphp
+                                        
+                                        <td colspan="{{ $footerColspan }}"></td> 
                                         <td class="total-label">Total DS</td> 
-                                        <td id="total_ds_netto_kering_display"></td> {{-- ID unik untuk diisi JS --}}
+                                        <td id="total_ds_netto_kering_display" class="text-right font-weight-bold">0</td>
                                     </tr>
                                     <tr>
-                                        <td colspan="8"></td> 
+                                        <td colspan="{{ $footerColspan }}"></td> 
                                         <td class="total-label">Total PT</td> 
-                                        <td id="total_pt_netto_kering_display"></td> {{-- ID unik untuk diisi JS --}}
+                                        <td id="total_pt_netto_kering_display" class="text-right font-weight-bold">0</td>
                                     </tr>
                                     <tr>
-                                        <td colspan="8"></td> 
+                                        <td colspan="{{ $footerColspan }}"></td> 
                                         <td class="total-label">Total INHUT</td> 
-                                        <td id="total_inhut_netto_kering_display"></td> {{-- ID unik untuk diisi JS --}}
+                                        <td id="total_inhut_netto_kering_display" class="text-right font-weight-bold">0</td>
                                     </tr>
                                     <tr>
-                                        <td colspan="8"></td> 
+                                        <td colspan="{{ $footerColspan }}"></td> 
                                         <td class="total-label">Jumlah</td> 
-                                        <td id="jumlah_netto_kering_display"></td> {{-- ID unik untuk diisi JS --}}
+                                        <td id="jumlah_netto_kering_display" class="text-right font-weight-bold">0</td>
                                     </tr>
                                 </tfoot>
                             </table>

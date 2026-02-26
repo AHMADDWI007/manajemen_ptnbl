@@ -662,16 +662,22 @@
                 <tr><td colspan="14" class="no-border" style="height:2px;"></td></tr>
                 
                 <tr class="no-border">
+                    {{-- TANDA TANGAN KIRI --}}
                     <td colspan="4" class="text-center no-border" style="vertical-align: top;">
-                        <br><br><br><br><br><br><br><br> <b><u>Sri Winarno</u></b><br>Kadiv Pengolahan
+                        <br><br><br><br><br><br><br><br> 
+                        <b><u>{{ $ttd_kiri_nama }}</u></b><br>
+                        {{ $ttd_kiri_jabatan }}
                     </td>
 
                     <td colspan="4" class="text-center no-border" style="vertical-align: top; padding-top: 0;">
                         <b>PT. NUSANTARA BATULICIN</b>
                     </td>
 
+                    {{-- TANDA TANGAN KANAN --}}
                     <td colspan="6" class="text-center no-border" style="vertical-align: top;">
-                        <br><br><br><br><br><br><br><br> <b><u>Sri Winarno</u></b><br>Manager
+                        <br><br><br><br><br><br><br><br> 
+                        <b><u>{{ $ttd_kanan_nama }}</u></b><br>
+                        {{ $ttd_kanan_jabatan }}
                     </td>
                 </tr>
             </tbody>

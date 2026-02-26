@@ -62,7 +62,7 @@
             <div class="container-fluid">
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white fw-bold">
-                        Preview Data Laporan
+                        <strong class="my-auto">Preview Data Laporan</strong>
                     </div>
                     <div class="card-body">
 

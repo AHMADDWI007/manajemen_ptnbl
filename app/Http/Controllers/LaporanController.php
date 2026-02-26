@@ -8,6 +8,7 @@ use App\Models\BahanProses;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\HasilUjiLabMaturasi;
 use App\Models\Maturasi;
+use App\Models\Pengaturan;
 use App\Models\PengolahanBasah;
 use App\Models\PengolahanMaturasi;
 use App\Models\PenjualanSir20;
@@ -87,6 +88,14 @@ class LaporanController extends Controller
         $gudangMutu   = $this->getDataGudangMutu($tanggal); // Return array [gudang, mutu]
         $dataPenjualan = $this->getDataPenjualan($tanggal);
 
+        // 🔥 TAMBAHAN: Ambil data Tanda Tangan dari tabel pengaturan
+        $ttd = Pengaturan::whereIn('kunci', [
+            'ttd_kiri_nama', 
+            'ttd_kiri_jabatan', 
+            'ttd_kanan_nama', 
+            'ttd_kanan_jabatan'
+        ])->get()->keyBy('kunci');
+
         // Satukan hasilnya dalam satu array
         return [
             'tanggal'       => $tanggal,
@@ -95,7 +104,12 @@ class LaporanController extends Controller
             'dataWip'       => $dataWip,
             'dataGudang'    => $gudangMutu['gudang'],
             'dataMutu'      => $gudangMutu['mutu'],
-            'dataPenjualan' => $dataPenjualan
+            'dataPenjualan' => $dataPenjualan,
+            // 🔥 Kirim data TTD ke view
+            'ttd_kiri_nama'     => $ttd->get('ttd_kiri_nama')->nilai ?? 'Sri Winarno',
+            'ttd_kiri_jabatan'  => $ttd->get('ttd_kiri_jabatan')->nilai ?? 'Kadiv Pengolahan',
+            'ttd_kanan_nama'    => $ttd->get('ttd_kanan_nama')->nilai ?? 'Sri Winarno',
+            'ttd_kanan_jabatan' => $ttd->get('ttd_kanan_jabatan')->nilai ?? 'Manager',
         ];
     }
 

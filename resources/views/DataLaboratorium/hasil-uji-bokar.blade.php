@@ -42,9 +42,17 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Hasil Uji Lab Bokar</h1>
-                <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
-                    <i class="fas fa-plus-circle"></i> Tambah Data
-                </button>
+                <div>
+                    <a href="javascript:void(0)" class="btn btn-warning btn-sm fw-bold mr-1" id="btnExportExcel">
+                        <i class="fas fa-file-excel"></i> Cetak Excel
+                    </a>
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL TAMBAH JIKA ROLE USER --}}
+                    @if(auth()->user()->role != 'user')
+                    <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
+                        <i class="fas fa-plus-circle"></i> Tambah Data
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -52,7 +60,7 @@
             <div class="container-fluid">
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white fw-bold">
-                        Daftar Hasil Uji Lab Bokar
+                        <strong class="my-auto">Daftar Hasil Uji Lab Bokar</strong>
                     </div>
                     <div class="card-body">
 
@@ -93,7 +101,10 @@
                                         <th>Po</th>
                                         <th>Pa</th>
                                         <th>PRI</th>
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -109,16 +120,25 @@
                                             <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td>
                                             <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
                                             <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td>
                                                 <div class="action-buttons">
                                                     <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_bokar }}" title="Detail"> <i class="fas fa-eye"></i> </button>
                                                     <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_bokar }}" title="Edit"> <i class="fas fa-edit"></i> </button>
-                                                    <form action="{{ route('hasil-uji-bokar.destroy', $item->id_hasil_uji_lab_bokar) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
+                                                    
+                                                    {{-- 🔥 TOMBOL HAPUS DENGAN CLASS BTN-HAPUS --}}
+                                                    <button type="button" class="btn btn-danger btn-sm btn-hapus" 
+                                                            data-id="{{ $item->id_hasil_uji_lab_bokar }}" 
+                                                            data-nama="{{ $item->no_sampel }}" title="Hapus"> 
+                                                        <i class="fas fa-trash"></i> 
+                                                    </button>
+                                                    <form id="form-hapus-{{ $item->id_hasil_uji_lab_bokar }}" action="{{ route('hasil-uji-bokar.destroy', $item->id_hasil_uji_lab_bokar) }}" method="POST" style="display:none;">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
                                                     </form>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -157,7 +177,11 @@
                     <div class="form-group"><label>Ash (%)</label><input type="number" name="ask" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
+                    <div class="form-group">
+                        <label>PRI</label>
+                        {{-- Tambahkan id="tambahPri" dan readonly --}}
+                        <input type="number" name="pri" id="tambahPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -229,7 +253,10 @@
                     <div class="form-group"><label>Ash (%)</label><input type="number" name="ask" id="editAsk" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
+                    <div class="form-group">
+                        <label>PRI</label>
+                        <input type="number" name="pri" id="editPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -250,10 +277,61 @@
 
 <script>
 $(document).ready(function() {
-
+    // 1. Notifikasi Sukses Global
     @if (session('success'))
         Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
     @endif
+
+    // 2. Notifikasi Error Validasi Global
+    @if ($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terjadi Kesalahan',
+            html: '{!! implode("<br>", $errors->all()) !!}',
+        });
+    @endif
+
+    // --- LOGIKA HITUNG PRI OTOMATIS ---
+    function hitungPRI(poSelector, paSelector, priSelector) {
+        let po = parseFloat($(poSelector).val()) || 0;
+        let pa = parseFloat($(paSelector).val()) || 0;
+        let priField = $(priSelector);
+
+        if (po > 0) {
+            let hasil = (pa / po) * 100;
+            priField.val(hasil.toFixed(2)); 
+        } else {
+            priField.val(''); 
+        }
+    }
+
+    // 🔥 LOGIKA EXCEL EXPORT (BOKAR DITERIMA)
+    // 🔥 LOGIKA EXCEL EXPORT (Ganti route sesuai halaman)
+    $('#btnExportExcel').on('click', function(e) {
+        e.preventDefault();
+        var minDate = $('#min-date').val();
+        var maxDate = $('#max-date').val();
+        
+        // Ganti 'hasil-uji-xxx.export' sesuai route di halaman tersebut
+        var exportUrl = "{{ route('hasil-uji-bokar.export') }}"; 
+        
+        if (minDate && maxDate) {
+            exportUrl += "?start_date=" + minDate + "&end_date=" + maxDate;
+            window.location.href = exportUrl;
+        } else {
+            Swal.fire('Informasi', 'Silakan pilih rentang tanggal filter terlebih dahulu.', 'info');
+        }
+    });
+
+    // Event untuk Modal Tambah (Uji Bokar)
+    $(document).on('input', '#modalTambah input[name="po"], #modalTambah input[name="pa"]', function() {
+        hitungPRI('#modalTambah input[name="po"]', '#modalTambah input[name="pa"]', '#tambahPri');
+    });
+
+    // Event untuk Modal Edit (Uji Bokar)
+    $(document).on('input', '#editPo, #editPa', function() {
+        hitungPRI('#editPo', '#editPa', '#editPri');
+    });
 
     // --- SETUP TANGGAL ---
     var today = new Date();
@@ -265,7 +343,7 @@ $(document).ready(function() {
     var fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: todayStr });
     var fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: todayStr });
 
-    // --- DATATABLES CONFIG (Bootstrap 4) ---
+    // --- DATATABLES CONFIG ---
     function parseDMY(dateStr){
         var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
     }
@@ -280,15 +358,11 @@ $(document).ready(function() {
         return false;
     });
 
-    // Inisialisasi DataTable (Style Bootstrap 4)
     var table = $('#dataTable').DataTable({
         "order": [[1,"desc"]],
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json"
-        }
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" }
     });
     
-    // Filter otomatis saat load
     table.draw();
 
     $('#filter-btn').on('click', function(e){ e.preventDefault(); table.draw(); });
@@ -296,7 +370,61 @@ $(document).ready(function() {
 
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    // DETAIL
+    // --- 3. KONFIRMASI SIMPAN (TAMBAH DATA) ---
+    $('#modalTambah form').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Simpan Data?',
+            text: "Pastikan data hasil uji sudah benar.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 4. KONFIRMASI UPDATE (EDIT DATA) ---
+    $('#formEdit').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Update Perubahan?',
+            text: "Data hasil uji akan diperbarui.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Update!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 5. KONFIRMASI HAPUS DATA ---
+    $(document).on('click', '.btn-hapus', function(e) {
+        var id = $(this).data('id');
+        var nama = $(this).data('nama');
+        Swal.fire({
+            title: 'Hapus Data?',
+            text: "Hasil uji sampel " + nama + " akan dihapus permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { $('#form-hapus-' + id).submit(); }
+        });
+    });
+
+    // --- AJAX DETAIL ---
     $(document).on('click','.btn-detail',function(){
         var id = $(this).data('id');
         var url = "{{ url('hasil-uji-bokar') }}/" + id;
@@ -305,9 +433,7 @@ $(document).ready(function() {
             if (data.tanggal) {
                 var dateObj = new Date(data.tanggal);
                 if (!isNaN(dateObj.getTime())) {
-                    tanggalFormatted = dateObj.toLocaleDateString('id-ID', { 
-                        day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' 
-                    });
+                    tanggalFormatted = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
                 }
             }
             $('#detailTanggal').text(tanggalFormatted);
@@ -320,10 +446,10 @@ $(document).ready(function() {
             $('#detailPa').text(data.pa ? (Math.floor(data.pa) == data.pa ? parseInt(data.pa) : data.pa) : '-');
             $('#detailPri').text(data.pri ? (Math.floor(data.pri) == data.pri ? parseInt(data.pri) : data.pri) : '-');
             $('#modalDetail').modal('show');
-        }).fail(function(){ alert('Gagal memuat detail.'); });
+        }).fail(function(){ Swal.fire('Gagal', 'Tidak dapat memuat detail.', 'error'); });
     });
 
-    // EDIT
+    // --- AJAX EDIT (MEMBUKA MODAL) ---
     $(document).on('click','.btn-edit',function(){
         var id = $(this).data('id');
         var urlGet = "{{ url('hasil-uji-bokar') }}/" + id + "/edit";
@@ -340,7 +466,7 @@ $(document).ready(function() {
             $('#editPri').val(data.pri);
             $('#formEdit').attr('action', urlPost);
             $('#modalEdit').modal('show');
-        }).fail(function(){ alert('Gagal memuat data edit.'); });
+        }).fail(function(){ Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });
     });
 });
 </script>

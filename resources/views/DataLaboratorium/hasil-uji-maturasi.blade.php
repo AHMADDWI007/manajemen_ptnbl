@@ -29,16 +29,25 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Hasil Uji Maturasi</h1>
-                <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
-                    <i class="fas fa-plus-circle"></i> Tambah Data
-                </button>
+                <div>
+                    <a href="javascript:void(0)" class="btn btn-warning btn-sm fw-bold mr-1" id="btnExportExcel">
+                        <i class="fas fa-file-excel"></i> Cetak Excel
+                    </a>
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL TAMBAH JIKA ROLE USER --}}
+                    @if(auth()->user()->role != 'user')
+                    <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
+                        <i class="fas fa-plus-circle"></i> Tambah Data
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
 
         <div class="content">
             <div class="container-fluid">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold"> Daftar Hasil Uji Maturasi </div>
+                    <div class="card-header bg-success text-white fw-bold"> 
+                        <strong class="my-auto">Daftar Hasil Uji Maturasi</strong></div>
                     <div class="card-body">
                          @if ($errors->any())
                             <div class="alert alert-danger"><ul class="mb-0">
@@ -73,7 +82,10 @@
                                         <th>Po</th>
                                         <th>Pa</th>
                                         <th>PRI</th>
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -89,24 +101,29 @@
                                             <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td> 
                                             <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td> 
                                             <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td> 
                                                 <div class="action-buttons">
-                                                    {{-- Tombol Detail --}}
                                                     <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_maturasi }}" title="Detail"> 
                                                         <i class="fas fa-eye"></i> 
                                                     </button>
-                                                    
-                                                    {{-- Tombol Edit --}}
                                                     <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_maturasi }}" title="Edit"> 
                                                         <i class="fas fa-edit"></i> 
                                                     </button>
                                                     
-                                                    <form action="{{ route('hasil-uji-maturasi.destroy', $item->id_hasil_uji_lab_maturasi) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?')" style="display:inline-block; margin:0;">
+                                                    {{-- 🔥 TOMBOL HAPUS DENGAN CLASS BTN-HAPUS --}}
+                                                    <button type="button" class="btn btn-danger btn-sm btn-hapus" 
+                                                            data-id="{{ $item->id_hasil_uji_lab_maturasi }}" 
+                                                            data-nama="{{ $item->maturasi->uraian ?? 'Bak' }}" title="Hapus"> 
+                                                        <i class="fas fa-trash"></i> 
+                                                    </button>
+                                                    <form id="form-hapus-{{ $item->id_hasil_uji_lab_maturasi }}" action="{{ route('hasil-uji-maturasi.destroy', $item->id_hasil_uji_lab_maturasi) }}" method="POST" style="display:none;">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
                                                     </form>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -150,7 +167,10 @@
                     <div class="form-group"><label>K3 (%)</label><input type="number" name="k3" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
+                    <div class="form-group"> 
+                        <label>PRI</label> 
+                        <input type="number" name="pri" id="tambahPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;"> 
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -186,7 +206,10 @@
                     <div class="form-group"> <label>K3 (%)</label> <input type="number" name="k3" id="editK3" class="form-control" step="0.01"> </div>
                     <div class="form-group"> <label>Po</label> <input type="number" name="po" id="editPo" class="form-control" step="0.01"> </div>
                     <div class="form-group"> <label>Pa</label> <input type="number" name="pa" id="editPa" class="form-control" step="0.01"> </div>
-                    <div class="form-group"> <label>PRI</label> <input type="number" name="pri" id="editPri" class="form-control" step="0.01"> </div>
+                    <div class="form-group"> 
+                        <label>PRI</label> 
+                        <input type="number" name="pri" id="editPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;"> 
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -239,84 +262,186 @@
 
 <script>
 $(document).ready(function() {
-    
-    // Notifikasi Sukses
+    // 1. Notifikasi Sukses Global
     @if (session('success'))
-        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
+        Swal.fire({ 
+            icon: 'success', 
+            title: 'Berhasil!', 
+            text: "{{ session('success') }}", 
+            showConfirmButton: false, 
+            timer: 2000 
+        });
     @endif
+
+    // 2. Notifikasi Error Validasi Global
+    @if ($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terjadi Kesalahan',
+            html: '{!! implode("<br>", $errors->all()) !!}',
+        });
+    @endif
+
+    // --- LOGIKA HITUNG PRI OTOMATIS ---
+    function hitungPRI(poSelector, paSelector, priSelector) {
+        let po = parseFloat($(poSelector).val()) || 0;
+        let pa = parseFloat($(paSelector).val()) || 0;
+        let priField = $(priSelector);
+
+        if (po > 0) {
+            let hasil = (pa / po) * 100;
+            priField.val(hasil.toFixed(2)); 
+        } else {
+            priField.val(''); 
+        }
+    }
+
+    // 🔥 LOGIKA EXCEL EXPORT (MATURASI)
+    // 🔥 LOGIKA EXCEL EXPORT (Ganti route sesuai halaman)
+    $('#btnExportExcel').on('click', function(e) {
+        e.preventDefault();
+        var minDate = $('#min-date').val();
+        var maxDate = $('#max-date').val();
+        
+        // Ganti 'hasil-uji-xxx.export' sesuai route di halaman tersebut
+        var exportUrl = "{{ route('hasil-uji-maturasi.export') }}"; 
+        
+        if (minDate && maxDate) {
+            exportUrl += "?start_date=" + minDate + "&end_date=" + maxDate;
+            window.location.href = exportUrl;
+        } else {
+            Swal.fire('Informasi', 'Silakan pilih rentang tanggal filter terlebih dahulu.', 'info');
+        }
+    });
+
+    // Event untuk Modal Tambah
+    $(document).on('input', '#modalTambah input[name="po"], #modalTambah input[name="pa"]', function() {
+        hitungPRI('#modalTambah input[name="po"]', '#modalTambah input[name="pa"]', '#modalTambah input[name="pri"]');
+    });
+
+    // Event untuk Modal Edit
+    $(document).on('input', '#editPo, #editPa', function() {
+        hitungPRI('#editPo', '#editPa', '#editPri');
+    });
+
+    // --- SETUP TANGGAL (Flatpickr) ---
+    var fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
+    var fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
     
-    // Setup Tanggal Filter (Flatpickr)
-    var fpMin, fpMax;
     function parseDMY(dateStr){
         var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
     }
-    fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
-    fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
     
-    // Setup Filter Table DataTables
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex){
         var min = $('#min-date').val(), max = $('#max-date').val(), tableDateStr = data[1] || '';
-        if (!tableDateStr || tableDateStr === '-') return true; var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
+        if (!tableDateStr || tableDateStr === '-') return true; 
+        var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
         var minDate = min ? new Date(min + 'T00:00:00') : null, maxDate = max ? new Date(max + 'T23:59:59') : null;
         if ((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; return false;
     });
 
-    var table = $('#dataTable').DataTable({ "order": [[1,"desc"]], "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" } });
+    // --- DATATABLES CONFIG ---
+    var table = $('#dataTable').DataTable({ 
+        "order": [[1,"desc"]], 
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" } 
+    });
     table.draw();
     
     $('#filter-btn').on('click', function(e) { e.preventDefault(); table.draw(); });
-    $('#reset-filter').on('click', function(e) { e.preventDefault(); fpMin.setDate("today"); fpMax.setDate("today"); setTimeout(function() { table.search('').draw(); }, 100); });
+    $('#reset-filter').on('click', function(e) { 
+        e.preventDefault(); 
+        fpMin.setDate("today"); fpMax.setDate("today"); 
+        setTimeout(function() { table.search('').draw(); }, 100); 
+    });
     
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    // DETAIL BUTTON
+    // --- 3. KONFIRMASI SIMPAN (TAMBAH DATA) ---
+    $('#modalTambah form').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Simpan Data Uji?',
+            text: "Pastikan input parameter lab sudah sesuai.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 4. KONFIRMASI UPDATE (EDIT DATA) ---
+    $('#formEdit').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Update Hasil Uji?',
+            text: "Data lab maturasi akan diperbarui.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Update!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 5. KONFIRMASI HAPUS DATA ---
+    $(document).on('click', '.btn-hapus', function(e) {
+        var id = $(this).data('id');
+        var nama = $(this).data('nama');
+        Swal.fire({
+            title: 'Hapus Hasil Uji?',
+            text: "Data uji kamar " + nama + " akan dihapus permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { $('#form-hapus-' + id).submit(); }
+        });
+    });
+
+    // --- AJAX DETAIL ---
     $(document).on('click', '.btn-detail', function () {
         var id = $(this).data('id'); 
         var url = "{{ url('hasil-uji-maturasi') }}/" + id; 
-        
         $.get(url, function (data) { 
-            // Format tanggal untuk Tampilan Teks (Indonesia: 01 Oktober 2025)
             var tanggalFormatted = data.tanggal ? new Date(data.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
-            
             $('#detailTanggal').text(tanggalFormatted);
             $('#detailNoKamar').text(data.maturasi ? data.maturasi.uraian : '-'); 
             $('#detailK3').text(data.k3 || '-');
             $('#detailPo').text(data.po || '-');
             $('#detailPa').text(data.pa || '-');
             $('#detailPri').text(data.pri || '-');
-            
             $('#modalDetail').modal('show');
-        }).fail(function(xhr) { alert('Gagal memuat detail.'); });
+        }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat detail.', 'error'); });
     });
 
-    // EDIT BUTTON (PERBAIKAN TANGGAL DI SINI)
+    // --- AJAX EDIT ---
     $(document).on('click', '.btn-edit', function () {
         var id = $(this).data('id'); 
         var urlGet = "{{ url('hasil-uji-maturasi') }}/" + id + "/edit"; 
         var urlPost = "{{ url('hasil-uji-maturasi') }}/" + id; 
-        
         $.get(urlGet, function (data) {
-            
-            // 🔥 PERBAIKAN: Ambil 10 karakter pertama (YYYY-MM-DD) dari string ISO
-            // Contoh: "2025-10-01T00:00:00..." menjadi "2025-10-01"
-            var tanggalInput = "";
-            if(data.tanggal) {
-                tanggalInput = data.tanggal.substring(0, 10);
-            }
-
+            var tanggalInput = data.tanggal ? data.tanggal.substring(0, 10) : "";
             $('#editTanggal').val(tanggalInput); 
-            
-            // Set Dropdown Select berdasarkan ID
             $('#editMaturasiId').val(data.id_maturasi); 
-            
             $('#editK3').val(data.k3);
             $('#editPo').val(data.po); 
             $('#editPa').val(data.pa); 
             $('#editPri').val(data.pri);
-            
             $('#formEdit').attr('action', urlPost);
             $('#modalEdit').modal('show');
-        }).fail(function(xhr) { alert('Gagal memuat data edit.'); });
+        }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });
     });
 });
 </script>

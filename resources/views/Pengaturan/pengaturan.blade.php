@@ -24,6 +24,13 @@
             font-weight: bold;
             color: #343a40;
         }
+        .ttd-box {
+            background-color: #f8f9fa;
+            border: 1px dashed #ced4da;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
@@ -70,25 +77,26 @@
                     </script>
                 @endif
 
-                <div class="row">
-                    {{-- Kolom Kiri: Form Konfigurasi --}}
-                    <div class="col-md-8">
-                        <div class="card card-outline card-primary shadow-sm">
-                            <div class="card-header">
-                                <h3 class="card-title font-weight-bold">
-                                    <i class="fas fa-network-wired mr-1"></i> Konfigurasi API Eksternal
-                                </h3>
-                                <div class="card-tools">
-                                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                                        <i class="fas fa-minus"></i>
-                                    </button>
-                                </div>
-                            </div>
+                <form action="{{ route('pengaturan.update') }}" method="POST">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="row">
+                        {{-- Kolom Kiri: Form Konfigurasi --}}
+                        <div class="col-md-8">
                             
-                            <form action="{{ route('pengaturan.update') }}" method="POST">
-                                @csrf
-                                @method('PUT')
-                                
+                            {{-- CARD 1: API BOKAR --}}
+                            <div class="card card-outline card-primary shadow-sm mb-4">
+                                <div class="card-header">
+                                    <h3 class="card-title font-weight-bold">
+                                        <i class="fas fa-network-wired mr-1"></i> Konfigurasi API Eksternal
+                                    </h3>
+                                    <div class="card-tools">
+                                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="card-body">
                                     <div class="callout callout-info mb-4">
                                         <h5><i class="fas fa-info-circle text-info"></i> Penting!</h5>
@@ -108,7 +116,6 @@
                                                    value="{{ old('url_api_bokar', $apiBokar->nilai ?? '') }}" 
                                                    placeholder="https://contoh.com/api/get_bokar.php"
                                                    style="height: 45px;">
-                                            
                                             @error('url_api_bokar')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -119,51 +126,109 @@
                                         </small>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div class="card-footer bg-light text-right">
-                                    <button type="submit" class="btn btn-success font-weight-bold px-4 shadow-sm">
-                                        <i class="fas fa-save mr-2"></i> Simpan Perubahan
-                                    </button>
+                            {{-- CARD 2: PENGATURAN TANDA TANGAN LAPORAN --}}
+                            <div class="card card-outline card-success shadow-sm mb-4">
+                                <div class="card-header">
+                                    <h3 class="card-title font-weight-bold">
+                                        <i class="fas fa-signature mr-1"></i> Pengaturan Tanda Tangan Laporan
+                                    </h3>
+                                    <div class="card-tools">
+                                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    {{-- Kolom Kanan: Panel Informasi --}}
-                    <div class="col-md-4">
-                        <div class="card card-outline card-info shadow-sm">
-                            <div class="card-header">
-                                <h3 class="card-title font-weight-bold"><i class="fas fa-question-circle mr-1"></i> Bantuan</h3>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-justify">
-                                    Halaman ini digunakan untuk mengatur parameter teknis sistem yang bersifat dinamis.
-                                </p>
-                                <hr>
-                                <strong><i class="fas fa-sync-alt mr-1 text-primary"></i> Fitur Sync API</strong>
-                                <p class="text-muted mt-1 mb-3">
-                                    Fitur "Sync API" pada menu Pengolahan Basah akan menggunakan URL yang Anda tentukan di sini untuk menarik data terbaru.
-                                </p>
-                                
-                                <strong><i class="fas fa-shield-alt mr-1 text-success"></i> Keamanan</strong>
-                                <p class="text-muted mt-1">
-                                    Perubahan pada pengaturan ini akan dicatat dalam log sistem untuk keperluan audit.
-                                </p>
-                            </div>
-                        </div>
+                                <div class="card-body">
+                                    <div class="callout callout-success mb-4">
+                                        <p class="mb-0">Data di bawah ini akan ditampilkan pada bagian akhir Cetak Laporan (Excel & PDF).</p>
+                                    </div>
 
-                        {{-- Status Koneksi (Visualisasi Sederhana) --}}
-                        <div class="info-box shadow-sm">
-                            <span class="info-box-icon bg-success elevation-1"><i class="fas fa-server"></i></span>
-                            <div class="info-box-content">
-                                <span class="info-box-text">Status API Saat Ini</span>
-                                <span class="info-box-number">
-                                    {{ !empty($apiBokar->nilai) ? 'Terkonfigurasi' : 'Belum Disetting' }}
-                                </span>
+                                    <div class="row">
+                                        {{-- TTD Kiri --}}
+                                        <div class="col-md-6 mb-3">
+                                            <div class="ttd-box">
+                                                <h6 class="font-weight-bold text-muted mb-3">Penandatangan Kiri</h6>
+                                                <div class="form-group text-left">
+                                                    <label class="small mb-1">Nama Terang</label>
+                                                    <input type="text" class="form-control text-center font-weight-bold" name="ttd_kiri_nama" value="{{ old('ttd_kiri_nama', $ttd_kiri_nama->nilai ?? 'Sri Winarno') }}" placeholder="Contoh: Budi Santoso" required>
+                                                </div>
+                                                <div class="form-group text-left mb-0">
+                                                    <label class="small mb-1">Jabatan</label>
+                                                    <input type="text" class="form-control text-center" name="ttd_kiri_jabatan" value="{{ old('ttd_kiri_jabatan', $ttd_kiri_jabatan->nilai ?? 'Kadiv Pengolahan') }}" placeholder="Contoh: Kadiv Pengolahan" required>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- TTD Kanan --}}
+                                        <div class="col-md-6 mb-3">
+                                            <div class="ttd-box">
+                                                <h6 class="font-weight-bold text-muted mb-3">Penandatangan Kanan</h6>
+                                                <div class="form-group text-left">
+                                                    <label class="small mb-1">Nama Terang</label>
+                                                    <input type="text" class="form-control text-center font-weight-bold" name="ttd_kanan_nama" value="{{ old('ttd_kanan_nama', $ttd_kanan_nama->nilai ?? 'Sri Winarno') }}" placeholder="Contoh: Agus Pratama" required>
+                                                </div>
+                                                <div class="form-group text-left mb-0">
+                                                    <label class="small mb-1">Jabatan</label>
+                                                    <input type="text" class="form-control text-center" name="ttd_kanan_jabatan" value="{{ old('ttd_kanan_jabatan', $ttd_kanan_jabatan->nilai ?? 'Manager') }}" placeholder="Contoh: Manager" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                        
+                        {{-- Kolom Kanan: Panel Informasi & Tombol --}}
+                        <div class="col-md-4">
+                            
+                            <div class="card card-outline card-info shadow-sm">
+                                <div class="card-header">
+                                    <h3 class="card-title font-weight-bold"><i class="fas fa-question-circle mr-1"></i> Bantuan</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-justify">
+                                        Halaman ini digunakan untuk mengatur parameter teknis sistem yang bersifat dinamis.
+                                    </p>
+                                    <hr>
+                                    <strong><i class="fas fa-sync-alt mr-1 text-primary"></i> Fitur Sync API</strong>
+                                    <p class="text-muted mt-1 mb-3">
+                                        Fitur "Sync API" pada menu Pengolahan Basah akan menggunakan URL yang Anda tentukan di sini untuk menarik data terbaru.
+                                    </p>
+                                    
+                                    <strong><i class="fas fa-signature mr-1 text-success"></i> Tanda Tangan Laporan</strong>
+                                    <p class="text-muted mt-1 mb-3">
+                                        Pengaturan nama dan jabatan penandatangan akan otomatis mengubah seluruh hasil cetak laporan terbaru tanpa perlu menyentuh kode program.
+                                    </p>
+
+                                    <strong><i class="fas fa-shield-alt mr-1 text-secondary"></i> Keamanan</strong>
+                                    <p class="text-muted mt-1">
+                                        Perubahan pada pengaturan ini akan dicatat dalam log sistem untuk keperluan audit.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {{-- Status Koneksi (Visualisasi Sederhana) --}}
+                            <div class="info-box shadow-sm mb-4">
+                                <span class="info-box-icon bg-success elevation-1"><i class="fas fa-server"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Status API Saat Ini</span>
+                                    <span class="info-box-number">
+                                        {{ !empty($apiBokar->nilai) ? 'Terkonfigurasi' : 'Belum Disetting' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {{-- TOMBOL SIMPAN GLOBAL DIPINDAH KE SINI --}}
+                            <button type="submit" class="btn btn-success btn-block font-weight-bold btn-lg shadow">
+                                <i class="fas fa-save mr-2"></i> Simpan Semua Perubahan
+                            </button>
+
+                        </div>
+                        
                     </div>
-                </div>
+                </form>
 
             </div>
         </div>

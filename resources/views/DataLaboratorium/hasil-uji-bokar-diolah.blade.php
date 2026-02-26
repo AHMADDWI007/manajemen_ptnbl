@@ -33,15 +33,24 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Input K3 Bokar Diolah</h1>
-                <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambahK3">
-                    <i class="fas fa-plus-circle"></i> Input K3
-                </button>
+                <div>
+                    <a href="javascript:void(0)" class="btn btn-warning btn-sm fw-bold mr-1" id="btnExportExcel">
+                        <i class="fas fa-file-excel"></i> Cetak Excel
+                    </a>
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL JIKA ROLE ADALAH USER --}}
+                    @if(auth()->user()->role != 'user')
+                    <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambahK3">
+                        <i class="fas fa-plus-circle"></i> Input K3
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
         <div class="content">
             <div class="container-fluid">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold"> Daftar Hasil Uji Bokar Diolah </div>
+                    <div class="card-header bg-success text-white fw-bold"> 
+                        <strong class="my-auto">Daftar Hasil Uji Bokar Diolah</strong></div>
                     <div class="card-body">
                         @if ($errors->any())
                             <div class="alert alert-danger"><ul class="mb-0">
@@ -87,7 +96,10 @@
                                         <th>Netto Basah (Kg)</th> 
                                         <th>K3 (%)</th> 
                                         <th>Netto Kering (Kg)</th> 
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE ADALAH USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -101,16 +113,25 @@
                                             <td>{{ is_numeric($item->netto_basah) ? number_format($item->netto_basah, 2) : '-' }}</td>
                                             <td>{{ is_numeric($item->k3) ? number_format($item->k3, 2) : '-' }}</td>
                                             <td>{{ is_numeric($item->netto_kering) ? number_format($item->netto_kering, 2) : '-' }}</td>
+                                            {{-- 🔥 SEMBUNYIKAN ISI KOLOM AKSI JIKA ROLE ADALAH USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td>
                                                 <div class="action-buttons">
                                                     <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_pengolahan_basah }}" title="Detail"> <i class="fas fa-eye"></i> </button>
                                                     <button type="button" class="btn btn-warning btn-sm btn-edit-k3" data-id="{{ $item->id_pengolahan_basah }}" title="Edit K3"> <i class="fas fa-edit"></i> </button>
-                                                    <form action="{{ route('hasil-uji-bokar-diolah.destroy', $item->id_pengolahan_basah) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?');" style="display:inline-block; margin:0;">
+                                                    
+                                                    {{-- 🔥 PERBAIKAN SWEETALERT PADA TOMBOL HAPUS --}}
+                                                    <button type="button" class="btn btn-danger btn-sm btn-hapus" 
+                                                            data-id="{{ $item->id_pengolahan_basah }}" 
+                                                            data-nama="{{ $item->maturasi->uraian ?? 'Bak' }}" title="Hapus"> 
+                                                        <i class="fas fa-trash"></i> 
+                                                    </button>
+                                                    <form id="form-hapus-{{ $item->id_pengolahan_basah }}" action="{{ route('hasil-uji-bokar-diolah.destroy', $item->id_pengolahan_basah) }}" method="POST" style="display:none;">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"> <i class="fas fa-trash"></i> </button>
                                                     </form>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -233,11 +254,45 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 $(document).ready(function() {
+    // 1. Notifikasi Sukses Global (Muncul otomatis setelah Redirect)
     @if (session('success'))
-        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
+        Swal.fire({ 
+            icon: 'success', 
+            title: 'Berhasil!', 
+            text: "{{ session('success') }}", 
+            showConfirmButton: false, 
+            timer: 2000 
+        });
     @endif
 
-    // --- SETUP TANGGAL ---
+    // 2. Notifikasi Error Validasi Global
+    @if ($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terjadi Kesalahan',
+            html: '{!! implode("<br>", $errors->all()) !!}',
+        });
+    @endif
+
+    // 🔥 LOGIKA EXCEL EXPORT (BOKAR DIOLAH)
+    // 🔥 LOGIKA EXCEL EXPORT (Ganti route sesuai halaman)
+    $('#btnExportExcel').on('click', function(e) {
+        e.preventDefault();
+        var minDate = $('#min-date').val();
+        var maxDate = $('#max-date').val();
+        
+        // Ganti 'hasil-uji-xxx.export' sesuai route di halaman tersebut
+        var exportUrl = "{{ route('hasil-uji-bokar-diolah.export') }}"; 
+        
+        if (minDate && maxDate) {
+            exportUrl += "?start_date=" + minDate + "&end_date=" + maxDate;
+            window.location.href = exportUrl;
+        } else {
+            Swal.fire('Informasi', 'Silakan pilih rentang tanggal filter terlebih dahulu.', 'info');
+        }
+    });
+
+    // --- SETUP TANGGAL (Flatpickr) ---
     var today = new Date();
     var yyyy = today.getFullYear();
     var mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -262,7 +317,6 @@ $(document).ready(function() {
         return false;
     });
 
-    // Inisialisasi DataTable (Style Bootstrap 4)
     var table = $('#dataTable').DataTable({
         "order": [[1,"desc"]],
         "language": {
@@ -276,6 +330,7 @@ $(document).ready(function() {
     $('#reset-filter').on('click', function(e){ e.preventDefault(); fpMin.clear(); fpMax.clear(); table.search('').draw(); });
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
+    // --- HELPER FORMATTING ---
     function formatNumber(num, precision = 2) {
         if (num === null || num === undefined || num === '') return '-';
         num = parseFloat(num);
@@ -290,6 +345,68 @@ $(document).ready(function() {
         } catch (e) { return '-'; }
     }
 
+    // --- 3. KONFIRMASI SIMPAN (TAMBAH DATA BARU) ---
+    $('#modalTambahK3 form').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Simpan Data?',
+            text: "Pastikan nilai K3 sudah benar.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    });
+
+    // --- 4. KONFIRMASI UPDATE (EDIT DATA) ---
+    $('#formEditK3').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Update Perubahan?',
+            text: "Data hasil uji akan diperbarui di database.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Update!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    });
+
+    // --- 5. KONFIRMASI HAPUS DATA ---
+    $(document).on('click', '.btn-hapus', function(e) {
+        e.preventDefault();
+        var id = $(this).data('id');
+        var nama = $(this).data('nama');
+        
+        Swal.fire({
+            title: 'Hapus Data?',
+            text: "Data uji " + nama + " akan dihapus secara permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $('#form-hapus-' + id).submit();
+            }
+        });
+    });
+
     // --- AJAX DETAIL ---
     $(document).on('click','.btn-detail',function(){
         var id = $(this).data('id');
@@ -303,10 +420,10 @@ $(document).ready(function() {
             $('#detailK3').text(k3Val !== '-' ? k3Val + ' %' : '-');
             $('#detailNettoKering').text(formatNumber(data.netto_kering) + ' Kg');
             $('#modalDetail').modal('show');
-        }).fail(function(){ alert('Gagal memuat detail.'); });
+        }).fail(function(){ Swal.fire('Gagal', 'Tidak dapat memuat detail data.', 'error'); });
     });
 
-    // --- AJAX EDIT K3 ---
+    // --- AJAX EDIT K3 (MEMBUKA MODAL) ---
     $(document).on('click','.btn-edit-k3',function(){
         var id = $(this).data('id');
         var urlGet = "{{ url('hasil-uji-bokar-diolah') }}/" + id + "/edit";
@@ -317,7 +434,7 @@ $(document).ready(function() {
             $('#editK3').val(data.k3);
             $('#formEditK3').attr('action', urlPost);
             $('#modalEditK3').modal('show');
-        }).fail(function(){ alert('Gagal memuat data edit K3.'); });
+        }).fail(function(){ Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });
     });
 });
 </script>

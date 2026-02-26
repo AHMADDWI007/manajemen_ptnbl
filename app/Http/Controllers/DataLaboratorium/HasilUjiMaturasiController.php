@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
+use App\Exports\HasilUjiMaturasiExport;
 use App\Http\Controllers\Controller;
 use App\Models\HasilUjiLabMaturasi; // 🔥 [PERBAIKAN] Nama Model Baru
 use App\Models\Maturasi; 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log; 
-use Illuminate\Http\RedirectResponse;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log; 
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HasilUjiMaturasiController extends Controller
 {
@@ -45,8 +48,12 @@ class HasilUjiMaturasiController extends Controller
             'id_maturasi.exists' => 'Bak Maturasi tidak ditemukan.'
         ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+        if ($validator->fails()) return redirect()->back()->withErrors($validator)->withInput();
+
+        $data = $validator->validated();
+        // ✅ HITUNG PRI OTOMATIS DI SERVER
+        if (!empty($data['po']) && !empty($data['pa']) && $data['po'] > 0) {
+            $data['pri'] = ($data['pa'] / $data['po']) * 100;
         }
 
         // Simpan data
@@ -117,5 +124,16 @@ class HasilUjiMaturasiController extends Controller
              Log::error("Gagal menghapus hasil uji: " . $e->getMessage());
              return redirect()->route('hasil-uji-maturasi.index')->with('error', 'Gagal menghapus data.');
         }
+    }
+
+    // Tambahkan fungsi export
+    public function exportExcel(Request $request)
+    {
+        if (ob_get_length()) { ob_end_clean(); }
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $namaFile = "Laporan_Uji_Maturasi_" . ($startDate ? Carbon::parse($startDate)->format('d-m-Y') : 'Semua') . ".xlsx";
+
+        return Excel::download(new HasilUjiMaturasiExport($startDate, $endDate), $namaFile);
     }
 }

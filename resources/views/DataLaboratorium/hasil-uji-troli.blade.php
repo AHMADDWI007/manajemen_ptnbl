@@ -42,9 +42,17 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Hasil Uji Troli</h1>
-                <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambahTroli">
-                    <i class="fas fa-plus-circle"></i> Tambah Data
-                </button>
+                <div>
+                    <a href="javascript:void(0)" class="btn btn-warning btn-sm fw-bold mr-1" id="btnExportExcel">
+                        <i class="fas fa-file-excel"></i> Cetak Excel
+                    </a>
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL JIKA ROLE USER --}}
+                    @if(auth()->user()->role != 'user')
+                    <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambahTroli">
+                        <i class="fas fa-plus-circle"></i> Tambah Data
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -52,7 +60,7 @@
             <div class="container-fluid">
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white fw-bold">
-                        Daftar Hasil Uji Troli
+                        <strong class="my-auto">Daftar Hasil Uji Troli</strong>
                     </div>
                     <div class="card-body">
                         @if ($errors->any())
@@ -90,7 +98,10 @@
                                         <th>Pa</th>
                                         <th>PRI</th>
                                         <th>Jam Sample</th>
+                                        {{-- 🔥 SEMBUNYIKAN TOMBOL JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -104,16 +115,25 @@
                                             <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
                                             <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
                                             <td>{{ $item->jam_sample ? \Carbon\Carbon::parse($item->jam_sample)->format('H:i') : '-' }}</td>
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td>
                                                 <div class="action-buttons">
                                                     <button type="button" class="btn btn-info btn-sm btn-detail" data-id="{{ $item->id_hasil_uji_lab_troli }}" title="Detail"><i class="fas fa-eye"></i></button>
                                                     <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_troli }}" title="Edit"><i class="fas fa-edit"></i></button>
-                                                    <form action="{{ route('hasil-uji-troli.destroy', $item->id_hasil_uji_lab_troli) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus data ini?')" style="display:inline-block; margin:0;">
+                                                    
+                                                    {{-- 🔥 TOMBOL HAPUS DENGAN CLASS BTN-HAPUS UNTUK SWEETALERT --}}
+                                                    <button type="button" class="btn btn-danger btn-sm btn-hapus" 
+                                                            data-id="{{ $item->id_hasil_uji_lab_troli }}" 
+                                                            data-nama="{{ $item->no_trolly }}" title="Hapus">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <form id="form-hapus-{{ $item->id_hasil_uji_lab_troli }}" action="{{ route('hasil-uji-troli.destroy', $item->id_hasil_uji_lab_troli) }}" method="POST" style="display:none;">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus"><i class="fas fa-trash"></i></button>
                                                     </form>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -149,7 +169,10 @@
                     <div class="form-group"><label>K3</label><input type="number" name="k3" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" class="form-control" step="0.01"></div>
+                    <div class="form-group"> 
+                        <label>PRI</label> 
+                        <input type="number" name="pri" id="tambahPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;"> 
+                    </div>
                     <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" class="form-control"></div>
                 </div>
                 <div class="modal-footer">
@@ -207,7 +230,10 @@
                     <div class="form-group"><label>K3</label><input type="number" name="k3" id="editK3" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" id="editPo" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" id="editPa" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>PRI</label><input type="number" name="pri" id="editPri" class="form-control" step="0.01"></div>
+                    <div class="form-group"> 
+                        <label>PRI</label> 
+                        <input type="number" name="pri" id="editPri" class="form-control bg-light" step="0.01" readonly style="background-color: #e9ecef;"> 
+                    </div>
                     <div class="form-group"><label>Jam Sample</label><input type="time" name="jam_sample" id="editJamSample" class="form-control"></div>
                 </div>
                 <div class="modal-footer">
@@ -229,32 +255,88 @@
 <script>
 $(document).ready(function() {
     
+    // 1. Notifikasi Sukses Global
     @if (session('success'))
-        Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 });
+        Swal.fire({ 
+            icon: 'success', 
+            title: 'Berhasil!', 
+            text: "{{ session('success') }}", 
+            showConfirmButton: false, 
+            timer: 2000 
+        });
     @endif
 
-    var fpMin, fpMax;
+    // 2. Notifikasi Error Validasi Global
+    @if ($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terjadi Kesalahan',
+            html: '{!! implode("<br>", $errors->all()) !!}',
+        });
+    @endif
+
+    // -- LOGIKA HITUNG PRI OTOMATIS ---
+    function hitungPRI(poSelector, paSelector, priSelector) {
+        let po = parseFloat($(poSelector).val()) || 0;
+        let pa = parseFloat($(paSelector).val()) || 0;
+        let priField = $(priSelector);
+
+        if (po > 0) {
+            let hasil = (pa / po) * 100;
+            priField.val(hasil.toFixed(2)); 
+        } else {
+            priField.val(''); 
+        }
+    }
+
+    // 🔥 LOGIKA EXCEL EXPORT (TROLI)
+    // 🔥 LOGIKA EXCEL EXPORT (Ganti route sesuai halaman)
+    $('#btnExportExcel').on('click', function(e) {
+        e.preventDefault();
+        var minDate = $('#min-date').val();
+        var maxDate = $('#max-date').val();
+        
+        // Ganti 'hasil-uji-xxx.export' sesuai route di halaman tersebut
+        var exportUrl = "{{ route('hasil-uji-troli.export') }}"; 
+        
+        if (minDate && maxDate) {
+            exportUrl += "?start_date=" + minDate + "&end_date=" + maxDate;
+            window.location.href = exportUrl;
+        } else {
+            Swal.fire('Informasi', 'Silakan pilih rentang tanggal filter terlebih dahulu.', 'info');
+        }
+    });
+
+    // Event untuk Modal Tambah Troli
+    // Gunakan selector ID input langsung agar lebih presisi
+    $(document).on('input', '#modalTambahTroli input[name="po"], #modalTambahTroli input[name="pa"]', function() {
+        hitungPRI('#modalTambahTroli input[name="po"]', '#modalTambahTroli input[name="pa"]', '#tambahPri');
+    });
+
+    // Event untuk Modal Edit Troli
+    $(document).on('input', '#editPo, #editPa', function() {
+        hitungPRI('#editPo', '#editPa', '#editPri');
+    });
+
+    // --- SETUP TANGGAL (Flatpickr) ---
+    var fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
+    var fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
 
     function parseDMY(dateStr){
         var parts = dateStr.split('-'); if(parts.length!==3) return null; return new Date(parts[2], parts[1]-1, parts[0]);
     }
 
-    fpMin = flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
-    fpMax = flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "today" });
-
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex){
         var min = $('#min-date').val(), max = $('#max-date').val(), tableDateStr = data[1] || '';
-        if (!tableDateStr || tableDateStr === '-') return true; var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
+        if (!tableDateStr || tableDateStr === '-') return true; 
+        var tableDate = parseDMY(tableDateStr); if (!tableDate) return true;
         var minDate = min ? new Date(min + 'T00:00:00') : null, maxDate = max ? new Date(max + 'T23:59:59') : null;
         if ((!minDate || tableDate >= minDate) && (!maxDate || tableDate <= maxDate)) return true; return false;
     });
     
-    // Inisialisasi DataTable (Bootstrap 4 Style)
     var table = $('#dataTable').DataTable({
         "order": [[1,"desc"]],
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json"
-        }
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" }
     });
 
     table.draw();
@@ -267,6 +349,60 @@ $(document).ready(function() {
 
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
+    // --- 3. KONFIRMASI SIMPAN (TAMBAH DATA) ---
+    $('#modalTambahTroli form').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Simpan Data Uji?',
+            text: "Pastikan input parameter lab troli sudah sesuai.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 4. KONFIRMASI UPDATE (EDIT DATA) ---
+    $('#formEdit').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Update Hasil Uji?',
+            text: "Data lab troli akan diperbarui.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Update!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { form.submit(); }
+        });
+    });
+
+    // --- 5. KONFIRMASI HAPUS DATA ---
+    $(document).on('click', '.btn-hapus', function(e) {
+        var id = $(this).data('id');
+        var nama = $(this).data('nama');
+        Swal.fire({
+            title: 'Hapus Data?',
+            text: "Data uji troli nomor " + nama + " akan dihapus permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) { $('#form-hapus-' + id).submit(); }
+        });
+    });
+
     // Helper Number Format
     function formatNumber(num) {
         if (num === null || num === undefined || num === '') return '-';
@@ -274,17 +410,11 @@ $(document).ready(function() {
         return (num % 1 === 0) ? parseInt(num) : parseFloat(num);
     }
 
-    // DETAIL
+    // AJAX DETAIL
     $(document).on('click', '.btn-detail', function () {
         var id = $(this).data('id'); var url = "{{ url('hasil-uji-troli') }}/" + id;
         $.get(url, function (data) {
-            var tanggalFormatted = '-';
-            if (data.tanggal) {
-                var dateObj = new Date(data.tanggal);
-                if (!isNaN(dateObj.getTime())) {
-                    tanggalFormatted = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
-                }
-            }
+            var tanggalFormatted = data.tanggal ? new Date(data.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '-';
             $('#detailTanggal').text(tanggalFormatted);
             $('#detailNoTrolly').text(data.no_trolly || '-'); 
             $('#detailK3').text(data.k3 ? (Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) + ' %' : '-');
@@ -294,10 +424,10 @@ $(document).ready(function() {
             var jam = data.jam_sample ? data.jam_sample.substring(0, 5) : '-';
             $('#detailJamSample').text(jam); 
             $('#modalDetail').modal('show');
-        }).fail(function() { alert('Gagal mengambil data detail. Cek URL atau route.'); });
+        }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat detail data.', 'error'); });
     });
 
-    // EDIT
+    // AJAX EDIT
     $(document).on('click', '.btn-edit', function () {
         var id = $(this).data('id');
         var urlGet = "{{ url('hasil-uji-troli') }}/" + id + "/edit";
@@ -309,7 +439,7 @@ $(document).ready(function() {
             $('#editJamSample').val(data.jam_sample ? data.jam_sample.substring(0, 5) : ''); 
             $('#formEdit').attr('action', urlPost);
             $('#modalEdit').modal('show');
-        }).fail(function() { alert('Gagal mengambil data edit. Cek URL atau route.'); });
+        }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });
     });
 });
 </script>

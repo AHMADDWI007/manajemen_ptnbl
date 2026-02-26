@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
-use Carbon\Carbon;
-use Illuminate\Http\Request;
-use App\Models\ProduksiSir20;
-use Illuminate\Validation\Rule;
-use App\Models\HasilUjiLabSIR20;
-use Illuminate\Http\JsonResponse;
+use App\Exports\HasilUjiSir20Export;
 use App\Http\Controllers\Controller;
+use App\Models\HasilUjiLabSIR20;
+use App\Models\ProduksiSir20;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HasilUjiSIR20Controller extends Controller
 {
@@ -191,5 +193,19 @@ public function index(Request $request)
         }
 
         return response()->json($daftarPalet);
+    }
+
+    // Tambahkan fungsi ini di dalam class
+    public function exportExcel(Request $request)
+    {
+        if (ob_get_length()) { ob_end_clean(); }
+        
+        $startDate  = $request->query('start_date');
+        $endDate    = $request->query('end_date');
+        $statusMutu = $request->query('status_mutu', 'all');
+
+        $namaFile = "Laporan_Uji_SIR20_" . ($startDate ? Carbon::parse($startDate)->format('d-m-Y') : 'Semua') . ".xlsx";
+
+        return Excel::download(new HasilUjiSir20Export($startDate, $endDate, $statusMutu), $namaFile);
     }
 }

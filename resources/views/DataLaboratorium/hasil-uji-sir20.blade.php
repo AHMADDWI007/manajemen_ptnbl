@@ -29,69 +29,87 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Hasil Uji Sir 20</h1>
-                <button class="btn btn-success btn-sm fw-bold" id="btnTambahData" data-toggle="modal" data-target="#modalTambahSir"> 
-                    <i class="fas fa-plus-circle"></i> Tambah Data
-                </button>
+                <div>
+                    <a href="javascript:void(0)" class="btn btn-warning btn-sm fw-bold mr-1" id="btnExportExcel">
+                        <i class="fas fa-file-excel"></i> Cetak Excel
+                    </a>
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL JIKA ROLE USER --}}
+                    @if(auth()->user()->role != 'user')
+                    <button class="btn btn-success btn-sm fw-bold" id="btnTambahData" data-toggle="modal" data-target="#modalTambahSir"> 
+                        <i class="fas fa-plus-circle"></i> Tambah Data
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
 
         <div class="content">
             <div class="container-fluid">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white fw-bold">Daftar Hasil Uji Sir 20</div>
+                    <div class="card-header bg-success text-white fw-bold">
+                        <strong class="my-auto">Daftar Hasil Uji Sir 20</strong></div>
                     <div class="card-body">
                         @if ($errors->any())
                         <div class="alert alert-danger"><ul class="mb-0">
                             @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
                         </ul></div>
                         @endif
-
-{{-- FILTER TANGGAL & MUTU --}}
-<form method="GET" action="{{ route('hasil-uji-sir20.index') }}">
-    <div class="row mb-3 align-items-end">
-        <div class="col-auto">
- 
-    <label for="min-date" class="form-label small fw-bold mb-1">Dari Tanggal:</label>
-    {{-- ✅ Ganti ke type="text", tambah bg-light dan readonly --}}
-    <input type="text" name="start_date" id="min-date" 
-           class="form-control form-control-sm bg-light" 
-           value="{{ $fromDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
-</div>
-<div class="col-auto">
-    <label for="max-date" class="form-label small fw-bold mb-1">Sampai Tanggal:</label>
-    {{-- ✅ Lakukan hal yang sama untuk input ini --}}
-    <input type="text" name="end_date" id="max-date" 
-           class="form-control form-control-sm bg-light" 
-           value="{{ $toDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
-</div>
-        <div class="col-auto">
-            <label class="form-label small fw-bold mb-1">Status Mutu:</label>
-            <select name="status_mutu" id="filter-mutu" class="form-control form-control-sm" style="width: 150px;">
-                <option value="all" {{ $statusMutu == 'all' ? 'selected' : '' }}>Semua Data</option>
-                <option value="low" {{ $statusMutu == 'low' ? 'selected' : '' }}>Hanya Low (PRI < 60)</option>
-            </select>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary btn-sm fw-bold">
-                <i class="fas fa-filter mr-1"></i> Filter
-            </button>
-            {{-- ✅ Tambahkan id="reset-filter" --}}
-            <a href="{{ route('hasil-uji-sir20.index') }}" id="reset-filter" class="btn btn-secondary btn-sm fw-bold">
-                <i class="fas fa-undo mr-1"></i> Reset
-            </a>
-        </div>
-    </div>
-</form>
+                            {{-- FILTER TANGGAL & MUTU --}}
+                            <form method="GET" action="{{ route('hasil-uji-sir20.index') }}">
+                                <div class="row mb-3 align-items-end">
+                                    <div class="col-auto">
+                            
+                                <label for="min-date" class="form-label small fw-bold mb-1">Dari Tanggal:</label>
+                                {{-- ✅ Ganti ke type="text", tambah bg-light dan readonly --}}
+                                <input type="text" name="start_date" id="min-date" 
+                                    class="form-control form-control-sm bg-light" 
+                                    value="{{ $fromDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
+                            </div>
+                            <div class="col-auto">
+                                <label for="max-date" class="form-label small fw-bold mb-1">Sampai Tanggal:</label>
+                                {{-- ✅ Lakukan hal yang sama untuk input ini --}}
+                                <input type="text" name="end_date" id="max-date" 
+                                    class="form-control form-control-sm bg-light" 
+                                    value="{{ $toDate }}" readonly placeholder="dd/mm/yyyy" style="width: 140px;">
+                            </div>
+                                    <div class="col-auto">
+                                        <label class="form-label small fw-bold mb-1">Status Mutu:</label>
+                                        <select name="status_mutu" id="filter-mutu" class="form-control form-control-sm" style="width: 150px;">
+                                            <option value="all" {{ $statusMutu == 'all' ? 'selected' : '' }}>Semua Data</option>
+                                            <option value="low" {{ $statusMutu == 'low' ? 'selected' : '' }}>Hanya Low (PRI < 60)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="submit" class="btn btn-primary btn-sm fw-bold">
+                                            <i class="fas fa-filter mr-1"></i> Filter
+                                        </button>
+                                        {{-- ✅ Tambahkan id="reset-filter" --}}
+                                        <a href="{{ route('hasil-uji-sir20.index') }}" id="reset-filter" class="btn btn-secondary btn-sm fw-bold">
+                                            <i class="fas fa-undo mr-1"></i> Reset
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
                         <hr>
-                        
 
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped align-middle" id="dataTable" style="width:100%">
                                 <thead class="text-center bg-light"> 
                                     <tr>
-                                        <th>No</th><th>Tanggal</th><th>Jenis Kemasan</th><th>No. Palet</th>
-                                        <th>Po</th><th>Pa</th><th>PRI</th><th>Dirt(%)</th><th>Ash(%)</th>
-                                        <th>VM(%)</th><th>Money</th><th>Nitrogen(%)</th><th>Aksi</th>
+                                        <th>No</th>
+                                        <th>Tanggal</th>
+                                        <th>Jenis Kemasan</th>
+                                        <th>No. Palet</th>
+                                        <th>Po</th>
+                                        <th>Pa</th>
+                                        <th>PRI</th>
+                                        <th>Dirt(%)</th>
+                                        <th>Ash(%)</th>
+                                        <th>VM(%)</th><th>Money</th><th>Nitrogen(%)</th>
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
+                                        <th>Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -109,15 +127,24 @@
                                             <td>{{ $item->vm }}</td>
                                             <td>{{ $item->money }}</td>
                                             <td>{{ $item->nitrogen }}</td>
+                                            {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
+                                            @if(auth()->user()->role != 'user')
                                             <td>
                                                 <div class="action-buttons">
-                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}"><i class="fas fa-edit"></i></button>
-                                                    <form action="{{ route('hasil-uji-sir20.destroy', $item->id_hasil_uji_lab_sir_20) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus?')" style="display:inline-block; margin:0;"> 
+                                                    <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="{{ $item->id_hasil_uji_lab_sir_20 }}" title="Edit"><i class="fas fa-edit"></i></button>
+                                                    
+                                                    {{-- 🔥 TOMBOL HAPUS DENGAN CLASS BTN-HAPUS UNTUK SWEETALERT --}}
+                                                    <button type="button" class="btn btn-danger btn-sm btn-hapus" 
+                                                            data-id="{{ $item->id_hasil_uji_lab_sir_20 }}" 
+                                                            data-nama="{{ $item->no_palet }}" title="Hapus">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <form id="form-hapus-{{ $item->id_hasil_uji_lab_sir_20 }}" action="{{ route('hasil-uji-sir20.destroy', $item->id_hasil_uji_lab_sir_20) }}" method="POST" style="display:none;"> 
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
                                                     </form>
                                                 </div>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -193,14 +220,14 @@
 
                     <div class="row">
                        <div class="col-6">
-    <div class="form-group">
-        <label class="font-weight-bold">PRI</label>
-        {{-- bg-light memberikan warna abu muda, readonly mencegah pengetikan manual --}}
-        <input type="number" name="pri" class="form-control bg-light" 
-               step="0.01" placeholder="Otomatis" readonly 
-               style="background-color: #e9ecef; border: 1px solid #ced4da;">
-    </div>
-</div>
+                            <div class="form-group">
+                                <label class="font-weight-bold">PRI</label>
+                                {{-- bg-light memberikan warna abu muda, readonly mencegah pengetikan manual --}}
+                                <input type="number" name="pri" class="form-control bg-light" 
+                                    step="0.01" placeholder="Otomatis" readonly 
+                                    style="background-color: #e9ecef; border: 1px solid #ced4da;">
+                            </div>
+                        </div>
                         <div class="col-6">
                             <div class="form-group">
                                 <label class="font-weight-bold">Dirt (%)</label>
@@ -312,13 +339,13 @@
                     {{-- Baris 4: PRI & Dirt --}}
                     <div class="row">
                        <div class="col-6">
-    <div class="form-group">
-        <label class="font-weight-bold">PRI</label>
-        <input type="number" name="pri" id="editPri" class="form-control bg-light" 
-               step="0.01" readonly 
-               style="background-color: #e9ecef; border: 1px solid #ced4da;">
-    </div>
-</div>
+                            <div class="form-group">
+                                <label class="font-weight-bold">PRI</label>
+                                <input type="number" name="pri" id="editPri" class="form-control bg-light" 
+                                    step="0.01" readonly 
+                                    style="background-color: #e9ecef; border: 1px solid #ced4da;">
+                            </div>
+                        </div>
                         <div class="col-6">
                             <div class="form-group">
                                 <label class="font-weight-bold">Dirt (%)</label>
@@ -378,46 +405,69 @@
 
 <script>
 $(document).ready(function(){
+    // 1. Notifikasi Sukses Global
+    @if (session('success'))
+        Swal.fire({ 
+            icon: 'success', 
+            title: 'Berhasil!', 
+            text: "{{ session('success') }}", 
+            showConfirmButton: false, 
+            timer: 2000 
+        });
+    @endif
+
+    // 2. Notifikasi Error Validasi Global
+    @if ($errors->any())
+        Swal.fire({
+            icon: 'error',
+            title: 'Terjadi Kesalahan',
+            html: '{!! implode("<br>", $errors->all()) !!}',
+        });
+    @endif
+
+    // 🔥 LOGIKA EXCEL EXPORT (SIR 20)
+    $('#btnExportExcel').on('click', function(e) {
+        e.preventDefault();
+        var minDate = $('#min-date').val();
+        var maxDate = $('#max-date').val();
+        var statusMutu = $('#filter-mutu').val(); // Mengambil filter status mutu
+        
+        var exportUrl = "{{ route('hasil-uji-sir20.export') }}";
+        
+        if (minDate && maxDate) {
+            exportUrl += "?start_date=" + minDate + "&end_date=" + maxDate + "&status_mutu=" + statusMutu;
+            window.location.href = exportUrl;
+        } else {
+            Swal.fire('Informasi', 'Silakan pilih rentang tanggal filter terlebih dahulu.', 'info');
+        }
+    });
+
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
-    flatpickr("#min-date", { 
-        altInput: true, 
-        altFormat: "d/m/Y", 
-        dateFormat: "Y-m-d", 
-        defaultDate: "{{ $fromDate }}" 
-    });
+    // --- SETUP TANGGAL (Flatpickr) ---
+    flatpickr("#min-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "{{ $fromDate }}" });
+    flatpickr("#max-date", { altInput: true, altFormat: "d/m/Y", dateFormat: "Y-m-d", defaultDate: "{{ $toDate }}" });
 
-    flatpickr("#max-date", { 
-        altInput: true, 
-        altFormat: "d/m/Y", 
-        dateFormat: "Y-m-d", 
-        defaultDate: "{{ $toDate }}" 
-    });
-    // ✅ 1. LOGIKA HITUNG PRI OTOMATIS (SIR 20: Pa / Po * 100)
+    // --- 3. LOGIKA HITUNG PRI OTOMATIS ---
     function hitungPRI(poSelector, paSelector, priSelector) {
         let po = parseFloat($(poSelector).val()) || 0;
         let pa = parseFloat($(paSelector).val()) || 0;
         let priField = $(priSelector);
-
-        if (po > 0) { // Proteksi pembagian dengan nol
+        if (po > 0) {
             let hasil = (pa / po) * 100;
             priField.val(hasil.toFixed(2)); 
-        } else {
-            priField.val(''); 
-        }
+        } else { priField.val(''); }
     }
 
-    // Modal Tambah
     $(document).on('input', '#modalTambahSir input[name="po"], #modalTambahSir input[name="pa"]', function() {
         hitungPRI('#modalTambahSir input[name="po"]', '#modalTambahSir input[name="pa"]', '#modalTambahSir input[name="pri"]');
     });
 
-    // Modal Edit
     $(document).on('input', '#editPo, #editPa', function() {
         hitungPRI('#editPo', '#editPa', '#editPri');
     });
 
-    // ✅ 2. DATATABLES & FILTER (Sama dengan Uji Troli)
+    // --- 4. DATATABLES & FILTER ---
     function parseDMY(dateStr){
         var parts = dateStr.split('-');
         if(parts.length !== 3) return null;
@@ -429,41 +479,75 @@ $(document).ready(function(){
         "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json" }
     });
 
-    // Push filter ke DataTables
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
         var min = $('#min-date').val();
         var max = $('#max-date').val();
         var statusMutu = $('#filter-mutu').val();
-        
-        var tableDateStr = data[1] || '';      
+        var tableDateStr = data[1] || '';      
         var priValue = parseFloat(data[6]) || 0; 
 
-        // Filter Tanggal
         var matchDate = true;
         if (tableDateStr) {
             var tableDate = parseDMY(tableDateStr);
             var minDate = min ? new Date(min + 'T00:00:00') : null;
             var maxDate = max ? new Date(max + 'T23:59:59') : null;
-            if ((minDate && tableDate < minDate) || (maxDate && tableDate > maxDate)) {
-                matchDate = false;
-            }
+            if ((minDate && tableDate < minDate) || (maxDate && tableDate > maxDate)) { matchDate = false; }
         }
-
-        // Filter Mutu
-        var matchMutu = true;
-        if (statusMutu === 'low') { matchMutu = (priValue < 60.00); }
-
+        var matchMutu = (statusMutu === 'low') ? (priValue < 60.00) : true;
         return matchDate && matchMutu;
     });
 
-    table.draw(); // Jalankan saat load awal
+    table.draw();
 
-    // Reset Button Logic
-    $('#reset-filter').on('click', function() {
-        // Biarkan link <a> bekerja untuk reload halaman ke index awal
+    // --- 5. KONFIRMASI SIMPAN ---
+    $('#modalTambahSir form').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Simpan Hasil Uji?',
+            text: "Data akan dicatat sebagai hasil uji SIR 20 resmi.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => { if (result.isConfirmed) { form.submit(); } });
     });
 
-    // --- Logika Edit ---
+    // --- 6. KONFIRMASI UPDATE ---
+    $('#formEdit').on('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        Swal.fire({
+            title: 'Update Data Uji?',
+            text: "Perubahan parameter akan langsung diperbarui.",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Update!',
+            cancelButtonText: 'Batal'
+        }).then((result) => { if (result.isConfirmed) { form.submit(); } });
+    });
+
+    // --- 7. KONFIRMASI HAPUS ---
+    $(document).on('click', '.btn-hapus', function(e) {
+        var id = $(this).data('id');
+        var nama = $(this).data('nama');
+        Swal.fire({
+            title: 'Hapus Data Uji?',
+            text: "Data uji palet nomor " + nama + " akan dihapus permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => { if (result.isConfirmed) { $('#form-hapus-' + id).submit(); } });
+    });
+
+    // --- 8. LOGIKA EDIT (AJAX) ---
     $(document).on('click', '.btn-edit', function(){
         var id = $(this).data('id');
         $.get("{{ url('hasil-uji-sir20') }}/" + id + "/edit", function(data){
@@ -478,13 +562,12 @@ $(document).ready(function(){
             $('#editVm').val(data.vm);
             $('#editMoney').val(data.money);
             $('#editNitrogen').val(data.nitrogen);
-            
             $('#formEdit').attr('action', "{{ url('hasil-uji-sir20') }}/" + id);
             $('#modalEdit').modal('show');
-        });
+        }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });
     });
 
-    // AJAX Load Pallets
+    // --- 9. AJAX LOAD PALLETS ---
     function loadAvailablePallets() {
         let dropdown = $('#tambah_no_palet');
         dropdown.html('<option value="">Memuat Palet...</option>').prop('disabled', true);
@@ -501,9 +584,7 @@ $(document).ready(function(){
         });
     }
 
-    $('#btnTambahData').on('click', function() {
-        loadAvailablePallets();
-    });
+    $('#btnTambahData').on('click', function() { loadAvailablePallets(); });
 });
 </script>
 </body>

@@ -94,12 +94,17 @@ Route::middleware(['auth'])->group(function () {
     // 🟡 MODUL: DATA LABORATORIUM
     // ====================================================
     
+    Route::get('/hasil-uji-bokar/export', [HasilUjiBokarController::class, 'exportExcel'])->name('hasil-uji-bokar.export');
     Route::resource('hasil-uji-bokar', HasilUjiBokarController::class);
+    Route::get('/hasil-uji-bokar-diolah/export', [HasilUjiBokarDiolahController::class, 'exportExcel'])->name('hasil-uji-bokar-diolah.export');
     Route::resource('hasil-uji-bokar-diolah', HasilUjiBokarDiolahController::class);
+    Route::get('/hasil-uji-maturasi/export', [HasilUjiMaturasiController::class, 'exportExcel'])->name('hasil-uji-maturasi.export');
     Route::resource('hasil-uji-maturasi', HasilUjiMaturasiController::class);
+    Route::get('/hasil-uji-troli/export', [HasilUjiTroliController::class, 'exportExcel'])->name('hasil-uji-troli.export');
     Route::resource('hasil-uji-troli', HasilUjiTroliController::class);
     
     // Hasil Uji SIR 20
+    Route::get('/hasil-uji-sir20/export', [HasilUjiSir20Controller::class, 'exportExcel'])->name('hasil-uji-sir20.export');
     Route::get('/get-available-pallets', [HasilUjiSir20Controller::class, 'getAvailablePallets'])->name('uji-sir20.get-pallets');
     Route::resource('hasil-uji-sir20', HasilUjiSir20Controller::class);
 

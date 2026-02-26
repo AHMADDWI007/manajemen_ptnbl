@@ -445,34 +445,39 @@
             <td colspan="11" style="{{ $sty }} text-align: center;">-</td>
         </tr>
 
-        {{-- ================= TANDA TANGAN ================= --}}
+        {{-- ================= TANDA TANGAN DYNAMIC ================= --}}
         <tr><td colspan="16" style="{{ $styNoB }} height: 15px;"></td></tr>
 
         <tr>
             <td colspan="16" style="{{ $styNoB }} text-align: center; font-weight: bold;">PT. NUSANTARA BATULICIN</td>
         </tr>
 
-        @for($i=0; $i<9; $i++)
+        {{-- Spasi untuk tanda tangan --}}
+        @for($i=0; $i<8; $i++)
             <tr><td colspan="16" style="{{ $styNoB }} height: 15px;"></td></tr>
         @endfor
 
         <tr>
+            {{-- TTD Kiri --}}
             <td colspan="5" style="{{ $styNoB }} text-align: center; font-weight: bold;">
-                <span style="text-decoration: underline;">Sri Winarno</span>
+                <span style="text-decoration: underline;">{{ $ttd_kiri_nama }}</span>
             </td>
             <td colspan="6" style="{{ $styNoB }}"></td>
+            {{-- TTD Kanan --}}
             <td colspan="5" style="{{ $styNoB }} text-align: center; font-weight: bold;">
-                <span style="text-decoration: underline;">Sri Winarno</span>
+                <span style="text-decoration: underline;">{{ $ttd_kanan_nama }}</span>
             </td>
         </tr>
         
         <tr>
+            {{-- Jabatan Kiri --}}
             <td colspan="5" style="{{ $styNoB }} text-align: center; font-weight: bold;">
-                Kadiv Pengolahan
+                {{ $ttd_kiri_jabatan }}
             </td>
             <td colspan="6" style="{{ $styNoB }}"></td>
+            {{-- Jabatan Kanan --}}
             <td colspan="5" style="{{ $styNoB }} text-align: center; font-weight: bold;">
-                Manager
+                {{ $ttd_kanan_jabatan }}
             </td>
         </tr>
     </tbody>

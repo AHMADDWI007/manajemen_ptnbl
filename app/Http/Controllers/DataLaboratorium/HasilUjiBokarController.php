@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
+use App\Exports\HasilUjiBokarExport;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\HasilUjiLabBokar; 
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HasilUjiBokarController extends Controller
 {
@@ -109,5 +112,19 @@ class HasilUjiBokarController extends Controller
 
         return redirect()->route('hasil-uji-bokar.index') 
                          ->with('error', 'Data gagal dihapus / tidak ditemukan.');
+    }
+
+    // Tambahkan fungsi ini di dalam class
+    public function exportExcel(Request $request)
+    {
+        if (ob_get_length()) { ob_end_clean(); }
+        while (ob_get_level() > 0) { ob_end_clean(); }
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        $namaFile = "Laporan_Uji_Bokar_Diterima_" . ($startDate ? Carbon::parse($startDate)->format('d-m-Y') : 'Semua') . ".xlsx";
+
+        return Excel::download(new HasilUjiBokarExport($startDate, $endDate), $namaFile);
     }
 }

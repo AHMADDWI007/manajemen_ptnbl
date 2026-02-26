@@ -70,9 +70,12 @@
                         <i class="fas fa-print"></i> Cetak PDF
                     </a>
 
+                    {{-- 🔥 SEMBUNYIKAN TOMBOL INPUT JIKA ROLE USER --}}
+                    @if(auth()->user()->role != 'user')
                     <button class="btn btn-success btn-sm fw-bold" data-toggle="modal" data-target="#modalTambah">
                         <i class="fas fa-plus-circle"></i> Input Diolah/Mutasi
                     </button>
+                    @endif
                 </div>
             </div>
         </div>
@@ -132,7 +135,10 @@
                                         <th rowspan="2">Stock Akhir</th>
                                         <th rowspan="2">Asal Bokar</th>
                                         <th rowspan="2">Keterangan</th>
+                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <th rowspan="2" style="width: 8%">Aksi</th>
+                                        @endif
                                     </tr>
                                     <tr>
                                         {{-- Sub Columns --}}
@@ -188,6 +194,8 @@
                                         <td>{{ $item->keterangan ?? '-' }}</td>
 
                                         {{-- Aksi --}}
+                                        {{-- 🔥 SEMBUNYIKAN ISI KOLOM AKSI JIKA ROLE USER --}}
+                                        @if(auth()->user()->role != 'user')
                                         <td>
                                             <div class="dropdown">
                                                 <button class="btn btn-success btn-sm dropdown-toggle" type="button" id="dropdownMenu{{ $item->id_maturasi }}" data-toggle="dropdown" aria-expanded="false">
@@ -218,6 +226,7 @@
                                                 </div>
                                             </div>
                                         </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -225,44 +234,65 @@
                                 {{-- FOOTER SUMMARY --}}
                                 <tfoot class="bg-light font-weight-bold">
                                     <tr>
+                                        {{-- Hitung colspan dasar: 2 (No + Uraian) + 1 (Kg KK) --}}
                                         <td colspan="2" class="text-center">Jumlah</td>
                                         <td class="text-center">{{ number_format($footer_data['total_stok_awal'], 0, ',', '.') }}</td>
+                                        
+                                        {{-- Kolom Tgl dan Umur --}}
                                         <td></td> <td></td>
+                                        
+                                        {{-- Kolom Diolah --}}
                                         <td class="text-center">{{ number_format($footer_data['total_diolah'], 0, ',', '.') }}</td>
-                                        {{-- ✅ FOOTER MUTASI (LOGIKA NETTO: KELUAR + MASUK) --}}
+                                        
+                                        {{-- Kolom Mutasi --}}
                                         <td class="text-center">
-                                            @php 
-                                                $nettoMutasi = $footer_data['total_mutasi']; 
-                                            @endphp
-
+                                            @php $nettoMutasi = $footer_data['total_mutasi']; @endphp
                                             @if($nettoMutasi > 0.1)
-                                                {{-- Jika ada barang keluar dari sistem --}}
                                                 ({{ number_format($nettoMutasi, 0, ',', '.') }})
                                             @elseif($nettoMutasi < -0.1)
-                                                {{-- Jika ada barang masuk ke sistem --}}
                                                 {{ number_format(abs($nettoMutasi), 0, ',', '.') }}
                                             @else
-                                                {{-- Jika perpindahan antar bak murni --}}
                                                 0
                                             @endif
                                         </td>
+                                        
+                                        {{-- Kolom Masuk HI, K3, Po, Pa --}}
                                         <td class="text-center">{{ number_format($footer_data['total_masuk_hi'], 0, ',', '.') }}</td>
-                                        <td colspan="3"></td>
+                                        <td></td> <td></td> <td></td>
+                                        
+                                        {{-- Kolom Stok Akhir --}}
                                         <td class="text-center">{{ number_format($footer_data['total_stok_akhir'], 0, ',', '.') }}</td>
-                                        <td colspan="3"></td>
+                                        
+                                        {{-- Kolom Asal Bokar & Keterangan --}}
+                                        <td></td> <td></td>
+
+                                        {{-- 🔥 KUNCI PERBAIKAN: Kolom Aksi di Footer 🔥 --}}
+                                        {{-- Hanya tampilkan <td> kosong jika role BUKAN user --}}
+                                        @if(auth()->user()->role != 'user')
+                                            <td></td>
+                                        @endif
                                     </tr>
+                                    
+                                    {{-- Baris Kedua: Maturasi Diolah (Summary) --}}
                                     <tr>
+                                        @php 
+                                            // Jika user: total kolom data sisa 13. Jika admin: total kolom data sisa 14.
+                                            // Kita hitung colspan untuk label agar sisa kolomnya pas.
+                                            $labelColspan = (auth()->user()->role == 'user') ? 12 : 13;
+                                        @endphp
                                         <td colspan="3" class="text-center font-weight-bold" style="font-size: 1rem;">Maturasi Diolah</td>
                                         <td colspan="2" class="text-center">s/d Kemarin</td>
-                                        <td colspan="2" class="text-center" style="background-color: #92D050; color: black; font-size: 1rem;">
+                                        <td colspan="2" class="text-center" style="background-color: #92D050; color: black;">
                                             {{ number_format($footer_data['maturasi_diolah_sd_kemarin'], 0, ',', '.') }}
                                         </td>
                                         <td colspan="1" class="text-center">Hari ini</td>
-                                        <td colspan="2" class="text-center" style="font-size: 1rem;">
+                                        <td colspan="2" class="text-center">
                                             {{ number_format($footer_data['maturasi_diolah_hari_ini'], 0, ',', '.') }}
                                         </td>
                                         <td colspan="2" class="text-center">s/d Hari ini</td>
-                                        <td colspan="3" class="text-center" style="font-size: 1rem;">
+                                        
+                                        {{-- 🔥 Sesuaikan colspan terakhir agar tidak berlebih --}}
+                                        <td colspan="{{ (auth()->user()->role == 'user') ? 2 : 3 }}" class="text-center" style="font-size: 1rem;">
                                             {{ number_format($footer_data['maturasi_diolah_sd_hari_ini'], 0, ',', '.') }}
                                         </td>
                                     </tr>

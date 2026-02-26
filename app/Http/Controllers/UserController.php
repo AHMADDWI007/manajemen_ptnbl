@@ -38,7 +38,8 @@ class UserController extends Controller
             // ✅ PERBAIKAN: Tambahkan role baru ke aturan 'in'
             'role' => [
                 'required', 'string',
-                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'user'])
+                // 🔥 TAMBAHKAN 'petugas' DISINI
+                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'petugas', 'user'])
             ],
             // ✅ AKHIR PERBAIKAN
             'password' => 'required|string|min:8', // password minimal 8 karakter
@@ -74,7 +75,8 @@ class UserController extends Controller
             // ✅ PERBAIKAN: Tambahkan role baru ke aturan 'in'
             'role' => [
                 'required', 'string',
-                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'user'])
+                // 🔥 TAMBAHKAN 'petugas' DISINI JUGA
+                Rule::in(['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'petugas', 'user'])
             ],
             // ✅ AKHIR PERBAIKAN
             'password' => 'nullable|string|min:8', // Password boleh kosong (tidak diubah)
