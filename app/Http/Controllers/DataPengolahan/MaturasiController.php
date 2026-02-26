@@ -16,9 +16,13 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
+use App\Traits\MaturasiSyncTrait;
 
 class MaturasiController extends Controller
 {
+
+    use MaturasiSyncTrait; // 🔥 Tambahkan ini
+
     // =========================================================================
     // HELPER 1: HITUNGAN STOK & SNAPSHOT
     // =========================================================================
@@ -334,27 +338,7 @@ class MaturasiController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Ambil Identitas Stok Awal
-            $snapVisualAsal = $this->hitungSnapshot($bakAsal, $tglInput);
-            $tglMasukYangDikirim = $snapVisualAsal['tgl_masuk']; 
-            
-            // 🔥 FIX: Tambahkan parameter ke-3 (Stok Awal)
-            $asalBokarYangDikirim = $this->getDetailedAsalBokarString(
-                $bakAsal, 
-                $snapVisualAsal['stok_akhir'], 
-                $snapVisualAsal['stok_awal'], // <-- Ini yang tadi kurang
-                $tglInput
-            );
-
-            if (!$tglMasukYangDikirim) {
-                $historyDate = $this->getHistoryDateFromLog($bakAsal->id_maturasi, $tglInput);
-                $tglMasukYangDikirim = $historyDate ? $historyDate->toDateString() : null;
-            }
-
-            // Hitung Stok Basis untuk Logic Pindah Identitas
-            $stokBasisMutasi = $snapVisualAsal['stok_awal'] + $snapVisualAsal['masuk_hi'] - $snapVisualAsal['diolah'];
-
-            // 2. Simpan Log di Bak ASAL
+            // --- LOGIKA SIMPAN LOG (Tetap Diperlukan) ---
             $existingAsal = PengolahanMaturasi::where('id_maturasi', $bakAsal->id_maturasi)
                 ->whereDate('tgl_laporan', $tglInput)->first();
 
@@ -363,6 +347,7 @@ class MaturasiController extends Controller
                 $ketAsal = $existingAsal->keterangan . ' & Mutasi';
             }
 
+            // Simpan Log di Bak ASAL
             PengolahanMaturasi::updateOrCreate(
                 ['id_maturasi' => $bakAsal->id_maturasi, 'tgl_laporan' => $tglInput],
                 [
@@ -372,7 +357,7 @@ class MaturasiController extends Controller
                 ]
             );
 
-            // 3. Simpan Log di Bak TUJUAN
+            // Simpan Log di Bak TUJUAN
             if ($request->filled('tujuan_mutasi') && $mutasiVal > 0) {
                 $bakTujuan = Maturasi::findOrFail($request->tujuan_mutasi);
                 $existingTujuan = PengolahanMaturasi::where('id_maturasi', $bakTujuan->id_maturasi)
@@ -385,41 +370,16 @@ class MaturasiController extends Controller
                         'keterangan' => 'Terima dari ' . $bakAsal->uraian
                     ]
                 );
-
-                // LOGIKA PINDAH IDENTITAS (Jika mutasi > 50% dari stok yang ada)
-                if ($stokBasisMutasi > 0 && ($mutasiVal / $stokBasisMutasi) >= 0.5) {
-                    // 🔥 FIX: Panggil string label dengan 4 parameter
-                    $asalBokarFinal = $this->getDetailedAsalBokarString(
-                        $bakAsal, 
-                        $stokBasisMutasi, 
-                        $stokBasisMutasi, // Anggap stok awal sama dg basis
-                        $tglInput
-                    );
-
-                    $bakTujuan->update([
-                        'asal_bokar' => $asalBokarFinal,
-                        'tgl_masuk'  => $tglMasukYangDikirim,
-                        'updated_at' => $tglInput
-                    ]);
-                }
-
-                // Refresh stok akhir tujuan
-                $snapTujuan = $this->hitungSnapshot($bakTujuan, $tglInput);
-                $bakTujuan->update(['stok_akhir' => $snapTujuan['stok_akhir']]);
-            }
-
-            // 4. Update Master Bak Asal
-            $snapAsalFinal = $this->hitungSnapshot($bakAsal, $tglInput);
-            $bakAsal->update([
-                'stok_akhir' => $snapAsalFinal['stok_akhir'],
-                'updated_at' => $tglInput 
-            ]);
-
-            if ($snapAsalFinal['stok_akhir'] <= 0.01) {
-                $bakAsal->update(['tgl_masuk' => null, 'asal_bokar' => null, 'keterangan' => 'KOSONG']);
             }
 
             DB::commit();
+
+            // 🔥 PERBAIKAN: Panggil Trait untuk sinkronisasi total stok dan label
+            $this->syncMaturasi($bakAsal->id_maturasi, $tglInput);
+            if ($request->filled('tujuan_mutasi')) {
+                $this->syncMaturasi($request->tujuan_mutasi, $tglInput);
+            }
+
             return redirect()->route('maturasi.index', ['filter_tanggal' => $tglInput->format('Y-m-d')])
                 ->with('success', 'Mutasi berhasil diproses.');
 
@@ -592,7 +552,6 @@ class MaturasiController extends Controller
                     ->where('keterangan', 'LIKE', '%Terima dari ' . $namaBakAsal . '%')
                     ->where('mutasi', '<', 0)->first();
                 if ($logPasangan) $bakPasangan = Maturasi::find($logPasangan->id_maturasi);
-
             } else if ($logSekarang->mutasi < 0) {
                 if (preg_match('/Terima dari (.*)/', $logSekarang->keterangan, $matches)) {
                     $namaBakAsal = trim($matches[1]);
@@ -605,7 +564,7 @@ class MaturasiController extends Controller
                 }
             }
 
-            // 2. UPDATE LOG
+            // 2. UPDATE ANGKA MUTASI DI LOG
             $nilaiSekarang = ($logSekarang->mutasi > 0) ? $mutasiBaru : -$mutasiBaru;
             $logSekarang->update(['mutasi' => $nilaiSekarang]);
 
@@ -614,54 +573,15 @@ class MaturasiController extends Controller
                 $logPasangan->update(['mutasi' => $nilaiPasangan]);
             }
 
-            // 3. SYNC IDENTITAS & STOK
-            $isOriginSource = ($logSekarang->mutasi > 0); 
-            $bakAsalObj     = $isOriginSource ? $bakSekarang : $bakPasangan;
-            $bakTujuanObj   = $isOriginSource ? $bakPasangan : $bakSekarang;
-
-            // Sync Bak Asal
-            if ($bakAsalObj) {
-                $snapA = $this->hitungSnapshot($bakAsalObj, $tglInput);
-                $updateA = ['stok_akhir' => $snapA['stok_akhir'], 'updated_at' => $tglInput];
-                
-                if ($snapA['stok_akhir'] <= 0.01) {
-                    $updateA += ['tgl_masuk' => null, 'asal_bokar' => null, 'keterangan' => 'KOSONG'];
-                } else {
-                     $histTgl = $this->getHistoryDateFromLog($bakAsalObj->id_maturasi, $tglInput);
-                     if($histTgl) {
-                        $updateA['tgl_masuk'] = $histTgl->toDateString();
-                        $updateA['keterangan'] = strtoupper($histTgl->format('d M Y'));
-                     }
-                }
-                $bakAsalObj->update($updateA);
-            }
-
-            // Sync Bak Tujuan
-            if ($bakTujuanObj) {
-                if ($bakAsalObj && $mutasiBaru > 0) {
-                     $snapVisualAsal = $this->hitungSnapshot($bakAsalObj, $tglInput);
-                     $tglMasukKirim  = $snapVisualAsal['tgl_masuk'];
-                     
-                     // 🔥 FIX: Tambahkan parameter ke-3 (Dummy stok awal 100)
-                     $asalBokarKirim = $this->getDetailedAsalBokarString($bakAsalObj, 100, 100, $tglInput); 
-
-                     if (!$tglMasukKirim) {
-                        $histTgl = $this->getHistoryDateFromLog($bakAsalObj->id_maturasi, $tglInput);
-                        $tglMasukKirim = $histTgl ? $histTgl->toDateString() : null;
-                     }
-
-                     $bakTujuanObj->update([
-                        'tgl_masuk'  => $tglMasukKirim,
-                        'asal_bokar' => $asalBokarKirim,
-                        'keterangan' => $tglMasukKirim ? strtoupper(Carbon::parse($tglMasukKirim)->format('d M Y')) : '-',
-                        'updated_at' => $tglInput
-                     ]);
-                }
-                $snapT = $this->hitungSnapshot($bakTujuanObj, $tglInput);
-                $bakTujuanObj->update(['stok_akhir' => $snapT['stok_akhir']]);
-            }
-
             DB::commit();
+
+            // 🔥 PERBAIKAN: SINKRONISASI OTOMATIS LEWAT TRAIT
+            // Trait ini akan menangani: Update Stok Akhir, Label CMP/PT/DS, dan status KOSONG
+            $this->syncMaturasi($id_maturasi, $tglInput);
+            if ($bakPasangan) {
+                $this->syncMaturasi($bakPasangan->id_maturasi, $tglInput);
+            }
+
             return redirect()->back()->with('success', 'Mutasi berhasil diperbarui dan disinkronkan.');
 
         } catch (\Exception $e) {

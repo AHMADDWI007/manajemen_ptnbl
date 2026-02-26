@@ -3,17 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Maturasi;
-use App\Models\PengolahanMaturasi;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\HasilUjiLabMaturasi;
+use App\Models\Maturasi;
+use App\Models\PengolahanMaturasi;
+use App\Traits\MaturasiSyncTrait;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class MaturasiApiController extends Controller
 {
+
+    use MaturasiSyncTrait; // 🔥 Tambahkan ini
+
     // =========================================================================
     // HELPER 1: HITUNGAN SNAPSHOT (COPY DARI WEB ADMIN)
     // =========================================================================
@@ -370,22 +374,17 @@ class MaturasiApiController extends Controller
      */
     public function store(Request $request)
     {
+        $request->merge(['mutasi' => (float) $request->input('mutasi', 0)]);
 
-        $request->merge([
-            'mutasi' => (float) $request->input('mutasi', 0),
-        ]);
-
-        // 2. Validasi sesuai Web
         $validator = Validator::make($request->all(), [
             'uraian' => 'required|string|exists:maturasi,uraian',
             'tanggal_input_harian' => 'required|date',
             'mutasi' => 'nullable|numeric|min:0',
-            'tujuan_mutasi' => 'nullable|exists:maturasi,id_maturasi', // 🔥 API SEKARANG MENGENALI TUJUAN
+            'tujuan_mutasi' => 'nullable|exists:maturasi,id_maturasi',
             'keterangan' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
-            // Ambil pesan error pertama agar mudah dibaca di Android
             return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
         }
 
@@ -393,36 +392,9 @@ class MaturasiApiController extends Controller
         $mutasiVal = (float) $request->input('mutasi');
         $bakAsal   = Maturasi::where('uraian', $request->input('uraian'))->first();
 
-        if (!$bakAsal) {
-            return response()->json(['success' => false, 'message' => 'Bak asal tidak ditemukan.'], 404);
-        }
-
         DB::beginTransaction();
         try {
-            // =================================================================
-            // LOGIKA 100% SAMA DENGAN WEB ADMIN
-            // =================================================================
-            
-            // 1. Ambil Identitas Stok Awal
-            $snapVisualAsal = $this->hitungSnapshot($bakAsal, $tglInput);
-            $tglMasukYangDikirim = $snapVisualAsal['tgl_masuk']; 
-            
-            $asalBokarYangDikirim = $this->getDetailedAsalBokarString(
-                $bakAsal, 
-                $snapVisualAsal['stok_akhir'], 
-                $snapVisualAsal['stok_awal'],
-                $tglInput
-            );
-
-            if (!$tglMasukYangDikirim) {
-                $historyDate = $this->getHistoryDateFromLog($bakAsal->id_maturasi, $tglInput);
-                $tglMasukYangDikirim = $historyDate ? $historyDate->toDateString() : null;
-            }
-
-            // Hitung Stok Basis untuk Logic Pindah Identitas
-            $stokBasisMutasi = $snapVisualAsal['stok_awal'] + $snapVisualAsal['masuk_hi'] - $snapVisualAsal['diolah'];
-
-            // 2. Simpan Log di Bak ASAL (SUMBER)
+            // --- 1. SIMPAN LOG (Tetap perlu untuk database history) ---
             $existingAsal = PengolahanMaturasi::where('id_maturasi', $bakAsal->id_maturasi)
                 ->whereDate('tgl_laporan', $tglInput)->first();
 
@@ -435,15 +407,13 @@ class MaturasiApiController extends Controller
                 ['id_maturasi' => $bakAsal->id_maturasi, 'tgl_laporan' => $tglInput],
                 [
                     'diolah' => $existingAsal->diolah ?? 0, 
-                    'mutasi' => ($existingAsal->mutasi ?? 0) + $mutasiVal, // Tambah minus di stok awal
+                    'mutasi' => ($existingAsal->mutasi ?? 0) + $mutasiVal, 
                     'keterangan' => $ketAsal
                 ]
             );
 
-            // 3. Simpan Log di Bak TUJUAN (JIKA ADA TUJUAN)
             if ($request->filled('tujuan_mutasi') && $mutasiVal > 0) {
                 $bakTujuan = Maturasi::find($request->input('tujuan_mutasi'));
-                
                 if ($bakTujuan) {
                     $existingTujuan = PengolahanMaturasi::where('id_maturasi', $bakTujuan->id_maturasi)
                         ->whereDate('tgl_laporan', $tglInput)->first();
@@ -451,46 +421,22 @@ class MaturasiApiController extends Controller
                     PengolahanMaturasi::updateOrCreate(
                         ['id_maturasi' => $bakTujuan->id_maturasi, 'tgl_laporan' => $tglInput],
                         [
-                            'mutasi'     => ($existingTujuan->mutasi ?? 0) - $mutasiVal, // Minus = Masuk
+                            'mutasi'     => ($existingTujuan->mutasi ?? 0) - $mutasiVal, 
                             'keterangan' => 'Terima dari ' . $bakAsal->uraian
                         ]
                     );
-
-                    // LOGIKA PINDAH IDENTITAS (Jika mutasi > 50% dari stok yang ada)
-                    if ($stokBasisMutasi > 0 && ($mutasiVal / $stokBasisMutasi) >= 0.5) {
-                        $asalBokarFinal = $this->getDetailedAsalBokarString(
-                            $bakAsal, 
-                            $stokBasisMutasi, 
-                            $stokBasisMutasi, 
-                            $tglInput
-                        );
-
-                        $bakTujuan->update([
-                            'asal_bokar' => $asalBokarFinal,
-                            'tgl_masuk'  => $tglMasukYangDikirim,
-                            'updated_at' => $tglInput
-                        ]);
-                    }
-
-                    // Refresh stok akhir tujuan
-                    $snapTujuan = $this->hitungSnapshot($bakTujuan, $tglInput);
-                    $bakTujuan->update(['stok_akhir' => $snapTujuan['stok_akhir']]);
                 }
             }
 
-            // 4. Update Master Bak Asal
-            $snapAsalFinal = $this->hitungSnapshot($bakAsal, $tglInput);
-            $bakAsal->update([
-                'stok_akhir' => $snapAsalFinal['stok_akhir'],
-                'updated_at' => $tglInput 
-            ]);
+            DB::commit();
 
-            // Jika stok habis, kosongkan identitas
-            if ($snapAsalFinal['stok_akhir'] <= 0.01) {
-                $bakAsal->update(['tgl_masuk' => null, 'asal_bokar' => null, 'keterangan' => 'KOSONG']);
+            // --- 2. 🔥 PERBAIKAN: SINKRONISASI TOTAL VIA TRAIT ---
+            // Ini akan menangani Label CMP, Stok Akhir, dan status KOSONG secara otomatis
+            $this->syncMaturasi($bakAsal->id_maturasi, $tglInput);
+            if ($request->filled('tujuan_mutasi')) {
+                $this->syncMaturasi($request->input('tujuan_mutasi'), $tglInput);
             }
 
-            DB::commit();
             return response()->json(['success' => true, 'message' => 'Mutasi berhasil diproses.']);
 
         } catch (\Exception $e) {
@@ -638,8 +584,14 @@ class MaturasiApiController extends Controller
             }
 
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Mutasi berhasil diperbarui.']);
 
+            // 🔥 PERBAIKAN: SINKRONISASI OTOMATIS LEWAT TRAIT
+            $this->syncMaturasi($id_maturasi, $tglInput);
+            if ($bakPasangan) {
+                $this->syncMaturasi($bakPasangan->id_maturasi, $tglInput);
+            }
+
+            return response()->json(['success' => true, 'message' => 'Mutasi berhasil diperbarui.']);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Gagal: ' . $e->getMessage()], 500);

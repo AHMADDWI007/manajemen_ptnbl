@@ -33,13 +33,15 @@ class AuthController extends Controller
         $user = $request->user();
 
         // 4. PERIKSA ROLE (Sesuai permintaan Anda)
-        if ($user->role !== 'admin') {
-            // Jika role bukan admin, tolak login
-             Auth::logout(); // Logout user yang baru saja login
+        // Ganti blok pengecekan role yang lama menjadi ini:
+        $allowedRoles = ['admin', 'laboratorium', 'penimbangan', 'pengolahan', 'produksi', 'penjualan', 'user'];
+
+        if (!in_array($user->role, $allowedRoles)) {
+            Auth::logout();
             return response()->json([
                 'success' => false,
-                'message' => 'Login gagal. Anda tidak memiliki hak akses Admin.',
-            ], 403); // 403 Forbidden
+                'message' => 'Akses ditolak. Role Anda tidak terdaftar di sistem mobile.',
+            ], 403);
         }
 
         // 5. Jika dia admin, buat token (Gunakan Sanctum)
@@ -54,5 +56,26 @@ class AuthController extends Controller
                 'user'  => $user
             ]
         ], 200);
+    }
+
+    /**
+     * Mengambil semua daftar pengguna untuk dropdown Android
+     */
+    public function getUsers()
+    {
+        try {
+            // Ambil data user. Bisa difilter misal: User::where('role', 'operator')->get() jika perlu
+            $users = User::all(); 
+            
+            return response()->json([
+                'success' => true,
+                'data' => $users
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data user: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

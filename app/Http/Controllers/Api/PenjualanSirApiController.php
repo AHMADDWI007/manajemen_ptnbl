@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Models\PenjualanSir20;
-use App\Models\HasilUjiLabSIR20;
 use App\Http\Controllers\Controller;
 use App\Models\Pallet; // 🔥 TAMBAHAN PENTING: Import model Pallet
 use Illuminate\Support\Facades\DB;
@@ -74,26 +73,20 @@ class PenjualanSirApiController extends Controller
     // =========================================================================
     // [GET AVAILABLE STOCK] Ambil Pallet Siap Jual (PRI >= 40 & Belum Terjual)
     // =========================================================================
+    // =========================================================================
+    // [GET AVAILABLE STOCK] Ambil Pallet yang Belum Terjual (Tanpa Filter Lab)
+    // =========================================================================
     public function getAvailableStock(Request $request)
     {
         try {
-            // 1. Cari pallet yang sudah uji lab dan PRI >= 40
-            $palletsTestedPrima = HasilUjiLabSIR20::where('pri', '>=', 40)->pluck('no_palet')->toArray();
-            
-            // 2. Cari pallet yang sudah terjual dari Riwayat Penjualan
-            $soldData = PenjualanSir20::where('is_summary', 0)->whereNotNull('no_palet_list')->get();
+            // 1. Ambil semua nomor pallet dari tabel Pallet yang belum terjual
+            // Kita tidak lagi memanggil HasilUjiLabSIR20 agar pallet baru langsung muncul
+            $availablePallets = Pallet::whereNull('tanggal_penjualan')
+                ->pluck('no_pallet')
+                ->toArray();
 
-            $palletsSold = [];
-            foreach ($soldData as $sale) {
-                if (!empty($sale->no_palet_list)) {
-                    $exploded = explode(',', $sale->no_palet_list);
-                    $palletsSold = array_merge($palletsSold, $exploded);
-                }
-            }
-
-            // 3. Sisa Pallet = Tested - Sold
-            $availablePallets = array_diff($palletsTestedPrima, $palletsSold);
-            sort($availablePallets, SORT_NUMERIC);
+            // 2. Urutkan nomor palet secara Natural (PLT-1, PLT-2, dst)
+            sort($availablePallets, SORT_NATURAL);
 
             return response()->json([
                 'success' => true,
@@ -114,60 +107,27 @@ class PenjualanSirApiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'tanggal'  => 'required|date',
-            'uraian'   => 'required|string',
-            'hari_ini' => 'required|numeric'
+            'tanggal' => 'required|date',
+            'selected_pallets' => 'required'
         ]);
 
-        DB::beginTransaction();
         try {
             $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
-            $kgTerjual = $request->hari_ini;
-            
-            // Handle array selected_pallets dari Android
-            $selectedPallets = $request->input('selected_pallets', []);
-            if (is_string($selectedPallets)) {
-                $selectedPallets = json_decode($selectedPallets, true) ?? [];
-            }
-            $palletTerjual = count($selectedPallets);
+            $selectedPallets = is_array($request->selected_pallets) ? $request->selected_pallets : json_decode($request->selected_pallets, true);
 
-            // 1. Simpan Detail Penjualan (Non-Summary / Bukti Invoice)
-            PenjualanSir20::create([
-                'tanggal'       => $tgl,
-                'uraian'        => $request->uraian,
-                'no_kontrak'    => $request->no_kontrak,
-                'no_invoice'    => $request->no_invoice,
-                'pallet'        => $palletTerjual,
-                'hari_ini'      => $kgTerjual,
-                'harga'         => $request->harga,
-                'no_palet_list' => implode(',', $selectedPallets),
-                'is_summary'    => 0 
-            ]);
+            // Simpan ke tabel penampung sementara (Booking)
+            // Kita gunakan updateOrCreate berdasarkan tanggal agar jika mobile kirim ulang di tgl yg sama, data terupdate.
+            DB::table('booking_pallet')->updateOrInsert(
+                ['tanggal' => $tgl],
+                [
+                    'no_palet_list' => implode(',', $selectedPallets),
+                    'created_at' => now(), // 🔥 Tambahkan ini
+                    'updated_at' => now()
+                ]
+            );
 
-            // 2. Update Summary Penjualan (Rekap Bulanan)
-            $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
-                ->where('uraian', $request->uraian)
-                ->where('is_summary', 0)
-                ->sum('hari_ini');
-                
-            $this->recalculateAndSave($tgl, $request->uraian, $totalKgHariIni, $request->keterangan);
-
-            // =========================================================================
-            // 🔥 3. UPDATE STATUS PALLET MENJADI TERJUAL (SAMA PERSIS DGN WEB) 🔥
-            // =========================================================================
-            if (!empty($selectedPallets)) {
-                Pallet::whereIn('no_pallet', $selectedPallets)->update([
-                    'tanggal_penjualan' => $tgl
-                ]);
-            }
-
-            // (Catatan: Fungsi syncToGudang & syncToMutu sudah dihapus dari sini)
-
-            DB::commit();
-            return response()->json(['success' => true, 'message' => 'Penjualan Tersimpan & Stok Gudang Terpotong.']);
-
+            return response()->json(['success' => true, 'message' => 'Daftar pallet berhasil dikirim ke Admin Web.']);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

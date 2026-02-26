@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+    Route::get('/users', [AuthController::class, 'getUsers']);
 
     // --- Rute Uji Bokar (Standar) ---
     Route::post('/uji-bokar', [HasilUjiLabBokarApiController::class, 'store'])->name('api.uji-bokar.store');

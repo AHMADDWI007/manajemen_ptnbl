@@ -451,20 +451,35 @@
                 data: { date: date },
                 success: function(response) {
                     grid.empty();
+                    
+                    // 🔥 DEFINISIKAN variabel bookedArr dari response server
+                    var bookedArr = response.booked_pallets ? response.booked_pallets : [];
+
                     if (response.list_pallet && response.list_pallet.length > 0) {
                         $.each(response.list_pallet, function(i, val) {
+                            
+                            // 🔥 CEK APAKAH PALLET INI ADA DI LIST BOOKING
+                            // Kita pakai toString() agar perbandingan datanya akurat
+                            var isBooked = bookedArr.includes(val.toString());
+                            var checkedAttr = isBooked ? 'checked' : '';
+                            var selectedClass = isBooked ? 'selected' : '';
+
                             grid.append(`
-                                <label class="pallet-item">
-                                    <input type="checkbox" name="selected_pallets[]" class="pallet-check" value="${val}">
+                                <label class="pallet-item ${selectedClass}">
+                                    <input type="checkbox" name="selected_pallets[]" 
+                                        class="pallet-check" value="${val}" ${checkedAttr}>
                                     <span>#${val}</span>
                                 </label>
                             `);
                         });
+                        
                         $('#txtStokTersedia').html(response.count + " <span style='font-size: 14px;'>Pallet Siap Jual</span>");
                     } else {
-                        grid.html('<span class="text-danger small">Belum ada palet yang Lulus Uji Lab (PRI >= 40).</span>');
+                        grid.html('<span class="text-danger small">Belum ada palet yang tersedia.</span>');
                         $('#txtStokTersedia').html("0 <span style='font-size: 14px;'>Pallet</span>");
                     }
+                    
+                    // 🔥 Jalankan kalkulasi setelah grid terisi agar angka total Kg langsung muncul
                     updateCalculation();
                 },
                 error: function(xhr) {

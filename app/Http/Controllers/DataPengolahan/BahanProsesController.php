@@ -272,22 +272,28 @@ class BahanProsesController extends Controller
                 ->whereIn('kode_api', ['petani', 'ptpn', 'inhut'])
                 ->sum('masuk_hi');
             
+            // 🔥 PASTIKAN: PengolahanBasah dihitung dari netto_kering yang sudah fix
             $total_diolah = PengolahanBasah::whereDate('tanggal', '<=', $date)
                 ->sum('netto_kering');
             
             $total_rektif = RektifikasiStok::whereDate('tanggal', '<=', $date)
                 ->sum('berat');
             
-            return max(0, $total_masuk - $total_diolah + $total_rektif);
+            return max(0, round($total_masuk - $total_diolah + $total_rektif, 2));
             
         } catch (\Exception $e) { return 0; }
     }
 
     private function getStokAkhirMaturasi($date) {
+        // 🔥 PERBAIKAN: Gunakan pembulatan (round) agar tidak ada selisih koma di neraca massa
         $sums = PengolahanMaturasi::whereDate('tgl_laporan', '<=', $date)
             ->selectRaw('SUM(masuk_hi) as in_total, SUM(diolah) as out_process, SUM(mutasi) as out_mutation')
             ->first();
+            
         if (!$sums) return 0;
-        return $sums->in_total - $sums->out_process - $sums->out_mutation;
+        
+        // Pastikan hasil akhirnya tidak negatif karena pembulatan database
+        $stok = $sums->in_total - $sums->out_process - $sums->out_mutation;
+        return max(0, round($stok, 2));
     }
 }

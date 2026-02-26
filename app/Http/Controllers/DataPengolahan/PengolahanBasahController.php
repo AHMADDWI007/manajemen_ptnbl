@@ -2,21 +2,23 @@
 
 namespace App\Http\Controllers\DataPengolahan;
 
-use Exception;
-use Carbon\Carbon;
-use App\Models\Maturasi;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\PengolahanBasah;
 use App\Models\RektifikasiStok;
 use App\Models\TransaksiApiBokar;
-use App\Models\PengolahanMaturasi;
+use App\Traits\MaturasiSyncTrait;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Http\Controllers\Controller;
-use App\Models\HasilUjiLabBokarDiolah;
 use Illuminate\Support\Facades\Validator;
 
 class PengolahanBasahController extends Controller
 {
+
+    use MaturasiSyncTrait; // 🔥 Tambahkan ini agar fungsi Trait bisa dipakai
+
     public function index(Request $request)
     {
         // 1. QUERY DATA UTAMA
@@ -116,7 +118,7 @@ class PengolahanBasahController extends Controller
                 ]);
 
                 // Update Trigger (Label DS akan masuk ke master bak)
-                $this->updateMaturasiTrigger($request->id_maturasi, 'DS', $request->tanggal);
+                $this->syncMaturasi($request->id_maturasi, $request->tanggal);
 
                 return redirect()->route('pengolahan-basah.index')->with('success', 'Data utuh berhasil disimpan (Belum dipecah).');
             }
@@ -153,7 +155,7 @@ class PengolahanBasahController extends Controller
                             'netto_kering'  => null,
                         ]);
 
-                        $this->updateMaturasiTrigger($request->id_maturasi, $jenis, $request->tanggal);
+                        $this->syncMaturasi($request->id_maturasi, $request->tanggal);
                     }
                 }
                 
@@ -246,7 +248,7 @@ class PengolahanBasahController extends Controller
                         'netto_kering'        => $pengolahanBaru->netto_kering,
                     ]);
                     
-                    $this->updateMaturasiTrigger($dataAsal->id_maturasi, $jenis, $dataAsal->tanggal);
+                    $this->syncMaturasi($dataAsal->id_maturasi, $dataAsal->tanggal);
                 }
             }
 
@@ -256,7 +258,7 @@ class PengolahanBasahController extends Controller
 
             DB::commit();
             // 🔥 TAMBAHKAN INI: Panggil fungsi sinkronisasi stok ke Maturasi
-            $this->syncMaturasiAfterDelete($dataAsal->id_maturasi, $dataAsal->tanggal);
+            $this->syncMaturasi($dataAsal->id_maturasi, $dataAsal->tanggal);
             return redirect()->back()->with('success', 'Rincian data berhasil diperbarui.');
 
         } catch (Exception $e) {
@@ -306,7 +308,7 @@ class PengolahanBasahController extends Controller
 
         // 3. 🔥 [PERBAIKAN UTAMA] TRIGGER UPDATE STATUS BAK MATURASI
         // Panggil fungsi trigger agar kolom 'asal_bokar' di tabel Maturasi berubah
-        $this->updateMaturasiTrigger($request->id_maturasi, $request->jenis, $request->tanggal);
+        $this->syncMaturasi($request->id_maturasi, $request->tanggal);
         
         return redirect()->route('pengolahan-basah.index')->with('success', 'Data diperbarui dan status Bak disesuaikan.');
     }
@@ -328,10 +330,7 @@ class PengolahanBasahController extends Controller
 
             // 3. 🔥 TRIGGER SINKRONISASI STOK MATURASI (PENTING!)
             // Hitung ulang 'Masuk HI' di Maturasi karena data sumber berkurang
-            $this->syncMaturasiAfterDelete($id_maturasi, $tanggal);
-            
-            // 4. Update Label Asal Bokar (CMP/DS/PT)
-            $this->updateMaturasiTrigger($id_maturasi, '', $tanggal);
+            $this->syncMaturasi($id_maturasi, $tanggal);
         }
         
         return redirect()->route('pengolahan-basah.index')->with('success', 'Data dihapus dan Stok Maturasi telah disesuaikan.');
@@ -357,10 +356,7 @@ class PengolahanBasahController extends Controller
                 PengolahanBasah::whereIn('id_pengolahan_basah', $ids)->delete();
 
                 // 3. 🔥 TRIGGER SINKRONISASI STOK MATURASI
-                $this->syncMaturasiAfterDelete($maturasiId, $tanggal);
-
-                // 4. Update Label Asal Bokar
-                $this->updateMaturasiTrigger($maturasiId, '', $tanggal);
+                $this->syncMaturasi($maturasiId, $tanggal);
             }
         }
 
@@ -500,111 +496,5 @@ class PengolahanBasahController extends Controller
 
         $stok = $total_masuk - $total_diolah + $total_rektif;
         return max(0, $stok);
-    }
-
-    // Function Helper untuk Update Status Bak Maturasi Otomatis (REVISI: Target kolom asal_bokar)
-    public function updateMaturasiTrigger($id_maturasi, $jenisBaru, $tanggal)
-    {
-        // 1. Ambil SEMUA jenis bokar unik di Bak & Tanggal tersebut
-        $listJenis = PengolahanBasah::where('id_maturasi', $id_maturasi)
-                        ->where('tanggal', $tanggal)
-                        ->pluck('jenis')
-                        // 🔥 PERBAIKAN DISINI: Tambahkan "&& $value !== 'PENDING'"
-                        ->filter(function ($value) { 
-                            return !is_null($value) && $value !== '' && $value !== 'PENDING'; 
-                        })
-                        ->unique()
-                        ->sort() 
-                        ->values();
-
-        // 2. Tentukan Label Akhir
-        $labelAkhir = '';
-
-        if ($listJenis->count() > 1) {
-            // Jika Multi Jenis -> CMP (DS, PT)
-            $rincian = $listJenis->implode(', '); 
-            $labelAkhir = "CMP ($rincian)";
-        } 
-        elseif ($listJenis->count() == 1) {
-            // Jika cuma 1 jenis -> Tetap PT / DS / INHUT
-            $labelAkhir = $listJenis->first();
-        } 
-        else {
-            // Jika data kosong
-            $labelAkhir = null; 
-        }
-
-        // 3. Update ke Tabel Master Maturasi
-        $bak = Maturasi::find($id_maturasi);
-        
-        if ($bak) {
-            // 🔥 PERBAIKAN DI SINI: Simpan ke kolom 'asal_bokar'
-            $bak->asal_bokar = $labelAkhir; 
-            $bak->save();
-        }
-    }
-
-    // =========================================================================
-    // HELPER: SINKRONISASI STOK MATURASI SAAT HAPUS DATA
-    // =========================================================================
-    // =========================================================================
-    // HELPER: SINKRONISASI STOK MATURASI SAAT HAPUS DATA (DIPERBARUI)
-    // =========================================================================
-    private function syncMaturasiAfterDelete($id_maturasi, $tanggal)
-    {
-        // 1. Hitung Ulang Total Netto Kering yang TERSISA di tanggal & bak tersebut
-        $sisaNettoKering = PengolahanBasah::where('id_maturasi', $id_maturasi)
-            ->where('tanggal', $tanggal)
-            ->sum('netto_kering'); // Jika kosong otomatis 0
-
-        // 2. Cari Log Pengolahan Maturasi
-        $logMaturasi = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
-            ->whereDate('tgl_laporan', $tanggal)
-            ->first();
-
-        if ($logMaturasi) {
-            
-            // 🔥 PERBAIKAN FATAL:
-            // Jika sisaNettoKering 0 (Artinya SEMUA data masuk_hi hari ini dihapus habis)
-            // DAN hari itu tidak ada aktivitas 'diolah' atau 'mutasi' sama sekali
-            // MAKA: HAPUS TOTAL LOG TERSEBUT! Jangan disisakan 'masuk_hi = 0'.
-            if ($sisaNettoKering <= 0.01 && $logMaturasi->diolah <= 0.01 && $logMaturasi->mutasi == 0) {
-                $logMaturasi->delete();
-            } else {
-                // Jika masih ada sisa (atau ada aktivitas lain), cukup update angkanya
-                $logMaturasi->masuk_hi = $sisaNettoKering;
-                $logMaturasi->save();
-            }
-
-            // 3. Hitung Ulang Stok Akhir Master Maturasi
-            // A. Stok Awal (H-1)
-            $stokAwal = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
-                ->whereDate('tgl_laporan', '<', $tanggal)
-                ->sum(DB::raw('masuk_hi - diolah - mutasi')); 
-
-            // B. Hitung Stok Akhir Baru (Ambil ulang dari log setelah di-delete/update)
-            $logBaru = PengolahanMaturasi::where('id_maturasi', $id_maturasi)->whereDate('tgl_laporan', $tanggal)->first();
-            $masukBaru = $logBaru ? $logBaru->masuk_hi : 0;
-            $keluarBaru = $logBaru ? ($logBaru->diolah + $logBaru->mutasi) : 0;
-            
-            $stokAkhirBaru = $stokAwal + $masukBaru - $keluarBaru;
-
-            // C. Update Master Maturasi
-            $masterBak = Maturasi::find($id_maturasi);
-            if ($masterBak) {
-                $masterBak->stok_akhir = max(0, $stokAkhirBaru); // Cegah minus
-                
-                // Jika stok habis karena dihapus, reset status
-                if ($masterBak->stok_akhir <= 0.01) {
-                    $masterBak->stok_akhir = 0;
-                    $masterBak->keterangan = 'KOSONG';
-                    $masterBak->asal_bokar = null;
-                    $masterBak->umur = 0;
-                    $masterBak->tgl_masuk = null;
-                }
-                
-                $masterBak->save();
-            }
-        }
     }
 }

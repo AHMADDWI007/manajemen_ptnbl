@@ -220,13 +220,11 @@
                                         <td>
                                             <select name="maturasi[0][ruang]" class="form-control form-control-sm select-ruang" required>
                                                 <option value="">- Pilih Ruang -</option>
+                                                {{-- Ganti bagian ini di dalam loop bak_aktif baris pertama --}}
                                                 @foreach($bak_aktif as $bak)
                                                     <option value="{{ $bak->uraian }}" 
                                                             data-berat="{{ $bak->stok_akhir }}" 
-                                                            {{-- 🔥 PERBAIKAN: TAMBAHKAN BARIS DI BAWAH INI 🔥 --}}
-                                                            data-tgl-masuk="{{ $bak->tgl_dasar_hitung }}"
-                                                            {{-- ------------------------------------------ --}}
-                                                            data-umur="{{ $bak->umur_real }}">
+                                                            data-umur="{{ $bak->umur }}"> {{-- 🔥 Pastikan pakai $bak->umur (sesuai buildOptions) --}}
                                                         {{ $bak->uraian }} (Stok: {{ number_format($bak->stok_akhir, 0) }})
                                                     </option>
                                                 @endforeach
@@ -326,7 +324,7 @@
                             
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4">Jumlah Bales</label>
-                                <div class="col-5"><input type="number" name="jumlah_bales" id="inputBales" class="form-control form-control-sm calc-trigger" step="1"></div>
+                                <div class="col-5"><input type="number" name="jumlah_bales" id="inputBales" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Bales</div>
                             </div>
                             <div class="row mb-1 align-items-center">
@@ -418,7 +416,7 @@
                                 <label class="col-4 font-weight-normal">Jml Pallet Diisi</label>
                                 <div class="col-5">
                                     {{-- 🔥 ID ditambahkan untuk Selector JS --}}
-                                    <input type="number" name="jml_pallet" id="inputJmlPallet" class="form-control form-control-sm auto-input" step="1" placeholder="Auto" readonly>
+                                    <input type="number" name="jml_pallet" id="inputJmlPallet" class="form-control form-control-sm calc-trigger" step="1" placeholder="Input Manual">
                                 </div>
                                 <div class="col-3 unit-label">SW</div>
                             </div>
@@ -479,20 +477,22 @@
 </div>
 
 {{-- MODAL EDIT LAPORAN --}}
+{{-- MODAL EDIT LAPORAN --}}
 <div class="modal fade" id="modalEditLaporan" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
+            {{-- Form action akan diisi dinamis via JS menggunakan ID --}}
             <form action="#" method="POST" id="formEditProduksi">
                 @csrf
-                @method('PUT') 
+                @method('PUT')
                 
                 <div class="modal-header bg-success text-white py-2"> 
                     <h5 class="modal-title fw-bold" style="font-size: 1.1rem;">Edit Laporan Produksi SIR 20</h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
+
                 <div class="modal-body pt-2">
-                    
-                    {{-- A. HEADER --}}
+                    {{-- HEADER FORM: TANGGAL & SHIFT --}}
                     <div class="row mb-3 bg-light p-2 rounded border">
                         <div class="col-md-3">
                             <label>Tanggal Produksi</label>
@@ -508,47 +508,45 @@
                         </div>
                     </div>
 
-                    {{-- B. TABEL MATURASI (EDIT) --}}
-                    <h6 class="font-weight-bold text-warning border-bottom pb-1">1. DATA MATURASI</h6>
+                    {{-- 1. DATA MATURASI --}}
+                    <h6 class="font-weight-bold text-success border-bottom pb-1">1. DATA MATURASI</h6>
                     <div class="row mb-3">
                         <div class="col-12">
                             <table class="table table-sm table-borderless table-maturasi mb-0">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th width="30%">Ruang Maturasi</th>
-                                        <th width="30%">Berat Remahan (Kg)</th>
-                                        <th width="30%">Umur (Hari)</th>
-                                        <th>
-                                            <button type="button" class="btn btn-warning btn-xs btn-block text-white" id="btnAddMaturasiEdit">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        </th>
+                                        <th width="40%" style="vertical-align: middle;">Ruang Maturasi</th>
+                                        <th width="25%" style="vertical-align: middle;">Berat Remahan (Kg)</th>
+                                        <th width="20%" style="vertical-align: middle;">Umur (Hari)</th>
+                                        <th class="text-center">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="maturasiContainerEdit">
-                                    {{-- Isi via JS --}}
+                                    {{-- Baris akan di-generate otomatis oleh JavaScript saat tombol Edit diklik --}}
                                 </tbody>
                             </table>
+                            <button type="button" class="btn btn-outline-success btn-xs mt-2" id="btnAddMaturasiEdit">
+                                <i class="fas fa-plus"></i> Tambah Baris Maturasi
+                            </button>
                         </div>
                     </div>
 
-                    {{-- C. GRID UTAMA --}}
+                    {{-- GRID UTAMA --}}
                     <div class="row">
+                        {{-- KOLOM KIRI: OPERASIONAL --}}
                         <div class="col-lg-6 pr-lg-4" style="border-right: 1px solid #eee;">
+                            <h6 class="font-weight-bold text-success border-bottom pb-1 mb-3">2. OPERASIONAL MESIN</h6>
                             
-                            {{-- OPERASIONAL --}}
-                            <h6 class="font-weight-bold text-warning border-bottom pb-1 mb-3">2. OPERASIONAL MESIN</h6>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4">Jam Start Dryer</label>
                                 <div class="col-4"><input type="time" name="jam_start_dryer" id="edit_jam_start" class="form-control form-control-sm"></div>
                             </div>
                             <div class="row mb-3 align-items-center">
                                 <label class="col-4">Trolly Masuk</label>
-                                <div class="col-4"><input type="number" name="trolly_masuk" id="edit_trolly_masuk" class="form-control form-control-sm" step="1"></div>
+                                <div class="col-4"><input type="number" name="trolly_masuk" id="edit_trolly_masuk" class="form-control form-control-sm"></div>
                             </div>
 
                             <label class="text-muted small font-weight-bold">AKTUAL TEMPERATURE</label>
-                            {{-- Note: name tetap sama agar Controller bisa baca --}}
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Brunner 1</label>
                                 <div class="col-3"><input type="number" name="temp_b1_start" id="edit_temp_b1_start" class="form-control form-control-sm"></div>
@@ -592,7 +590,7 @@
 
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4">Jml Trolly Keluar</label>
-                                <div class="col-5"><input type="number" name="trolly_keluar" id="edit_trolly_keluar" class="form-control form-control-sm calc-trigger-edit" step="1"></div>
+                                <div class="col-5"><input type="number" name="trolly_keluar" id="edit_trolly_keluar" class="form-control form-control-sm calc-trigger-edit"></div>
                                 <div class="col-3 unit-label">Unit</div>
                             </div>
                             <div class="row mb-1 align-items-center">
@@ -607,10 +605,9 @@
                                 <div class="col-3 unit-label">Jam</div>
                             </div>
                             
-                            {{-- HASIL PRODUKSI --}}
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4">Jumlah Bales</label>
-                                <div class="col-5"><input type="number" name="jumlah_bales" id="edit_bales" class="form-control form-control-sm calc-trigger-edit" step="1"></div>
+                                <div class="col-5"><input type="number" name="jumlah_bales" id="edit_bales" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Bales</div>
                             </div>
                             <div class="row mb-1 align-items-center">
@@ -633,15 +630,10 @@
                                 <div class="col-5"><input type="text" name="produktivitas" id="edit_produktivitas" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Kg/H</div>
                             </div>
-                             <div class="row mb-1 align-items-center">
-                                <label class="col-4">Kg Sir20/Cake</label>
-                                <div class="col-5"><input type="number" name="kg_sir20" id="edit_kg_cake" class="form-control form-control-sm auto-input" readonly></div>
-                                <div class="col-3 unit-label">Kg</div>
-                            </div>
                             <div class="row mb-1 align-items-center">
-                                <label class="col-4">Bales Kontamin</label>
-                                <div class="col-5"><input type="number" name="bales_kontamin" id="edit_bales_kontamin" class="form-control form-control-sm"></div>
-                                <div class="col-3 unit-label">Bales</div>
+                                <label class="col-4">Kg Sir20/Cake</label>
+                                <div class="col-5"><input type="number" name="kg_sir20" id="edit_kg_sir20" class="form-control form-control-sm auto-input" readonly></div>
+                                <div class="col-3 unit-label">Kg</div>
                             </div>
                             <div class="row mb-3 align-items-center">
                                 <label class="col-4">Jam Ops Genset</label>
@@ -649,74 +641,83 @@
                                 <div class="col-3 unit-label">Jam</div>
                             </div>
 
-                            <label class="text-muted small font-weight-bold">RATA-RATA BAHAN BAKAR</label>
+                            <label class="text-muted small font-weight-bold">RATA-RATA BAHAN BAKAR (AUTO)</label>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Solar</label>
-                                <div class="col-5"><input type="text" id="edit_avg_solar" class="form-control form-control-sm auto-input" readonly></div>
+                                <div class="col-5"><input type="text" id="edit_avgSolar" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Liter</div>
                             </div>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Batu Bara</label>
-                                <div class="col-5"><input type="text" id="edit_avg_batubara" class="form-control form-control-sm auto-input" readonly></div>
+                                <div class="col-5"><input type="text" id="edit_avgBatubara" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Kg</div>
                             </div>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Cangkang</label>
-                                <div class="col-5"><input type="text" id="edit_avg_cangkang" class="form-control form-control-sm auto-input" readonly></div>
+                                <div class="col-5"><input type="text" id="edit_avgCangkang" class="form-control form-control-sm auto-input" readonly></div>
                                 <div class="col-3 unit-label">Kg</div>
                             </div>
                         </div>
 
-                        {{-- KOLOM KANAN --}}
+                        {{-- KOLOM KANAN: SUMMARY & PACKING --}}
                         <div class="col-lg-6 pl-lg-4">
-                            <h6 class="font-weight-bold text-warning border-bottom pb-1 mb-3">3. LAIN-LAIN & PACKING</h6>
+                            <h6 class="font-weight-bold text-success border-bottom pb-1 mb-3">3. LAIN-LAIN & PACKING</h6>
+                            
                             <div class="row mb-4 align-items-center">
                                 <label class="col-4">Listrik PLN</label>
                                 <div class="col-5"><input type="number" name="pln_kwh" id="edit_pln_kwh" class="form-control form-control-sm"></div>
                                 <div class="col-3 unit-label">KWH</div>
                             </div>
 
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="summary-box">
+                                        <span class="summary-title">Total Remahan</span>
+                                        <span class="summary-value" id="edit_bigTotalRemahan">0</span>
+                                        <small class="text-muted">Kilogram</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="summary-box">
+                                        <span class="summary-title">Produksi SIR 20</span>
+                                        <span class="summary-value" id="edit_bigTotalProduksi">0</span>
+                                        <small class="text-muted">Kilogram</small>
+                                    </div>
+                                </div>
+                            </div>
+
                             <label class="text-muted small font-weight-bold">DETAIL PACKING</label>
-                            <div class="row mb-1 align-items-center">
+                            <div class="form-group row align-items-center">
                                 <label class="col-4 font-weight-normal">Jml Pallet Diisi</label>
-                                <div class="col-5"><input type="number" name="jml_pallet" id="edit_jml_pallet" class="form-control form-control-sm auto-input" step="1" readonly></div>
+                                <div class="col-5">
+                                    <input type="number" name="jml_pallet" id="edit_inputJmlPallet" class="form-control form-control-sm calc-trigger-edit" step="1">
+                                </div>
                                 <div class="col-3 unit-label">SW</div>
                             </div>
-                            {{-- <div class="row mb-1 align-items-center">
-                                <label class="col-4 font-weight-normal">Total Nomor</label>
-                                <div class="col-5"><input type="number" name="total_nomor" id="edit_total_nomor" class="form-control form-control-sm"></div>
-                                <div class="col-3 unit-label">WP</div>
-                            </div>
-                             <div class="row mb-1 align-items-center">
-                                <label class="col-4 font-weight-normal">MC</label>
-                                <div class="col-5"><input type="number" name="mc_val" id="edit_mc_val" class="form-control form-control-sm"></div>
-                                <div class="col-3 unit-label">MC</div>
-                            </div> --}}
+
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Nomor</label>
                                 <div class="col-2 pr-0">
-                                    <input type="text" name="nomor_start" id="edit_nomor_start" class="form-control form-control-sm text-center auto-input" readonly>
+                                    <input type="text" name="nomor_start" id="edit_outNomorStart" class="form-control form-control-sm text-center auto-input" readonly>
                                 </div>
                                 <div class="col-1 text-center small px-0">s/d</div>
                                 <div class="col-2 pl-0">
-                                    <input type="text" name="nomor_end" id="edit_nomor_end" class="form-control form-control-sm text-center auto-input" readonly>
+                                    <input type="text" name="nomor_end" id="edit_outNomorEnd" class="form-control form-control-sm text-center auto-input" readonly>
                                 </div>
-                                <div class="col-3"></div>
                             </div>
-                            <div class="row mb-1 align-items-center">
+                            <div class="row mb-3 align-items-center">
                                 <label class="col-4 font-weight-normal">Total Akhir</label>
                                 <div class="col-5">
-                                    {{-- TOTAL AKHIR: Tambah readonly & auto-input --}}
-                                    <input type="number" name="total_nomor_akhir" id="edit_total_nomor_akhir" class="form-control form-control-sm auto-input" readonly>
+                                    <input type="number" name="total_nomor_akhir" id="edit_outTotalAkhir" class="form-control form-control-sm auto-input" readonly>
                                 </div>
                                 <div class="col-3 unit-label">WP</div>
                             </div>
-                            {{-- 🔥 TAMBAHAN 3: Dropdown Petugas untuk Edit --}}
-                            <div class="row mb-1 align-items-center mt-2 border-top pt-2">
+
+                            <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-bold text-dark">Petugas</label>
                                 <div class="col-5">
                                     <select name="petugas" id="edit_petugas" class="form-control form-control-sm" required>
-                                        <option value="" disabled>-- Pilih Petugas --</option>
+                                        <option value="" disabled selected>-- Pilih Petugas --</option>
                                         @foreach($users as $user)
                                             <option value="{{ $user->fullname }}">{{ $user->fullname }}</option>
                                         @endforeach
@@ -728,7 +729,7 @@
                 </div>
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-warning btn-sm fw-bold px-4">Update Laporan</button>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold px-4 text-white">Update Laporan</button>
                 </div>
             </form>
         </div>
@@ -883,7 +884,12 @@
         function buildOptions(dataArray) {
             let html = '<option value="">- Pilih Ruang -</option>';
             dataArray.forEach(function(bak) {
-                html += `<option value="${bak.uraian}" data-berat="${bak.stok_akhir}" data-umur="${bak.umur}">
+                // Ambil umur dari properti yang tersedia (umur atau umur_real)
+                let umurBak = bak.umur !== undefined ? bak.umur : (bak.umur_real !== undefined ? bak.umur_real : 0);
+                
+                html += `<option value="${bak.uraian}" 
+                                data-berat="${bak.stok_akhir}" 
+                                data-umur="${umurBak}">
                             ${bak.uraian} (Stok: ${new Intl.NumberFormat('id-ID').format(bak.stok_akhir)} Kg)
                         </option>`;
             });
@@ -907,7 +913,7 @@
                             var currentVal = $(this).val();
                             $(this).html(optionsMaturasi);
                             $(this).val(currentVal);
-                            $(this).trigger('change');
+                            $(this).trigger('change'); // 🔥 TRIGGER INI PENTING agar umur terisi otomatis
                         });
                     }
                 });
@@ -923,12 +929,11 @@
                     type: 'GET',
                     success: function(data) {
                         var newEditOptions = buildOptions(data);
-                        // Refresh semua dropdown di modal edit
                         $('.select-ruang-edit').each(function() {
                             var currentVal = $(this).val();
                             $(this).html(newEditOptions);
                             $(this).val(currentVal);
-                            $(this).trigger('change');
+                            $(this).trigger('change'); // 🔥 TRIGGER INI PENTING
                         });
                     }
                 });
@@ -940,20 +945,24 @@
             var selectedOption = $(this).find(':selected');
             var row = $(this).closest('tr');
 
-            if(selectedOption.val() !== "") {
-                var beratRaw = selectedOption.data('berat');
-                var beratBersih = parseFloat(String(beratRaw).replace(',', '.'));
+            var inputBerat = row.find('.input-berat, .input-berat-edit');
+            var inputUmur = row.find('.input-umur, .input-umur-edit');
+
+            if (selectedOption.val() !== "") {
+                // Gunakan .attr('data-umur') sebagai fallback jika .data('umur') gagal
+                var berat = selectedOption.data('berat');
+                var umur = selectedOption.data('umur');
+
+                // Jika .data() menghasilkan undefined, ambil mentahnya
+                if (umur === undefined) {
+                    umur = selectedOption.attr('data-umur');
+                }
+
+                inputBerat.val(parseFloat(String(berat).replace(',', '.')));
+                inputUmur.val(umur || 0); 
                 
-                var inputBerat = row.find('.input-berat').length > 0 ? row.find('.input-berat') : row.find('.input-berat-edit');
-                var inputUmur = row.find('.input-umur').length > 0 ? row.find('.input-umur') : row.find('.input-umur-edit');
-                
-                inputBerat.val(beratBersih);
-                inputUmur.val(selectedOption.data('umur') || 0); // Ambil mutlak dari server
                 calculateTotals();
             } else {
-                var inputBerat = row.find('.input-berat').length > 0 ? row.find('.input-berat') : row.find('.input-berat-edit');
-                var inputUmur = row.find('.input-umur').length > 0 ? row.find('.input-umur') : row.find('.input-umur-edit');
-                
                 inputBerat.val(''); 
                 inputUmur.val(''); 
                 calculateTotals();
@@ -977,7 +986,7 @@
 
         // Fungsi Hitung Total Berat & Produksi
         function calculateTotals() {
-            // 1. Hitung Total Remahan
+            // 1. Hitung Total Remahan (Tetap Sama)
             var totalRemahan = 0;
             $('.input-berat').each(function() { 
                 var val = parseFloat($(this).val()) || 0;
@@ -985,41 +994,48 @@
             });
             $('#bigTotalRemahan').text(Math.ceil(totalRemahan).toLocaleString('id-ID'));
 
-            // 2. Hitung Kg Press (Bales x 35)
-            var bales = parseFloat($('#inputBales').val()) || 0;
-            var kgPress = Math.ceil(bales * 35); 
+            // =========================================================
+            // 🔥 LOGIKA BARU: PALLET MANUAL -> BALES AUTO 🔥
+            // =========================================================
+            
+            // 2. Ambil input Jml Pallet yang diisi manual
+            var jmlPallet = parseFloat($('#inputJmlPallet').val()) || 0;
+
+            // 3. Hitung Jumlah Bales Otomatis (Misal: 1 Pallet isi 36 Bales)
+            // Ganti angka 36 di bawah ini sesuai standar Maswi
+            var autoBales = jmlPallet * 36; 
+            $('#inputBales').val(autoBales); // Set ke input Bales
+
+            // 4. Hitung Kg Press (Bales x 35)
+            var kgPress = Math.ceil(autoBales * 35); 
             
             $('#outKgPress').val(kgPress);
             $('#bigTotalProduksi').text(kgPress.toLocaleString('id-ID'));
 
-            // =========================================================
-            // 🔥 3. AUTO JUMLAH PALLET (KG PRESS / 1260) 🔥
-            // =========================================================
-            if (kgPress > 0) {
-                var jmlPallet = Math.round(kgPress / 1260); // Pembulatan ke integer terdekat
-                $('#inputJmlPallet').val(jmlPallet);
-                
-                // PENTING: Trigger event input agar "Total Nomor" & "Nomor End" (Packing) ikut terupdate
-                $('#inputJmlPallet').trigger('input'); 
+            // 5. Update Nomor Packing (Tetap otomatis berdasarkan Jml Pallet)
+            if (jmlPallet > 0) {
+                // nextStart didapat dari variabel global lastNomorDB + 1
+                var nomorEnd = nextStart + jmlPallet - 1;
+                $('#outNomorStart').val(nextStart);
+                $('#outNomorEnd').val(nomorEnd); 
+                $('#outTotalAkhir').val(nomorEnd); 
             } else {
-                $('#inputJmlPallet').val(0);
+                $('#outNomorEnd').val('');
+                $('#outTotalAkhir').val('');
             }
 
             // =========================================================
-            // 🔥 4. RUMUS BARU: KG CAKE (RATA-RATA PER SEKAT) 🔥
-            // Rumus: (Total Kg / Total Trolly) / 28 Sekat
+            // 6. RUMUS KG CAKE (RATA-RATA PER SEKAT)
             // =========================================================
             var trollyKeluar = parseFloat($('#inputTrollyKeluar').val()) || 0;
-
             if (kgPress > 0 && trollyKeluar > 0) {
                 var nilaiCake = (kgPress / trollyKeluar) / 28;
-                // Tampilkan 2 angka di belakang koma (misal: 16.46)
                 $('#inputKgSir20').val(nilaiCake.toFixed(2));
             } else {
                 $('#inputKgSir20').val(0);
             }
 
-            // 5. Hitung Kapasitas & Produktivitas
+            // 7. Hitung Kapasitas & Produktivitas
             var jamJalan = parseFloat($('#inputJamJalan').val()) || 0;
             var jamKerja = parseFloat($('#inputJamKerja').val()) || 0;
             
@@ -1029,16 +1045,26 @@
             $('#outCapacity').val(capacity);
             $('#outProductivity').val(productivity);
 
-            // 6. Hitung Rata-rata Bahan Bakar
+            // 8. Hitung Rata-rata Bahan Bakar
             var solar = parseFloat($('#inputSolar').val()) || 0;
             var batubara = parseFloat($('#inputBatubara').val()) || 0;
             var cangkang = parseFloat($('#inputCangkang').val()) || 0;
 
-            $('#avgSolar').val(kgPress > 0 ? (solar/kgPress).toFixed(4) : 0);
-            $('#avgBatubara').val(kgPress > 0 ? (batubara/kgPress).toFixed(4) : 0);
-            $('#avgCangkang').val(kgPress > 0 ? (cangkang/kgPress).toFixed(4) : 0);
+            // Rumus: Kg SIR Press / 1000
+            var divisor = kgPress / 1000;
+
+            if (divisor > 0) {
+                $('#avgSolar').val((solar / divisor).toFixed(4));
+                $('#avgBatubara').val((batubara / divisor).toFixed(4));
+                $('#avgCangkang').val((cangkang / divisor).toFixed(4));
+            } else {
+                $('#avgSolar').val(0);
+                $('#avgBatubara').val(0);
+                $('#avgCangkang').val(0);
+            }
         }
-        $(document).on('input', '.calc-trigger, .input-berat, input[name="jam_start_dryer"], input[name="jam_stop_dryer"]', calculateTotals);
+        
+        $(document).on('input', '.calc-trigger, .input-berat, #inputJmlPallet, input[name="jam_start_dryer"], input[name="jam_stop_dryer"]', calculateTotals);
 
         // Logika Jam Jalan Otomatis
         $('input[name="jam_start_dryer"], input[name="jam_stop_dryer"]').on('change', function() {
@@ -1079,6 +1105,9 @@
         // Reset Form saat modal dibuka
         $('#modalInputLaporan').on('show.bs.modal', function () {
             $('#outNomorStart').val(nextStart); 
+            // 2. 🔥 REFRESH Dropdown Baris Pertama agar mengikuti opsi terbaru dari buildOptions
+            // Ini penting agar atribut data-umur dan data-berat-nya segar
+            $('.select-ruang').first().html(optionsMaturasi);
             $('#inputJmlPallet').val('');
             $('#outNomorEnd').val('');
             $('#outTotalAkhir').val('');
@@ -1102,59 +1131,82 @@
 
         // Logika Hitung Total Edit
         function calculateTotalsEdit() {
-            // 1. Hitung Kg Press (Bales x 35)
-            var bales = parseFloat($('#edit_bales').val()) || 0;
-            var kgPress = Math.ceil(bales * 35);
+            // 1. Hitung Total Remahan
+            var totalRemahan = 0;
+            $('.input-berat-edit').each(function() { 
+                totalRemahan += parseFloat($(this).val()) || 0; 
+            });
+            $('#edit_bigTotalRemahan').text(Math.ceil(totalRemahan).toLocaleString('id-ID'));
+
+            // 2. Logika Pallet -> Bales -> Kg Press
+            var jmlPallet = parseFloat($('#edit_inputJmlPallet').val()) || 0;
+            var autoBales = jmlPallet * 36; // 1 Pallet = 36 Bales
+            var kgPress = Math.ceil(autoBales * 35); // 1 Bale = 35 Kg
+            
+            $('#edit_bales').val(autoBales);
             $('#edit_kg_press').val(kgPress);
+            $('#edit_bigTotalProduksi').text(kgPress.toLocaleString('id-ID'));
 
-            // =========================================================
-            // 🔥 2. RUMUS BARU EDIT: AUTO JUMLAH PALLET 🔥
-            // Rumus: Kg Dipress / 1260 (Dibulatkan)
-            // =========================================================
-            if (kgPress > 0) {
-                var jmlPallet = Math.round(kgPress / 1260);
-                $('#edit_jml_pallet').val(jmlPallet);
-                
-                // PENTING: Trigger agar nomor urut (packing) di modal edit terupdate otomatis
-                $('#edit_jml_pallet').trigger('input'); 
-            } else {
-                $('#edit_jml_pallet').val(0);
+            // 3. Update Nomor Packing (Otomatis)
+            var start = parseInt($('#edit_outNomorStart').val()) || 0;
+            if (start > 0 && jmlPallet > 0) {
+                var end = start + jmlPallet - 1;
+                $('#edit_outNomorEnd').val(end);
+                $('#edit_outTotalAkhir').val(end); 
             }
-            // =========================================================
 
-            // =========================================================
-            // 🔥 3. RUMUS CAKE EDIT (RATA-RATA PER SEKAT) 🔥
-            // Rumus: (Total Kg / Total Trolly) / 28
-            // =========================================================
-            var trollyKeluar = parseFloat($('#edit_trolly_keluar').val()) || 0;
-            if (kgPress > 0 && trollyKeluar > 0) {
-                var nilaiCake = (kgPress / trollyKeluar) / 28;
-                $('#edit_kg_cake').val(nilaiCake.toFixed(2));
-            } else {
-                $('#edit_kg_cake').val(0);
+            // 4. Hitung Jam Jalan Dryer
+            var startT = $('#edit_jam_start').val();
+            var stopT = $('#edit_jam_stop').val();
+            if (startT && stopT) {
+                var d1 = new Date("01/01/2000 " + startT);
+                var d2 = new Date("01/01/2000 " + stopT);
+                if (d2 < d1) d2.setDate(d2.getDate() + 1);
+                var diff = (d2 - d1) / 1000 / 60 / 60;
+                $('#edit_jam_jalan').val(diff.toFixed(2));
             }
-            // =========================================================
 
-            // 4. Hitung Jam Jalan & Kerja
+            // 5. Hitung Kapasitas & Produktivitas
             var jamJalan = parseFloat($('#edit_jam_jalan').val()) || 0;
             var jamKerja = parseFloat($('#edit_jam_kerja').val()) || 0;
+            
+            $('#edit_capacity').val(jamJalan > 0 ? Math.ceil(kgPress / jamJalan) : 0);
+            $('#edit_produktivitas').val(jamKerja > 0 ? Math.ceil(kgPress / jamKerja) : 0);
 
-            var capacity = jamJalan > 0 ? Math.ceil(kgPress / jamJalan) : 0;
-            var productivity = jamKerja > 0 ? Math.ceil(kgPress / jamKerja) : 0;
-
-            $('#edit_capacity').val(capacity);
-            $('#edit_produktivitas').val(productivity);
-
-            // 5. Hitung Bahan Bakar
+            // 6. Hitung Rata-rata Bahan Bakar
             var solar = parseFloat($('#edit_bb_solar').val()) || 0;
             var batubara = parseFloat($('#edit_bb_batubara').val()) || 0;
             var cangkang = parseFloat($('#edit_bb_cangkang').val()) || 0;
 
-            $('#edit_avg_solar').val(kgPress > 0 ? (solar/kgPress).toFixed(4) : 0);
-            $('#edit_avg_batubara').val(kgPress > 0 ? (batubara/kgPress).toFixed(4) : 0);
-            $('#edit_avg_cangkang').val(kgPress > 0 ? (cangkang/kgPress).toFixed(4) : 0);
+            // Rumus: Kg SIR Press / 1000
+            var divisorEdit = kgPress / 1000;
+
+            if (divisorEdit > 0) {
+                $('#edit_avgSolar').val((solar / divisorEdit).toFixed(4));
+                $('#edit_avgBatubara').val((batubara / divisorEdit).toFixed(4));
+                $('#edit_avgCangkang').val((cangkang / divisorEdit).toFixed(4));
+            } else {
+                $('#edit_avgSolar').val(0);
+                $('#edit_avgBatubara').val(0);
+                $('#edit_avgCangkang').val(0);
+            }
         }
-        $(document).on('input', '.calc-trigger-edit', calculateTotalsEdit);
+
+        // Trigger untuk Modal Edit
+        $(document).on('input change', '.calc-trigger-edit, .input-berat-edit, #edit_inputJmlPallet, #edit_jam_start, #edit_jam_stop, #edit_jam_kerja, #edit_trolly_keluar', calculateTotalsEdit);
+
+        // Tombol Tambah Baris Maturasi di Edit
+        var maturasiEditIndex = 0; // Global agar tidak reset
+        $('#btnAddMaturasiEdit').click(function() {
+            var html = `<tr>
+                <td><select name="maturasi[${maturasiEditIndex}][ruang]" class="form-control form-control-sm select-ruang-edit" required>${optionsMaturasi}</select></td>
+                <td><input type="number" name="maturasi[${maturasiEditIndex}][berat]" class="form-control form-control-sm input-berat-edit" step="0.01"></td>
+                <td><input type="number" name="maturasi[${maturasiEditIndex}][umur]" class="form-control form-control-sm input-umur-edit" readonly></td>
+                <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-remove-maturasi"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+            $('#maturasiContainerEdit').append(html);
+            maturasiEditIndex++;
+        });
 
         // Jam Jalan Edit
         $('#edit_jam_start, #edit_jam_stop').on('change', function() {
@@ -1174,81 +1226,75 @@
         var maturasiEditIndex = 0;
         $(document).on('click', '.btn-edit', function() {
             var id = $(this).data('id');
-            var urlShow = "{{ url('produksi-sir20') }}/" + id;
-            var urlUpdate = "{{ url('produksi-sir20') }}/" + id;
-
             $.ajax({
-                url: urlShow, type: "GET", dataType: "JSON",
+                url: "{{ url('produksi-sir20') }}/" + id,
+                type: "GET",
                 success: function(data) {
-                    $('#formEditProduksi').attr('action', urlUpdate);
+                    // Set Action Form
+                    $('#formEditProduksi').attr('action', "{{ url('produksi-sir20') }}/" + id);
+                    
+                    // Map Data Header
                     $('#edit_tanggal_produksi').val(data.tanggal_produksi);
                     $('#edit_shift_kerja').val(data.shift_kerja);
-
-                    // Isi Tabel Maturasi Edit
-                    var editOptions = buildOptions(data.opsi_maturasi); // 🔥 Pakai data khusus tgl edit
-                    var htmlMaturasi = '';
-                    maturasiEditIndex = 0;
-                    if (data.remahan && data.remahan.length > 0) {
-                        $.each(data.remahan, function(i, val) {
-                            htmlMaturasi += `<tr>
-                                <td><select name="maturasi[${maturasiEditIndex}][ruang]" class="form-control form-control-sm select-ruang-edit" required>${editOptions}</select></td>
-                                <td><input type="number" name="maturasi[${maturasiEditIndex}][berat]" class="form-control form-control-sm input-berat-edit" step="0.01" value="${val.berat}"></td>
-                                <td><input type="number" name="maturasi[${maturasiEditIndex}][umur]" class="form-control form-control-sm input-umur-edit" readonly value="${val.umur}"></td>
-                                <td><button type="button" class="btn btn-danger btn-xs btn-remove-maturasi"><i class="fas fa-trash"></i></button></td>
-                            </tr>`;
-                            maturasiEditIndex++;
-                        });
-                    } else {
-                        htmlMaturasi += `<tr><td><select name="maturasi[0][ruang]" class="form-control form-control-sm select-ruang-edit" required>${editOptions}</select></td><td><input type="number" name="maturasi[0][berat]" class="form-control form-control-sm input-berat-edit" step="0.01"></td><td><input type="number" name="maturasi[0][umur]" class="form-control form-control-sm input-umur-edit" readonly></td><td><button type="button" class="btn btn-danger btn-xs btn-remove-maturasi"><i class="fas fa-trash"></i></button></td></tr>`;
-                        maturasiEditIndex = 1;
-                    }
-                    $('#maturasiContainerEdit').html(htmlMaturasi);
-                    
-                    if (data.remahan) {
-                        $.each(data.remahan, function(i, val) { $('#maturasiContainerEdit tr').eq(i).find('select').val(val.ruang_maturasi); });
-                    }
-
-                    // Isi Data Lainnya (Operasional, Temp, BB, Packing)
-                    $('#edit_jam_start').val(data.jam_start_dryer);
-                    $('#edit_trolly_masuk').val(data.jumlah_trolly_masuk);
-                    $('#edit_trolly_keluar').val(data.jumlah_trolly_keluar);
-                    $('#edit_jam_stop').val(data.jam_stop_dryer);
-                    $('#edit_jam_jalan').val(data.jumlah_jam_dryer);
-
-                    var temps = data.aktual_temperature || [];
-                    var b1 = temps.find(t => t.jenis === 'Burner 1');
-                    var b2 = temps.find(t => t.jenis === 'Burner 2');
-                    var cy = temps.find(t => t.jenis === 'Cycle Time');
-                    if(b1) { $('#edit_temp_b1_start').val(b1.nilai_start); $('#edit_temp_b1_end').val(b1.nilai_end); }
-                    if(b2) { $('#edit_temp_b2_start').val(b2.nilai_start); $('#edit_temp_b2_end').val(b2.nilai_end); }
-                    if(cy) { $('#edit_cycle_start').val(cy.nilai_start); $('#edit_cycle_end').val(cy.nilai_end); }
-
-                    var fuels = data.bahan_bakar || [];
-                    var solar = fuels.find(f => f.bahan_bakar === 'Solar');
-                    var batu = fuels.find(f => f.bahan_bakar === 'Batu Bara');
-                    var cangkang = fuels.find(f => f.bahan_bakar === 'Cangkang');
-                    if(solar) $('#edit_bb_solar').val(solar.digunakan);
-                    if(batu) $('#edit_bb_batubara').val(batu.digunakan);
-                    if(cangkang) $('#edit_bb_cangkang').val(cangkang.digunakan);
-
-                    $('#edit_bales').val(data.jumlah_bales_dipress);
-                    $('#edit_jam_kerja').val(data.jam_kerja);
-                    $('#edit_kg_cake').val(data.kg_cake);
-                    $('#edit_bales_kontamin').val(data.bales_terkontaminasi);
-                    $('#edit_jam_genset').val(data.jam_operasional_genset);
-                    $('#edit_pln_kwh').val(data.pemakaian_listrik_pln);
-                    
-                    $('#edit_jml_pallet').val(data.jumlah_pallet);
-                    $('#edit_nomor_start').val(data.nomor_start);
-                    $('#edit_nomor_end').val(data.nomor_end);
-                    $('#edit_total_nomor_akhir').val(data.total_nomor_akhir);
-                    
                     $('#edit_petugas').val(data.petugas);
 
+                    // Map Maturasi
+                    $('#maturasiContainerEdit').empty();
+                    if(data.remahan && data.remahan.length > 0) {
+                        data.remahan.forEach(function(val, i) {
+                            var row = `<tr>
+                                <td><select name="maturasi[${i}][ruang]" class="form-control form-control-sm select-ruang-edit" required>${optionsMaturasi}</select></td>
+                                <td><input type="number" name="maturasi[${i}][berat]" class="form-control form-control-sm input-berat-edit" step="0.01" value="${val.berat}"></td>
+                                <td><input type="number" name="maturasi[${i}][umur]" class="form-control form-control-sm input-umur-edit" readonly value="${val.umur}"></td>
+                                <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-remove-maturasi"><i class="fas fa-trash"></i></button></td>
+                            </tr>`;
+                            $('#maturasiContainerEdit').append(row);
+                            // Set value dropdown
+                            $('#maturasiContainerEdit tr').last().find('select').val(val.ruang_maturasi);
+                            maturasiEditIndex = i + 1;
+                        });
+                    }
+
+                    // Map Operasional & Suhu
+                    $('#edit_jam_start').val(data.jam_start_dryer);
+                    $('#edit_jam_stop').val(data.jam_stop_dryer);
+                    $('#edit_trolly_masuk').val(data.jumlah_trolly_masuk);
+                    $('#edit_trolly_keluar').val(data.jumlah_trolly_keluar);
+                    $('#edit_jam_kerja').val(data.jam_kerja);
+                    $('#edit_jam_genset').val(data.jam_operasional_genset);
+                    $('#edit_pln_kwh').val(data.pemakaian_listrik_pln);
+
+                    // Map Suhu & Cycle
+                    if(data.aktual_temperature) {
+                        var b1 = data.aktual_temperature.find(t => t.jenis === 'Burner 1');
+                        var b2 = data.aktual_temperature.find(t => t.jenis === 'Burner 2');
+                        var cy = data.aktual_temperature.find(t => t.jenis === 'Cycle Time');
+                        if(b1) { $('#edit_temp_b1_start').val(b1.nilai_start); $('#edit_temp_b1_end').val(b1.nilai_end); }
+                        if(b2) { $('#edit_temp_b2_start').val(b2.nilai_start); $('#edit_temp_b2_end').val(b2.nilai_end); }
+                        if(cy) { $('#edit_cycle_start').val(cy.nilai_start); $('#edit_cycle_end').val(cy.nilai_end); }
+                    }
+
+                    // Map Bahan Bakar
+                    if(data.bahan_bakar) {
+                        var s = data.bahan_bakar.find(f => f.bahan_bakar === 'Solar');
+                        var b = data.bahan_bakar.find(f => f.bahan_bakar === 'Batu Bara');
+                        var c = data.bahan_bakar.find(f => f.bahan_bakar === 'Cangkang');
+                        if(s) $('#edit_bb_solar').val(s.digunakan);
+                        if(b) $('#edit_bb_batubara').val(b.digunakan);
+                        if(c) $('#edit_bb_cangkang').val(c.digunakan);
+                    }
+
+                    // Map Packing
+                    $('#edit_inputJmlPallet').val(data.jumlah_pallet);
+                    $('#edit_outNomorStart').val(data.nomor_start);
+                    $('#edit_outNomorEnd').val(data.nomor_end);
+                    $('#edit_outTotalAkhir').val(data.total_nomor_akhir);
+
+                    // Jalankan kalkulasi setelah semua data masuk
                     calculateTotalsEdit();
+                    
                     $('#modalEditLaporan').modal('show');
-                },
-                error: function() { Swal.fire('Error', 'Gagal mengambil data edit.', 'error'); }
+                }
             });
         });
 

@@ -14,6 +14,7 @@ use App\Models\PenjualanSir20;
 use App\Models\ProduksiSir20; 
 use App\Models\RektifikasiStok;
 use App\Models\TransaksiApiBokar;
+use App\Traits\MaturasiSyncTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,6 +22,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class LaporanController extends Controller
 {
+
+    use MaturasiSyncTrait;
+
     // =========================================================================
     // 1. TAMPILAN DASHBOARD (INDEX)
     // =========================================================================
@@ -113,7 +117,7 @@ class LaporanController extends Controller
             $masuk_kemarin = TransaksiApiBokar::where('kode_api', $kodeApi)->where('tanggal', '<=', $yesterday)->sum('masuk_hi');
             $olah_kemarin  = PengolahanBasah::where('jenis', $jenis)->where('tanggal', '<=', $yesterday)->sum('netto_kering');
             $rektif_kemarin = RektifikasiStok::where('jenis', $jenis)->where('tanggal', '<=', $yesterday)->sum('berat');
-            $stok_awal = max(0, $masuk_kemarin - $olah_kemarin + $rektif_kemarin);
+            $stok_awal = max(0, round($masuk_kemarin - $olah_kemarin + $rektif_kemarin, 2));
 
             // Data Hari Ini
             $masuk_hi = TransaksiApiBokar::where('kode_api', $kodeApi)->where('tanggal', $tglStr)->value('masuk_hi') ?? 0;
@@ -141,6 +145,61 @@ class LaporanController extends Controller
             ];
         }
         return $rekapBokar;
+    }
+
+    // =========================================================================
+    // 🔥 HELPER: PENCARIAN ASAL BOKAR (CMP TRACING) KHUSUS LAPORAN
+    // =========================================================================
+    private function getDetailedAsalBokarStringLaporan($maturasi, float $stokAkhir, float $stokAwal, Carbon $filterDate)
+    {
+        if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
+
+        try {
+            $realBatchStartDate = $filterDate->copy();
+            
+            $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tgl_laporan', '<=', $filterDate)
+                ->orderBy('tgl_laporan', 'desc')
+                ->get();
+
+            $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
+            $akumulasiKeluar = 0; 
+
+            foreach ($logs as $log) {
+                $realBatchStartDate = Carbon::parse($log->tgl_laporan);
+                
+                $masuk  = $log->masuk_hi;
+                $keluar = $log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0); 
+                $mutasiMasuk = ($log->mutasi < 0) ? abs($log->mutasi) : 0;
+                
+                $akumulasiKeluar += $keluar; 
+                $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
+
+                // LOGIKA RESET: Jika ada masuk baru dan sudah ada produksi, abaikan masa lalu
+                if (($masuk + $mutasiMasuk) > 0.01 && $akumulasiKeluar > 0.01) {
+                    break; 
+                }
+
+                if ($prevStock <= 0.01) break;
+                $currentTracingStock = $prevStock;
+            }
+
+            $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tanggal', '>=', $realBatchStartDate)
+                ->whereDate('tanggal', '<=', $filterDate)
+                ->pluck('jenis')
+                ->map(function($v) { return strtoupper(trim($v)); })
+                ->unique()->filter()->sort()->values()->toArray();
+
+            if (!empty($jenisList)) {
+                return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
+            }
+
+            return $maturasi->asal_bokar ?? '-';
+
+        } catch (\Exception $e) {
+            return $maturasi->asal_bokar ?? '-';
+        }
     }
 
     // =========================================================================
@@ -181,7 +240,7 @@ class LaporanController extends Controller
                 $masuk_hi_today = max($trans_masuk, $masuk_from_uji);
                 
                 // 4. Hitung Stok Akhir
-                $stok_akhir = $stok_awal + $masuk_hi_today - $trans_diolah - $trans_mutasi;
+                $stok_akhir = round($stok_awal + $masuk_hi_today - $trans_diolah - $trans_mutasi, 2);
 
                 // 5. Logika Umur
                 $tgl_basis = null;
@@ -210,7 +269,9 @@ class LaporanController extends Controller
                 }
 
                 if (!$tgl_basis && $stok_awal > 0.01) {
-                    $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at);
+                    // 🔥 GANTI: Gunakan fungsi pusat dari Trait
+                    $historyDate = $this->getHistoryDateFromLog($bak->id_maturasi, $tanggal);
+                    $tgl_basis = $historyDate ? $historyDate : (!empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at));
                 }
 
                 $tgl_masuk_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->toDateString() : null;
@@ -250,61 +311,6 @@ class LaporanController extends Controller
             $dataMaturasi->push($row);
         }
         return $dataMaturasi;
-    }
-
-    // =========================================================================
-    // 🔥 HELPER BARU: TARIK LOGIKA ASAL BOKAR KHUSUS UNTUK LAPORAN
-    // =========================================================================
-    private function getDetailedAsalBokarStringLaporan($maturasi, float $stokAkhir, float $stokAwal, Carbon $filterDate)
-    {
-        if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
-
-        try {
-            $realBatchStartDate = $filterDate->copy();
-            
-            $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
-                ->whereDate('tgl_laporan', '<=', $filterDate)
-                ->orderBy('tgl_laporan', 'desc')
-                ->get();
-
-            $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
-            $akumulasiKeluar = 0; 
-
-            foreach ($logs as $log) {
-                $realBatchStartDate = Carbon::parse($log->tgl_laporan);
-                
-                $masuk  = $log->masuk_hi;
-                $keluar = $log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0); 
-                $mutasiMasuk = ($log->mutasi < 0) ? abs($log->mutasi) : 0;
-                
-                $akumulasiKeluar += $keluar; 
-                $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
-
-                // LOGIKA RESET ULTIMATE (SINKRON DENGAN MATURASI CONTROLLER)
-                if (($masuk + $mutasiMasuk) > 0.01 && $akumulasiKeluar > 0.01) {
-                    break; 
-                }
-
-                if ($prevStock <= 0.01) break;
-                $currentTracingStock = $prevStock;
-            }
-
-            $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
-                ->whereDate('tanggal', '>=', $realBatchStartDate)
-                ->whereDate('tanggal', '<=', $filterDate)
-                ->pluck('jenis')
-                ->map(function($v) { return strtoupper(trim($v)); })
-                ->unique()->filter()->sort()->values()->toArray();
-
-            if (!empty($jenisList)) {
-                return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
-            }
-
-            return $maturasi->asal_bokar ?? '-';
-
-        } catch (\Exception $e) {
-            return $maturasi->asal_bokar ?? '-';
-        }
     }
 
     // =========================================================================

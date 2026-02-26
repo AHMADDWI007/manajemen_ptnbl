@@ -11,7 +11,6 @@ use App\Models\PenjualanSir20;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
-use App\Models\HasilUjiLabSIR20; // Sumber data utama
 
 class PenjualanSir20Controller extends Controller
 {
@@ -29,7 +28,7 @@ class PenjualanSir20Controller extends Controller
         // Hitung Pallet yang: 
         // 1. Belum Terjual (tanggal_penjualan NULL)
         // 2. Mutu TERAKHIR-nya adalah Prima
-        $mutuTersedia = 0;
+        $mutuTersedia = Pallet::whereNull('tanggal_penjualan')->count();
         
         // Ambil semua pallet aktif
         $pallets = Pallet::whereNull('tanggal_penjualan')->get();
@@ -93,38 +92,25 @@ class PenjualanSir20Controller extends Controller
     public function getAvailableStock(Request $request)
     {
         try {
-            // 1. Cari nomor palet di Lab yang PRI >= 40 (Mutu Prima)
-            // Sesuai gambar Hasil Uji Lab Anda (image_699332.png), kita ambil no_palet 2 dan 3.
-            $palletsTestedPrima = HasilUjiLabSIR20::where('pri', '>=', 40)
-                ->pluck('no_palet')
+            $tgl = $request->query('date');
+
+            // 1. Ambil pallet yang benar-benar belum terjual (tanggal_penjualan is NULL)
+            $availablePallets = Pallet::whereNull('tanggal_penjualan')
+                ->pluck('no_pallet')
                 ->toArray();
 
-            // 2. Cari nomor palet yang SUDAH terjual
-            $soldData = PenjualanSir20::where('is_summary', 0)
-                ->whereNotNull('no_palet_list')
-                ->get();
+            // 2. Ambil list pallet yang di-booking dari mobile untuk tanggal tersebut
+            $bookedData = DB::table('booking_pallet')->where('tanggal', $tgl)->first();
+            $bookedPallets = $bookedData ? explode(',', $bookedData->no_palet_list) : [];
 
-            $palletsSold = [];
-            foreach ($soldData as $sale) {
-                // Pastikan data diproses hanya jika tidak kosong
-                if (!empty($sale->no_palet_list)) {
-                    $exploded = explode(',', $sale->no_palet_list);
-                    $palletsSold = array_merge($palletsSold, $exploded);
-                }
-            }
-
-            // 3. Filter: Palet yang sudah teruji Prima DIKURANGI palet yang sudah terjual
-            $availablePallets = array_diff($palletsTestedPrima, $palletsSold);
-            
-            // Urutkan nomor palet
-            sort($availablePallets, SORT_NUMERIC);
+            sort($availablePallets, SORT_NATURAL);
 
             return response()->json([
                 'list_pallet' => array_values($availablePallets),
+                'booked_pallets' => $bookedPallets, // Daftar ID untuk dicentang otomatis oleh JS
                 'count' => count($availablePallets)
             ]);
         } catch (\Exception $e) {
-            // Kirim pesan error asli jika gagal agar bisa di-debug
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -149,19 +135,18 @@ class PenjualanSir20Controller extends Controller
 
             // 1. Simpan Detail Penjualan (Untuk Arsip Invoice/Kontrak)
             PenjualanSir20::create([
-                'tanggal'    => $tgl,
-                'uraian'     => $request->uraian,
-                'no_kontrak' => $request->no_kontrak,
-                'no_invoice' => $request->no_invoice,
-                'pallet'     => $palletTerjual,
-                'hari_ini'   => $kgTerjual,
-                'harga'      => $request->harga,
+                'tanggal'     => $tgl,
+                'uraian'      => $request->uraian,
+                'no_kontrak'  => $request->no_kontrak,
+                'no_invoice'  => $request->no_invoice,
+                'pallet'      => $palletTerjual,
+                'hari_ini'    => $kgTerjual,
+                'harga'       => $request->harga,
                 'no_palet_list' => implode(',', $request->selected_pallets),
-                'is_summary' => 0 
+                'is_summary'  => 0 
             ]);
 
             // 2. Sinkronisasi ke Summary Penjualan (Tabel V - Laporan Penjualan)
-            // Bagian ini TETAP ADA agar Tabel V di halaman Penjualan terisi rekapnya
             $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
                 ->where('uraian', $request->uraian)
                 ->where('is_summary', 0)
@@ -169,20 +154,21 @@ class PenjualanSir20Controller extends Controller
             
             $this->recalculateAndSave($tgl, $request->uraian, $totalKgHariIni);
 
-            // =========================================================================
-            // 🔥 3. UPDATE STATUS PALLET MENJADI TERJUAL (CORE TRACKING SYSTEM) 🔥
-            // =========================================================================
-            // Inilah pengganti langkah 3 & 4 yang error tadi.
-            // Cukup update kolom 'tanggal_penjualan' di tabel pallet.
-            // Sistem Dashboard otomatis tidak akan menghitung pallet ini lagi sebagai stok.
-            
+            // 3. UPDATE STATUS PALLET MENJADI TERJUAL
             Pallet::whereIn('no_pallet', $request->selected_pallets)
                 ->update([
                     'tanggal_penjualan' => $tgl
                 ]);
 
+            // =========================================================================
+            // 🔥 TAMBAHAN PERBAIKAN: HAPUS DATA BOOKING DARI MOBILE 🔥
+            // =========================================================================
+            // Setelah sukses jadi penjualan resmi, hapus draft booking di tabel sementara
+            // agar tidak membingungkan atau tercentang lagi di masa depan.
+            DB::table('booking_pallet')->where('tanggal', $tgl)->delete();
+
             DB::commit();
-            return redirect()->back()->with('success', 'Penjualan berhasil disimpan. Stok gudang otomatis terpotong!');
+            return redirect()->back()->with('success', 'Penjualan berhasil disimpan. Stok gudang terpotong & data booking dibersihkan!');
 
         } catch (\Exception $e) {
             DB::rollBack();

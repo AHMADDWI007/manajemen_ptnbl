@@ -7,18 +7,16 @@ use App\Models\AktualTemperatureSir20;
 use App\Models\BahanBakarSir20;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\KondisiPallet;
-
-// --- IMPORT MODEL ---
 use App\Models\Lokasi;
 use App\Models\LokasiPallet;
 use App\Models\Maturasi;
 use App\Models\Mutu;
 use App\Models\Pallet;
 use App\Models\PengolahanMaturasi;
-// Model Gudang & Mutu
 use App\Models\ProduksiSir20;
 use App\Models\ProduksiSir;
 use App\Models\RemahanSir20;
+use App\Traits\MaturasiSyncTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +24,9 @@ use Illuminate\Support\Facades\Validator;
 
 class ProduksiSir20ApiController extends Controller
 {
+
+    use MaturasiSyncTrait; // 🔥 Tambahkan baris ini
+
     public function index(Request $request)
     {
         try {
@@ -49,11 +50,11 @@ class ProduksiSir20ApiController extends Controller
     public function getActiveMaturasi(Request $request)
     {
         try {
-            // 1. Ambil Parameter Tanggal (Sama seperti Web)
+            // 1. Ambil Parameter Tanggal
             $dateInput = $request->query('date');
             $hari_ini = $dateInput ? Carbon::parse($dateInput)->startOfDay() : Carbon::today()->startOfDay();
             
-            // 2. Tarik semua bak (Web menggunakan get() tanpa filter stok_akhir di query awal agar bisa simulasi)
+            // 2. Tarik semua bak
             $bak_aktif_raw = Maturasi::orderBy('uraian', 'asc')->get();
             $bak_aktif = collect(); 
 
@@ -69,14 +70,12 @@ class ProduksiSir20ApiController extends Controller
 
                 $stok_kemarin = ($sums->sum_masuk ?? 0) - ($sums->sum_diolah ?? 0) - ($sums->sum_mutasi ?? 0);
                 
-                // Fallback stok awal jika belum ada log sama sekali
                 if (!PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->exists()) {
                     $stok_kemarin = $bak->stok_awal;
                 }
 
-                // Hanya tampilkan jika stok pada tanggal tersebut > 0
                 if ($stok_kemarin > 0.01) {
-                    // --- LOGIKA UMUR (SINKRON 100% DENGAN WEB) ---
+                    // 2. LOGIKA UMUR
                     $tgl_basis = null;
                     $logsBeforeToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
                         ->whereDate('tgl_laporan', '<', $hari_ini->toDateString())
@@ -89,7 +88,6 @@ class ProduksiSir20ApiController extends Controller
                         $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
                         $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
 
-                        // RESET UMUR JIKA ADA MASUK FRESH (Sesuai Logika Web Anda)
                         if ($in_fresh > 0.01) {
                             $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
                                 ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
@@ -103,7 +101,7 @@ class ProduksiSir20ApiController extends Controller
                         if ($running_stock <= 0.01) $tgl_basis = null;
                     }
 
-                    // Fallback jika tidak ditemukan tgl_basis di log
+                    // 🔥 PERBAIKAN DI SINI: Panggil fungsi dari Trait menggunakan $this->
                     if (!$tgl_basis) {
                         $historyDate = $this->getHistoryDateFromLog($bak->id_maturasi, $hari_ini);
                         $tgl_basis = $historyDate ? $historyDate : (!empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at));
@@ -114,6 +112,11 @@ class ProduksiSir20ApiController extends Controller
                     // Set Data untuk Mobile
                     $bak->umur = (int) $tgl_basis->diffInDays($hari_ini); 
                     $bak->stok_akhir = round($stok_kemarin, 2);
+
+                    // Tambahkan field yang dibutuhkan Java Android (Bug fix umur baris pertama)
+                    $bak->umur_real = $bak->umur; 
+                    $bak->tgl_dasar_hitung = $tgl_basis->format('Y-m-d');
+
                     $bak_aktif->push($bak);
                 }
             }
@@ -125,25 +128,6 @@ class ProduksiSir20ApiController extends Controller
         }
     }
 
-    // Jangan lupa tambahkan method helper ini di API Controller juga (Copy dari Web)
-    protected function getHistoryDateFromLog(int $id_maturasi, Carbon $reportDate)
-    {
-        $lastEntry = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
-            ->whereDate('tgl_laporan', '<', $reportDate->toDateString())
-            ->where(function($q) {
-                $q->where('masuk_hi', '>', 0.01)->orWhere('mutasi', '<', -0.01); 
-            })->orderBy('tgl_laporan', 'desc')->first();
-
-        if ($lastEntry) {
-            if ($lastEntry->masuk_hi > 0.01) {
-                $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $id_maturasi)
-                    ->whereDate('tanggal', '<=', $lastEntry->tgl_laporan)->orderBy('tanggal', 'desc')->first();
-                return $lab ? Carbon::parse($lab->tanggal) : Carbon::parse($lastEntry->tgl_laporan);
-            }
-            return Carbon::parse($lastEntry->tgl_laporan);
-        }
-        return null;
-    }
 
     public function store(Request $request)
     {
@@ -498,102 +482,21 @@ class ProduksiSir20ApiController extends Controller
         $maturasi = Maturasi::where('uraian', $namaRuang)->first();
         
         if ($maturasi) {
+            // 1. Update Log Pengolahan (Kolom diolah)
             $log = PengolahanMaturasi::firstOrCreate(
                 ['id_maturasi' => $maturasi->id_maturasi, 'tgl_laporan' => $tanggal],
-                ['masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0, 'keterangan' => 'Auto Produksi']
+                ['masuk_hi' => 0, 'diolah' => 0, 'mutasi' => 0, 'keterangan' => 'Auto Produksi API']
             );
 
             if ($aksi === 'tambah') {
                 $log->increment('diolah', $berat);
-                $maturasi->decrement('stok_akhir', $berat); 
             } else {
-                if ($log->diolah >= $berat) $log->decrement('diolah', $berat);
-                else $log->update(['diolah' => 0]);
-                $maturasi->increment('stok_akhir', $berat); 
-            }
-            
-            // 🔥 RESET TOTAL HANYA JIKA BAK KOSONG
-            if ($maturasi->stok_akhir <= 0.01) {
-                $maturasi->update([
-                    'stok_akhir' => 0, 
-                    'keterangan' => 'KOSONG', 
-                    'asal_bokar' => null,
-                    'tgl_masuk'  => null // Dikosongkan karena habis
-                ]);
-            } else {
-                // Update string identitas (Bisa berubah jadi CMP jika ada Masuk HI baru)
-                $newIdentitas = $this->getDetailedAsalBokarString($maturasi, $maturasi->stok_akhir, $maturasi->stok_akhir, Carbon::parse($tanggal));
-                $maturasi->update(['asal_bokar' => $newIdentitas]);
-                
-                // ❌ DILARANG KERAS update tgl_masuk dan umur di sini!
-            }
-        }
-    }
-
-    // =========================================================================
-    // HELPER: PENCARIAN ASAL BOKAR (CMP TRACING) SINKRON WEB
-    // =========================================================================
-    // =========================================================================
-    // HELPER: PENCARIAN ASAL BOKAR (CMP TRACING) ANTI-GABUNG
-    // =========================================================================
-    private function getDetailedAsalBokarString($maturasi, float $stokAkhir, float $stokAwal, Carbon $filterDate)
-    {
-        // Jika Stok Awal KOSONG DAN Stok Akhir KOSONG, baru return '-'
-        if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
-
-        try {
-            $realBatchStartDate = $filterDate->copy();
-            
-            // Ambil log mundur
-            $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
-                ->whereDate('tgl_laporan', '<=', $filterDate)
-                ->orderBy('tgl_laporan', 'desc')
-                ->get();
-
-            $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
-            $isFirstLog = true;
-
-            foreach ($logs as $log) {
-                $realBatchStartDate = Carbon::parse($log->tgl_laporan);
-                
-                $masuk  = $log->masuk_hi;
-                $keluar = $log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0); 
-                $mutasiMasuk = ($log->mutasi < 0) ? abs($log->mutasi) : 0;
-                
-                // Saldo Sebelumnya
-                $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
-
-                // 🔥 LOGIKA BARU ANTI-GABUNG: 
-                // Jika di hari ini (log pertama), stok warisan kemarin ternyata 
-                // habis terpakai oleh gilingan hari ini (prevStock <= keluar), 
-                // maka BERHENTI melacak ke belakang! Ini adalah batch baru murni.
-                if ($isFirstLog) {
-                    if ($prevStock <= ($keluar + 0.01) && ($masuk + $mutasiMasuk) > 0.01) {
-                        break; 
-                    }
-                    $isFirstLog = false;
-                }
-
-                if ($prevStock <= 0.01) break;
-                $currentTracingStock = $prevStock;
+                $log->decrement('diolah', min($log->diolah, $berat));
             }
 
-            // Cari Jenis di Lab Bokar berdasarkan Range Tanggal yang ditemukan
-            $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
-                ->whereDate('tanggal', '>=', $realBatchStartDate)
-                ->whereDate('tanggal', '<=', $filterDate)
-                ->pluck('jenis')
-                ->map(fn($v) => strtoupper(trim($v)))
-                ->unique()->filter()->sort()->values()->toArray();
-
-            if (!empty($jenisList)) {
-                return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
-            }
-
-            return $maturasi->asal_bokar ?? '-';
-
-        } catch (\Exception $e) {
-            return $maturasi->asal_bokar ?? '-';
+            // 2. 🔥 PERBAIKAN: Panggil Trait untuk Sinkronisasi Total
+            // Ini akan mengupdate stok_akhir master, label CMP, dan status KOSONG
+            $this->syncMaturasi($maturasi->id_maturasi, $tanggal);
         }
     }
 
@@ -610,19 +513,13 @@ class ProduksiSir20ApiController extends Controller
 
     public function getLastNumber(Request $request)
     {
-        // 1. Tentukan Tahun yang mau dicek (Default: Tahun Hari Ini)
-        // Kalau Android kirim parameter ?date=2025-12-31, kita cek tahun 2025.
         $dateInput = $request->query('date');
         $year = $dateInput ? Carbon::parse($dateInput)->year : Carbon::now()->year;
 
-        // 2. Cari Data Terakhir HANYA di Tahun Tersebut
         $last = ProduksiSir20::whereYear('tanggal_produksi', $year)
-                             ->orderBy('total_nomor_akhir', 'desc') // Pastikan ambil urutan angka tertinggi
-                             ->first();
+                            ->orderBy('total_nomor_akhir', 'desc')
+                            ->first();
 
-        // 3. Jika ketemu, ambil nomornya. Jika tidak (awal tahun), kembalikan 0.
-        $num = $last ? $last->total_nomor_akhir : 0;
-        
-        return response()->json(['success' => true, 'data' => $num]);
+        return response()->json(['success' => true, 'data' => $last ? $last->total_nomor_akhir : 0]);
     }
 }

@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers\DataLaboratorium;
 
-use Carbon\Carbon;
-use App\Models\Maturasi;
-use Illuminate\Http\Request;
-use App\Models\PengolahanBasah;
-use Illuminate\Http\JsonResponse;
-use App\Models\PengolahanMaturasi;
-use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Validator;
 use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\PengolahanBasah;
+use App\Traits\MaturasiSyncTrait;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class HasilUjiBokarDiolahController extends Controller
 {
+
+    use MaturasiSyncTrait; // 🔥 Tambahkan baris ini
+
     public function index()
     {
         $data_diolah = PengolahanBasah::with('maturasi')
@@ -71,7 +71,7 @@ class HasilUjiBokarDiolahController extends Controller
         );
         
         $namaBak = $data->maturasi ? $data->maturasi->uraian : 'Unknown Bak';
-        $this->updateMaturasiMasukHI($data->id_maturasi, $netto_kering, $data->tanggal, $data->jenis, $namaBak);
+        $this->syncMaturasi($data->id_maturasi, $data->tanggal);
 
         return redirect()->route('hasil-uji-bokar-diolah.index')->with('success', 'Data K3 berhasil disimpan dan Stok Maturasi bertambah.');
     }
@@ -126,7 +126,7 @@ class HasilUjiBokarDiolahController extends Controller
         );
                             
         $namaBak = $data->maturasi ? $data->maturasi->uraian : 'Unknown Bak';
-        $this->updateMaturasiMasukHI($data->id_maturasi, $netto_kering_baru, $data->tanggal, $data->jenis, $namaBak);
+        $this->syncMaturasi($data->id_maturasi, $data->tanggal);
 
         return redirect()->route('hasil-uji-bokar-diolah.index')->with('success', 'Data K3 berhasil diperbarui.');
     }
@@ -147,83 +147,10 @@ class HasilUjiBokarDiolahController extends Controller
             // 🔥 3. SYNC MATURASI: Panggil fungsi sinkronisasi
             // Kita gunakan fungsi updateMaturasiMasukHI yang sudah ada di controller ini
             // Kita kirim angka 0 (karena K3 dihapus), fungsi tersebut akan menghitung sum otomatis
-            $this->updateMaturasiMasukHI($id_maturasi, 0, $tanggal);
+            $this->syncMaturasi($id_maturasi, $tanggal);
 
             return redirect()->route('hasil-uji-bokar-diolah.index')->with('success', 'Data K3 dihapus dan Stok Maturasi telah diperbarui.');
         }
         return redirect()->route('hasil-uji-bokar-diolah.index')->withErrors(['error' => 'Data tidak ditemukan.']);
-    }
-    
-    // ===================================================================
-    // FUNGSI TRIGGER OTOMATIS KE PENGOLAHAN MATURASI (UPDATED)
-    // ===================================================================
-    private function updateMaturasiMasukHI(int $id_maturasi, float $masuk_hi, string $tanggalInput, ?string $asal_bokar_baru = null, string $uraianMaturasi = ''): void
-    {
-        $maturasi = Maturasi::find($id_maturasi);
-        if (!$maturasi) return;
-
-        $tgl = Carbon::parse($tanggalInput);
-        
-        $log = PengolahanMaturasi::firstOrNew([
-            'id_maturasi' => $id_maturasi,
-            'tgl_laporan' => $tgl
-        ]);
-
-        $totalMasukReal = PengolahanBasah::where('id_maturasi', $id_maturasi)
-            ->whereDate('tanggal', $tgl)
-            ->sum('netto_kering');
-            
-        if ($totalMasukReal <= 0) $totalMasukReal = $masuk_hi;
-
-        $log->masuk_hi = $totalMasukReal;
-        
-        if (empty($log->keterangan)) {
-            $log->keterangan = 'Fisik Bokar Masuk';
-        }
-        $log->save();
-
-        $stokAwalH1 = round(PengolahanMaturasi::where('id_maturasi', $id_maturasi)
-            ->whereDate('tgl_laporan', '<', $tgl)
-            ->sum(DB::raw('masuk_hi - diolah - mutasi')), 2);
-
-        $masuk  = $log->masuk_hi;
-        $keluar = $log->diolah + $log->mutasi;
-        
-        $maturasi->stok_awal  = $stokAwalH1;
-        $maturasi->stok_akhir = $stokAwalH1 + $masuk - $keluar;
-        $maturasi->updated_at = $tgl;
-        
-        if ($maturasi->stok_akhir > 0) {
-            $listJenis = PengolahanBasah::where('id_maturasi', $id_maturasi)
-                        ->where('tanggal', $tanggalInput)
-                        ->pluck('jenis')
-                        ->filter(function ($value) { return !is_null($value) && $value !== '' && $value !== 'PENDING'; }) 
-                        ->unique()
-                        ->sort()
-                        ->values();
-
-            $labelAkhir = '';
-            if ($listJenis->count() > 1) {
-                $rincian = $listJenis->implode(', ');
-                $labelAkhir = "CMP ($rincian)";
-            } 
-            elseif ($listJenis->count() == 1) {
-                $labelAkhir = $listJenis->first();
-            } 
-            else {
-                $labelAkhir = $maturasi->asal_bokar; 
-            }
-
-            $maturasi->asal_bokar = $labelAkhir; 
-            
-            // 🔥 PERBAIKAN: Hapus baris yang memaksa $maturasi->umur = 0 dan update keterangan di sini!
-            // Biarkan sistem yang menghitungnya saat data ditampilkan.
-
-        } else {
-            $maturasi->keterangan = 'KOSONG'; 
-            $maturasi->asal_bokar = null;
-        }
-
-        $maturasi->save();
     }
 }
