@@ -158,6 +158,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);
     Route::get('penjualan-sir20/cek-gudang', [PenjualanSirApiController::class, 'getPengirimanGudang']);
     Route::delete('penjualan-sir20/{id}', [PenjualanSirApiController::class, 'destroy']);
+    Route::get('penjualan-sir20/pending-debts', [PenjualanSirApiController::class, 'getPendingDebts']);
+    Route::post('penjualan-sir20/fulfill-debt/{id_manual}', [PenjualanSirApiController::class, 'fulfillDebt']);
 
     // ==========================================
     // [PRODUKSI SIR 20] - MODUL BARU

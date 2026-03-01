@@ -8,27 +8,33 @@ class Pallet extends Model
 {
     protected $table = 'pallet';
     protected $primaryKey = 'id_pallet';
-    protected $guarded = [];
+    
+    // 🔥 PERBAIKAN: Masukkan kolom baru ke dalam fillable agar bisa diupdate oleh API
+    protected $fillable = [
+        'id_produksi_sir',
+        'no_pallet',
+        'berat',
+        'jenis_pallet',
+        'tanggal_produksi',
+        'tanggal_penjualan'
+    ];
 
-    // Relasi ke History Lokasi
+    // Gunakan guarded jika ingin lebih fleksibel, tapi fillable lebih aman untuk API
+    // protected $guarded = []; 
+
     public function historyLokasi() {
         return $this->hasMany(LokasiPallet::class, 'id_pallet');
     }
 
-    // Relasi ke History Mutu
     public function historyMutu() {
         return $this->hasMany(KondisiPallet::class, 'id_pallet');
     }
 
-    // 🔥 PERBAIKAN: Tambahkan parameter nama kolom PK di latestOfMany()
     public function latestLokasi() {
-        // Kita beri tahu: "Urutkan berdasarkan 'id_lokasi_pallet', bukan 'id'"
         return $this->hasOne(LokasiPallet::class, 'id_pallet')->latestOfMany('id_lokasi_pallet');
     }
 
-    // 🔥 PERBAIKAN: Tambahkan parameter nama kolom PK di latestOfMany()
     public function latestMutu() {
-        // Kita beri tahu: "Urutkan berdasarkan 'id_kondisi_pallet', bukan 'id'"
         return $this->hasOne(KondisiPallet::class, 'id_pallet')->latestOfMany('id_kondisi_pallet');
     }
 }

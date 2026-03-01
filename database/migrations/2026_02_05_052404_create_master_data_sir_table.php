@@ -33,6 +33,9 @@ return new class extends Migration
             $table->string('no_pallet')->index(); // Nomor Pallet (String biar aman)
             // 🔥 PASTIKAN BARIS INI ADA! 🔥
             $table->decimal('berat', 8, 2)->default(0);
+            // 🔥 TAMBAHAN KOLOM JENIS PALLET 🔥
+            // Default diset ke 'SW' agar data lama tidak kosong saat migration dijalankan
+            $table->string('jenis_pallet', 10)->default('SW');
             $table->date('tanggal_produksi');
             $table->date('tanggal_penjualan')->nullable(); // Nullable karena belum tentu langsung terjual
             $table->timestamps();

@@ -40,10 +40,13 @@
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h3 class="mb-0 text-success fw-bold">Data SIR (Gudang & Mutu)</h3>
                 <div>
-                    {{-- TOMBOL INPUT DATA --}}
-                    <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm" id="btnInputData">
-                        <i class="fas fa-plus-circle"></i> Input Data
-                    </button>
+                        {{-- TOMBOL INPUT DATA --}}
+                    {{-- 🔥 HANYA TAMPIL JIKA BUKAN USER --}}
+                    @if(auth()->user()->role != 'user')
+                        <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm" id="btnInputData">
+                            <i class="fas fa-plus-circle"></i> Input Data
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
@@ -84,7 +87,9 @@
                                         <th rowspan="2">Pengiriman</th>
                                         <th rowspan="2">Saldo Akhir</th>
                                         <th rowspan="2">TOTAL I SD IV</th>
-                                        <th rowspan="2">Aksi</th>
+                                        @if(auth()->user()->role != 'user')
+                                            <th rowspan="2">Aksi</th>
+                                        @endif
                                     </tr>
                                     <tr>
                                         <th>Yg lalu</th>
@@ -105,6 +110,7 @@
                                         <td class="text-center font-weight-bold text-danger">{{ number_format($item->pengiriman, 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($item->saldo_akhir, 0, ',', '.') }}</td>
                                         <td class="text-center">-</td>
+                                        @if(auth()->user()->role != 'user')
                                         <td class="text-center">
                                         {{-- Jika ada stok, tampilkan tombol Edit Lokasi --}}
                                         @if($item->saldo_akhir > 0)
@@ -117,6 +123,7 @@
                                             <span class="badge badge-secondary">Kosong</span>
                                         @endif
                                         </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -132,7 +139,10 @@
                                         <td class="text-center text-danger">{{ number_format($tabelIV->sum('pengiriman'), 0, ',', '.') }}</td>
                                         <td class="text-center">{{ number_format($tabelIV->sum('saldo_akhir'), 0, ',', '.') }}</td>
                                         <td class="text-center font-weight-bold">{{ number_format($grandTotal ?? 0, 0, ',', '.') }}</td>
-                                        <td></td>
+                                        {{-- 🔥 SESUAIKAN FOOTER --}}
+                                        @if(auth()->user()->role != 'user')
+                                            <td></td>
+                                        @endif
                                     </tr>
                                 </tfoot>
                             </table>

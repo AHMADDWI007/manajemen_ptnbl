@@ -125,6 +125,10 @@ Route::middleware(['auth'])->group(function () {
 
     // 2. Proses Produksi Harian
     Route::post('/produksi-sir20/get-maturasi-details', [ProduksiSir20Controller::class, 'getMaturasiDetails'])->name('produksi.getMaturasiDetails');
+
+    // 1. Letakkan route custom di atas resource
+    Route::get('/produksi-sir20/cetak-harian', [ProduksiSir20Controller::class, 'cetakHarian'])->name('produksi-sir20.cetak-harian');
+    Route::get('/produksi-sir20/{id}/cetak', [ProduksiSir20Controller::class, 'cetakPdf'])->name('produksi-sir20.cetak');
     Route::resource('produksi-sir20', ProduksiSir20Controller::class);
 
     // 3. Penjualan

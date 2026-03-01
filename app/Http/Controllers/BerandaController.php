@@ -3,65 +3,63 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
-use App\Models\User;
 use App\Models\Pallet;
 use App\Models\Maturasi;
-use App\Models\ProduksiSir20;
+use App\Models\PengolahanBasah;
 use App\Models\TransaksiApiBokar;
+use App\Models\PenjualanSir20;
 
 class BerandaController extends Controller
 {
-    public function index()
+   public function index()
     {
         $today = Carbon::today();
         $startOfMonth = Carbon::today()->startOfMonth();
+        $currentYear = Carbon::today()->year; 
 
+        // =========================================================
         // 1. DATA UNTUK KARTU STATISTIK (STAT CARDS)
-        // A. Total Penerimaan Bokar Bulan Ini (Ton)
+        // =========================================================
+        
+        // A. Bokar Masuk (Bulan Ini) (Ton)
         $totalBokarBulanIni = TransaksiApiBokar::whereBetween('tanggal', [$startOfMonth->format('Y-m-d'), $today->format('Y-m-d')])
                                 ->sum('masuk_hi');
         $statBokar = $totalBokarBulanIni / 1000; // Ubah ke Ton
 
-        // B. Total Stok Maturasi Saat Ini (Ton)
+      // 🔥 PERBAIKAN: Menggunakan 'netto_kering' agar sama persis dengan tabel Ringkasan Stok
+        $totalBokarDiolah = PengolahanBasah::whereBetween('tanggal', [$startOfMonth->format('Y-m-d'), $today->format('Y-m-d')])
+                                ->sum('netto_kering'); 
+        $statBokarDiolah = $totalBokarDiolah / 1000; // Ubah ke Ton
+        // C. Stok Maturasi Saat Ini (Ton)
         $totalMaturasi = Maturasi::sum('stok_akhir');
         $statMaturasi = $totalMaturasi / 1000; // Ubah ke Ton
         
-        // C. Total Stok Gudang SIR 20 (Siap Jual) (Ton)
-        // Menghitung jumlah berat pallet yang belum terjual
+        // D. Stok Gudang SIR 20 (Siap Jual) (Ton)
         $totalGudangSir = Pallet::whereNull('tanggal_penjualan')
                                 ->orWhere('tanggal_penjualan', '>', $today->format('Y-m-d'))
                                 ->sum('berat');
         $statGudang = $totalGudangSir / 1000; // Ubah ke Ton
 
-        // D. Total Karyawan Aktif
-        $statKaryawan = User::count();
-
         // =========================================================
+        // 2. DATA UNTUK GRAFIK PENJUALAN BULANAN (TAHUN INI)
+        // =========================================================
+        
+        $chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+        $chartPenjualan = array_fill(0, 12, 0); 
 
-        // 2. DATA UNTUK GRAFIK (7 HARI TERAKHIR)
-        $chartLabels = [];
-        $chartBokar = [];
-        $chartProduksi = [];
+        $penjualanData = PenjualanSir20::whereYear('tanggal', $currentYear)
+            ->where('is_summary', 0) 
+            ->selectRaw('MONTH(tanggal) as bulan, SUM(hari_ini) as total')
+            ->groupBy('bulan')
+            ->get();
 
-        // Looping mundur dari H-6 sampai H-0 (Hari Ini)
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
-            
-            // Label Hari (Contoh: "Senin", "Selasa")
-            $chartLabels[] = $date->translatedFormat('l');
-
-            // Data Bokar Masuk per Hari (Kg)
-            $bokarMasuk = TransaksiApiBokar::whereDate('tanggal', $date->format('Y-m-d'))->sum('masuk_hi');
-            $chartBokar[] = $bokarMasuk;
-
-            // Data Produksi SIR 20 per Hari (Kg)
-            $produksiSir = ProduksiSir20::whereDate('tanggal_produksi', $date->format('Y-m-d'))->sum('kg_yang_dipress');
-            $chartProduksi[] = $produksiSir;
+        foreach ($penjualanData as $data) {
+            $chartPenjualan[$data->bulan - 1] = $data->total;
         }
 
         return view('HalamanDepan.beranda', compact(
-            'statBokar', 'statMaturasi', 'statGudang', 'statKaryawan',
-            'chartLabels', 'chartBokar', 'chartProduksi'
+            'statBokar', 'statBokarDiolah', 'statMaturasi', 'statGudang', // 🔥 Update Variabel di sini
+            'chartLabels', 'chartPenjualan', 'currentYear'
         ));
     }
 }

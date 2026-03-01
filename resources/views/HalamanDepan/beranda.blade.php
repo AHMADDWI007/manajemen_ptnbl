@@ -84,22 +84,19 @@
         }
 
         /* WARNA BORDER KIRI (SINKRONISASI TEMA) */
-        
-        /* A. Bokar (Bahan Baku) -> Hijau Tua (Mirip Sidebar) */
         .border-left-primary { border-left: 5px solid #0B6623; }
         .text-primary-custom { color: #0B6623 !important; }
 
-        /* B. Maturasi (Proses) -> Hijau Terang (Mirip Menu Aktif) */
-        .border-left-success { border-left: 5px solid #3BB143; }
+       /* 🔥 INI YANG SEBELUMNYA HILANG (Untuk Kotak Ke-2) 🔥 */
+        .border-left-info { border-left: 5px solid #17a2b8; } /* Biru Teal */
+        .text-info-custom { color: #17a2b8 !important; }
+
+        .border-left-success { border-left: 5px solid #3BB143; } /* Hijau Terang */
         .text-success-custom { color: #3BB143 !important; }
 
-        /* C. SIR 20 (Jadi) -> Hijau Kekuningan/Emas (Premium) */
         .border-left-warning { border-left: 5px solid #FFD700; }
         .text-warning-custom { color: #d4b106 !important; }
 
-        /* D. Karyawan -> Abu Gelap (Netral) */
-        .border-left-danger { border-left: 5px solid #343a40; }
-        .text-danger-custom { color: #343a40 !important; }
 
         /* 3. Card Grafik & Tabel */
         .card-modern {
@@ -152,8 +149,10 @@
                     <div class="card-body p-4 welcome-content">
                         <div class="row align-items-center">
                             <div class="col-md-8">
-                                <h1 class="font-weight-bold mb-2">
-                                    Halo, {{ Auth::user()->name ?? 'Maswi' }}! 👋
+                               <h1 class="font-weight-bold mb-2">
+                                    {{-- 🔥 MEMANGGIL NAMA USER YANG SEDANG LOGIN 🔥 --}}
+                                    {{-- Menggunakan optional() untuk mencegah error jika user null --}}
+                                    Halo, {{ Auth::check() ? optional(Auth::user())->fullname : 'Guest' }}! 👋
                                 </h1>
                                 <p class="mb-0" style="font-size: 1.1rem; opacity: 0.9;">
                                     Selamat datang di Sistem Manajemen Produksi PT. NBL.
@@ -170,35 +169,53 @@
             </div>
         </div>
 
-        {{-- 2. KARTU STATISTIK (WARNA SINKRON) --}}
+       {{-- 2. KARTU STATISTIK (ALUR PRODUKSI) --}}
         <div class="row mb-4">
             
-            {{-- Stok Bokar Masuk (Hijau Tua) --}}
+            {{-- 1. Bokar Masuk --}}
             <div class="col-xl-3 col-md-6 mb-3">
                 <div class="card stat-card border-left-primary h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="stat-label text-primary-custom mb-1">Bokar Masuk (Bln Ini)</div>
-                                <div class="stat-value">{{ number_format($statBokar, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                                <div class="stat-value">{{ number_format($statBokar, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
-                                <i class="fas fa-cubes fa-2x text-gray-300"></i>
+                                <i class="fas fa-truck-loading fa-2x text-gray-300"></i>
                             </div>
                         </div>
-                        <i class="fas fa-cubes stat-icon-bg"></i>
+                        <i class="fas fa-truck-loading stat-icon-bg"></i>
                     </div>
                 </div>
             </div>
 
-            {{-- Stok Maturasi (Hijau Terang) --}}
+            {{-- 2. Bokar Diolah --}}
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card stat-card border-left-info h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="stat-label text-info-custom mb-1">Bokar Diolah (Bln Ini)</div>
+                                <div class="stat-value">{{ number_format($statBokarDiolah, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-cogs fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                        <i class="fas fa-cogs stat-icon-bg"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 3. Stok Maturasi --}}
             <div class="col-xl-3 col-md-6 mb-3">
                 <div class="card stat-card border-left-success h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="stat-label text-success-custom mb-1">Stok Maturasi</div>
-                                <div class="stat-value">{{ number_format($statMaturasi, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                                <div class="stat-label text-success-custom mb-1">Stok Maturasi (Saat Ini)</div>
+                                <div class="stat-value">{{ number_format($statMaturasi, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-flask fa-2x text-gray-300"></i>
@@ -209,14 +226,14 @@
                 </div>
             </div>
 
-            {{-- Stok SIR 20 (Emas/Kuning) --}}
+            {{-- 4. Gudang SIR 20 --}}
             <div class="col-xl-3 col-md-6 mb-3">
                 <div class="card stat-card border-left-warning h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="stat-label text-warning-custom mb-1">Gudang SIR 20</div>
-                                <div class="stat-value">{{ number_format($statGudang, 1, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                                <div class="stat-label text-warning-custom mb-1">Gudang SIR 20 (Siap Jual)</div>
+                                <div class="stat-value">{{ number_format($statGudang, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-box-open fa-2x text-gray-300"></i>
@@ -226,39 +243,21 @@
                     </div>
                 </div>
             </div>
-
-            {{-- Total Karyawan (Abu Gelap) --}}
-            <div class="col-xl-3 col-md-6 mb-3">
-                <div class="card stat-card border-left-danger h-100 py-2">
-                    <div class="card-body">
-                        <div class="row no-gutters align-items-center">
-                            <div class="col mr-2">
-                                <div class="stat-label text-danger-custom mb-1">Total Karyawan</div>
-                                <div class="stat-value">{{ $statKaryawan }} <small class="text-muted" style="font-size: 1rem">Orang</small></div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-users fa-2x text-gray-300"></i>
-                            </div>
-                        </div>
-                        <i class="fas fa-users stat-icon-bg"></i>
-                    </div>
-                </div>
-            </div>
         </div>
 
         {{-- 3. AREA GRAFIK & LIST --}}
         <div class="row">
-            {{-- Grafik Produksi --}}
+            {{-- Grafik Produksi -> Grafik Penjualan Bulanan --}}
             <div class="col-lg-8">
                 <div class="card card-modern mb-4">
                     <div class="card-header card-header-modern d-flex flex-row align-items-center justify-content-between">
                         <h6 class="m-0 card-title-modern text-primary-custom">
-                            <i class="fas fa-chart-area mr-2"></i> Grafik Produksi Minggu Ini
+                            <i class="fas fa-chart-bar mr-2"></i> Grafik Penjualan SIR 20 (Tahun {{ $currentYear }})
                         </h6>
                     </div>
                     <div class="card-body">
                         <div class="chart-area">
-                            <canvas id="productionChart" style="height: 320px;"></canvas>
+                            <canvas id="salesChart" style="height: 320px;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -315,39 +314,30 @@
         inline: true
     });
 
-    // 3. Grafik (Warna Disesuaikan dengan Tema Hijau)
+    // 3. Grafik Penjualan (Bulanan) - MENGGUNAKAN LINE CHART
     $(function () {
-        var ctx = document.getElementById('productionChart').getContext('2d');
+        var ctx = document.getElementById('salesChart').getContext('2d');
         
         // Ambil data array dari PHP ke Javascript
         var chartLabels = {!! json_encode($chartLabels) !!};
-        var dataBokar = {!! json_encode($chartBokar) !!};
-        var dataProduksi = {!! json_encode($chartProduksi) !!};
+        var dataPenjualan = {!! json_encode($chartPenjualan) !!};
 
-        var productionChart = new Chart(ctx, {
-            type: 'line',
+        var salesChart = new Chart(ctx, {
+            type: 'line', // 🔥 DIUBAH MENJADI 'line' 🔥
             data: {
-                labels: chartLabels, // <-- Menggunakan Array Hari
+                labels: chartLabels, 
                 datasets: [{
-                    label: 'Produksi SIR 20 (Kg)',
-                    data: dataProduksi, // <-- Menggunakan Array Data Produksi
-                    backgroundColor: 'rgba(255, 215, 0, 0.1)', 
-                    borderColor: '#FFD700', 
-                    pointBackgroundColor: '#FFD700',
-                    pointBorderColor: '#fff',
+                    label: 'Total Penjualan (Kg)',
+                    data: dataPenjualan, 
+                    backgroundColor: 'rgba(11, 102, 35, 0.1)', // Warna hijau transparan (isi bawah garis)
+                    borderColor: '#0B6623', // Warna garis hijau tua
+                    pointBackgroundColor: '#0B6623', // Warna titik
+                    pointBorderColor: '#fff', // Warna pinggiran titik
                     pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: '#FFD700',
-                    fill: true,
-                    tension: 0.4
-                },
-                {
-                    label: 'Penerimaan Bokar (Kg)',
-                    data: dataBokar, // <-- Menggunakan Array Data Bokar
-                    backgroundColor: 'rgba(11, 102, 35, 0.05)',
-                    borderColor: '#0B6623',
-                    borderDash: [5, 5],
-                    fill: false,
-                    tension: 0.4
+                    pointHoverBorderColor: '#0B6623',
+                    borderWidth: 2,
+                    fill: true, // Mengaktifkan arsiran warna di bawah garis
+                    tension: 0.4 // Membuat garisnya melengkung halus (smooth curve)
                 }]
             },
             options: {
@@ -356,6 +346,12 @@
                 tooltips: {
                     mode: 'index',
                     intersect: false,
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            var value = data.datasets[0].data[tooltipItem.index];
+                            return 'Total: ' + value.toLocaleString('id-ID') + ' Kg';
+                        }
+                    }
                 },
                 hover: {
                     mode: 'nearest',
@@ -366,7 +362,12 @@
                         gridLines: { display: false, drawBorder: false }
                     }],
                     yAxes: [{
-                        ticks: { beginAtZero: true },
+                        ticks: { 
+                            beginAtZero: true,
+                            callback: function(value) {
+                                return value.toLocaleString('id-ID'); // Format ribuan di sumbu Y
+                            }
+                        },
                         gridLines: { color: "rgba(0, 0, 0, .05)" }
                     }]
                 }

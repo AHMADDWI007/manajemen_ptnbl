@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\DataProduksi;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DataPengolahan\BahanProsesController;
 use App\Models\AktualTemperatureSir20;
 use App\Models\BahanBakarSir20;
 use App\Models\HasilUjiLabBokarDiolah;
@@ -260,8 +261,17 @@ class ProduksiSir20Controller extends Controller
                 $this->cleanNumber($request->kg_press), 
                 $this->cleanNumber($request->jml_pallet),
                 $request->nomor_start,
-                $request->nomor_end
+                $request->nomor_end,
+                $request->jenis_pallets // 🔥 Tambahkan parameter ini
             );
+
+                // 🔥 TAMBAHKAN PEMICU KE BAHAN PROSES
+                // Panggil controller BahanProses secara internal untuk sinkronisasi otomatis
+                $bahanController = new BahanProsesController();
+                
+                // Kita butuh akses ke method syncChainData. 
+                // Pastikan di BahanProsesController, method syncChainData diubah dari 'private' menjadi 'public'.
+                $bahanController->syncChainData($request->tanggal_produksi);
 
             DB::commit();
             return redirect()->back()->with('success', 'Data Produksi Berhasil Disimpan & Pallet Masuk ke Gudang!');
@@ -275,40 +285,75 @@ class ProduksiSir20Controller extends Controller
     // =========================================================================
     // 🔥 HELPER BARU: GENERATE PALLET SESUAI NOMOR START & END INPUTAN OPERATOR 🔥
     // =========================================================================
-    private function generatePalletsOtomatis($tanggal, $totalKg, $totalPallet, $nomorStart, $nomorEnd)
+    private function generatePalletsOtomatis($tanggal, $totalKg, $totalPallet, $nomorStart, $nomorEnd, $jenisArray = [])
     {
         if ($totalPallet <= 0) return;
 
-        // 1. Buat atau Update Header Laporan Harian
+        // 1. Header Laporan Harian (Gudang)
         $header = ProduksiSir::firstOrCreate(
             ['tanggal_produksi' => $tanggal],
             ['kg' => 0, 'pallet' => 0, 'keterangan' => 'Generate Otomatis dari Laporan Pabrik']
         );
-
         $header->increment('kg', $totalKg);
         $header->increment('pallet', $totalPallet);
 
-        // 2. Ambil Default Lokasi & Mutu
-        $lokasiAwal = Lokasi::firstOrCreate(['nama' => 'Di Gudang SIR']);
-        $mutuPrima  = Mutu::firstOrCreate(['uraian' => 'Mutu Prima (siap jual)']);
-
-        // 3. Hitung Berat Rata-rata per Pallet
         $kgPerPallet = $totalKg / $totalPallet;
-        
-        // Ambil 2 digit tahun (Contoh: "26" dari 2026)
         $tahunSingkat = Carbon::parse($tanggal)->format('y'); 
 
-        // 4. 🔥 LOOPING DARI NOMOR START SAMPAI NOMOR END! 🔥
+        // 2. 🔥 AMBIL DAFTAR HUTANG PENJUALAN MANUAL YANG BELUM LUNAS
+        // Kita urutkan berdasarkan tanggal kontrak paling lama (FIFO)
+        $hutangManual = DB::table('penjualan_manual_sir20')
+            ->where('status', 'Pending')
+            ->orderBy('tanggal', 'asc')
+            ->get();
+
+        $idxHutang = 0;
+        $sisaKebutuhanHutang = $hutangManual->count() > 0 ? $hutangManual[$idxHutang]->pallet_manual : 0;
+
+        // 3. LOOPING GENERATE PALLET FISIK
         for ($i = $nomorStart; $i <= $nomorEnd; $i++) {
-            // Hasil: PLT-26-0001
+            // Ambil jenis pallet dari array input (MB5/SW)
+            $idxArr = $i - $nomorStart;
+            $jenisFix = isset($jenisArray[$idxArr]) ? $jenisArray[$idxArr] : 'SW';
+            
             $noPalletFix = 'PLT-' . $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
+            // --- 🛡️ LOGIKA PELUNASAN OTOMATIS 🛡️ ---
+            $tglPenjualanOtomatis = null;
+
+            // Jika masih ada hutang yang harus dilunasi
+            if ($hutangManual->count() > 0 && $idxHutang < $hutangManual->count()) {
+                $tglPenjualanOtomatis = $hutangManual[$idxHutang]->tanggal;
+                $sisaKebutuhanHutang--;
+
+                // Jika jatah hutang pada record ini sudah terpenuhi (sudah habis didebet)
+                if ($sisaKebutuhanHutang <= 0) {
+                    // Update status di tabel hutang menjadi Settled (Lunas)
+                    DB::table('penjualan_manual_sir20')
+                        ->where('id_penjualan_manual', $hutangManual[$idxHutang]->id_penjualan_manual)
+                        ->update(['status' => 'Settled']);
+                    
+                    // Pindah ke baris hutang berikutnya jika masih ada
+                    $idxHutang++;
+                    if ($idxHutang < $hutangManual->count()) {
+                        $sisaKebutuhanHutang = $hutangManual[$idxHutang]->pallet_manual;
+                    }
+                }
+            }
+
+            // 4. SIMPAN DATA KE TABEL PALLET
             $pallet = Pallet::create([
-                'id_produksi_sir'  => $header->id_produksi_sir,
-                'no_pallet'        => $noPalletFix,
-                'berat'            => $kgPerPallet,
-                'tanggal_produksi' => $tanggal,
+                'id_produksi_sir'   => $header->id_produksi_sir,
+                'no_pallet'         => $noPalletFix,
+                'berat'             => $kgPerPallet,
+                'jenis_pallet'      => $jenisFix, // 🔥 Kolom baru MB5/SW
+                'tanggal_produksi'  => $tanggal,
+                'tanggal_penjualan' => $tglPenjualanOtomatis // 🔥 Otomatis terisi jika melunasi hutang
             ]);
+
+            // Simpan Relasi Lokasi & Kondisi (Default: Di Gudang & Mutu Prima)
+            $lokasiAwal = Lokasi::firstOrCreate(['nama' => 'Di Gudang SIR']);
+            $mutuPrima  = Mutu::firstOrCreate(['uraian' => 'Mutu Prima (siap jual)']);
 
             LokasiPallet::create([
                 'id_lokasi' => $lokasiAwal->id_lokasi,
@@ -339,14 +384,14 @@ class ProduksiSir20Controller extends Controller
         try {
             $produksi = ProduksiSir20::findOrFail($id);
             
-            // 🔥 1. AMBIL DATA LAMA SEBELUM DI-UPDATE 🔥
+            // 1. AMBIL DATA LAMA UNTUK REVERT STOK
             $oldDate      = $produksi->tanggal_produksi; 
             $oldKgPress   = $produksi->kg_yang_dipress;
             $oldJmlPallet = $produksi->jumlah_pallet;
             $oldStart     = $produksi->nomor_start;
             $oldEnd       = $produksi->nomor_end;
 
-            // 2. Update Header Laporan Pabrik
+            // 2. UPDATE HEADER PRODUKSI
             $produksi->update([
                 'tanggal_produksi'      => $request->tanggal_produksi,
                 'shift_kerja'           => $request->shift_kerja,
@@ -374,7 +419,7 @@ class ProduksiSir20Controller extends Controller
                 'petugas'               => $request->petugas,
             ]);
 
-            // 3. Update Remahan & TRIGGER MATURASI (Revert & Add)
+            // 3. REVERT STOK MATURASI LAMA & SIMPAN YANG BARU
             $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
             foreach($oldRemahan as $old) {
                 $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
@@ -396,7 +441,7 @@ class ProduksiSir20Controller extends Controller
                 }
             }
 
-            // 4. Update Lainnya (Temp & BB)
+            // 4. UPDATE TEMPERATURE & BAHAN BAKAR
             AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
             $tempData = [
                 ['jenis' => 'Burner 1',   'start' => $request->temp_b1_start, 'end' => $request->temp_b1_end],
@@ -431,26 +476,15 @@ class ProduksiSir20Controller extends Controller
                 }
             }
 
-            // =========================================================================
-            // 🔥 5. SINKRONISASI GUDANG (REGENERATE PALLET JIKA ADA PERUBAHAN FISIK) 🔥
-            // =========================================================================
-            
+            // 5. REGENERASI PALLET GUDANG (JIKA ADA PERUBAHAN TANGGAL/BERAT/NOMOR)
             $newDate      = $produksi->tanggal_produksi;
             $newKgPress   = $produksi->kg_yang_dipress;
             $newJmlPallet = $produksi->jumlah_pallet;
             $newStart     = $produksi->nomor_start;
             $newEnd       = $produksi->nomor_end;
 
-            // 🔥 RADAR: Format Nomor PLT-YY-XXXX
-            $tahunLama = Carbon::parse($oldDate)->format('y');
-            $prefixLama  = 'PLT-' . $tahunLama . '-';
-            $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
-            $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
-            $palletFisikAda = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->exists();
-
-            if (!$palletFisikAda || $oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || $oldStart != $newStart || $oldEnd != $newEnd) {
-
-                // A. Kurangi Rekap Header
+            if ($oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || $oldStart != $newStart || $oldEnd != $newEnd) {
+                // A. Kurangi Rekap Header Lama
                 $oldHeader = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
                 if ($oldHeader) {
                     $oldHeader->decrement('kg', $oldKgPress);
@@ -458,20 +492,34 @@ class ProduksiSir20Controller extends Controller
                     if ($oldHeader->pallet <= 0) $oldHeader->delete();
                 }
 
-                // B. Hapus Fisik Pallet LAMA
-                $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->get();
+                // B. Hapus Fisik Pallet LAMA (Berdasarkan Range Nomor Lama)
+                $tahunLama = Carbon::parse($oldDate)->format('y');
+                $prefixLama = 'PLT-' . $tahunLama . '-';
+                $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
+                $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
+
+                $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])
+                                    ->where('tanggal_produksi', $oldDate)->get();
                 foreach($palletsLama as $pLama) {
                     LokasiPallet::where('id_pallet', $pLama->id_pallet)->delete();
                     KondisiPallet::where('id_pallet', $pLama->id_pallet)->delete();
                     $pLama->delete();
                 }
 
-                // C. Generate Ulang Pallet BARU
+                // C. Generate Ulang Pallet Baru
                 $this->generatePalletsOtomatis($newDate, $newKgPress, $newJmlPallet, $newStart, $newEnd);
             }
 
+            // 🔥 6. SINKRONISASI WIP (BAHAN PROSES) 🔥
+            $bahanController = new BahanProsesController();
+            $bahanController->syncChainData($newDate);
+            // Jika tanggal berubah, sinkronkan juga tanggal lamanya untuk update saldo pindahan
+            if ($oldDate != $newDate) {
+                $bahanController->syncChainData($oldDate);
+            }
+
             DB::commit();
-            return redirect()->back()->with('success', 'Data Produksi Diperbarui & Gudang Tersinkronisasi!');
+            return redirect()->back()->with('success', 'Data Produksi & WIP Berhasil Diperbarui!');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -489,51 +537,71 @@ class ProduksiSir20Controller extends Controller
             $produksi = ProduksiSir20::findOrFail($id);
             $oldDate  = $produksi->tanggal_produksi;
 
-            // 1. Kembalikan Stok Maturasi (Revert)
+            // 1. KEMBALIKAN STOK KE MATURASI (REVERT)
             $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
             foreach ($oldRemahan as $old) {
-                // Aksi 'kurang' akan menambah stok master dan mengurangi kolom diolah di log
                 $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
             }
 
-            // 2. 🔥 BERSIHKAN DATA GUDANG (PALLET) 🔥
-            // Kita cari Pallet berdasarkan range nomor yang ada di data produksi ini
+            // 2. BERSIHKAN DATA GUDANG (PALLET)
             $tahunPallet = Carbon::parse($oldDate)->format('y');
             $prefix      = 'PLT-' . $tahunPallet . '-';
             $noStart     = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
             $noEnd       = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
 
-            // Cari Header Produksi Gudang (ProduksiSir) untuk sinkronisasi rekap
+            // --- 🛡️ LOGIKA PENGEMBALIAN STATUS HUTANG MANUAL 🛡️ ---
+            // Cari pallet yang akan dihapus yang ternyata punya 'tanggal_penjualan' 
+            // (artinya pallet ini dipakai melunasi hutang manual saat store tadi)
+            $palletsUsedForDebt = Pallet::whereBetween('no_pallet', [$noStart, $noEnd])
+                ->where('tanggal_produksi', $oldDate)
+                ->whereNotNull('tanggal_penjualan')
+                ->get();
+
+            foreach ($palletsUsedForDebt as $p) {
+                // Kita kembalikan status hutang manual yang bersangkutan menjadi 'Pending'
+                // agar bisa dilunasi lagi oleh produksi di masa depan
+                DB::table('penjualan_manual_sir20')
+                    ->where('id_penjualan_sir20', function($query) use ($p) {
+                        $query->select('id_penjualan_sir20')
+                            ->from('penjualan_sir20')
+                            ->where('tanggal', $p->tanggal_penjualan)
+                            ->limit(1);
+                    })
+                    ->where('status', 'Settled')
+                    ->update(['status' => 'Pending']);
+            }
+
+            // Kurangi Header Rekap ProduksiSir (Gudang)
             $headerGudang = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
             if ($headerGudang) {
                 $headerGudang->decrement('kg', $produksi->kg_yang_dipress);
                 $headerGudang->decrement('pallet', $produksi->jumlah_pallet);
-                // Jika setelah dikurangi jadi 0, hapus headernya
                 if ($headerGudang->pallet <= 0) $headerGudang->delete();
             }
 
-            // Ambil pallet fisik untuk dihapus riwayatnya
+            // Hapus Fisik Pallet & Riwayatnya (Lokasi & Kondisi)
             $pallets = Pallet::whereBetween('no_pallet', [$noStart, $noEnd])
-                        ->where('tanggal_produksi', $oldDate)
-                        ->get();
+                            ->where('tanggal_produksi', $oldDate)->get();
 
             foreach ($pallets as $p) {
-                // Hapus riwayat lokasi dan kondisi sebelum hapus palletnya
                 LokasiPallet::where('id_pallet', $p->id_pallet)->delete();
                 KondisiPallet::where('id_pallet', $p->id_pallet)->delete();
                 $p->delete();
             }
 
-            // 3. Hapus Data Detail Produksi Pabrik
+            // 3. HAPUS DATA DETAIL & HEADER PRODUKSI SIR 20
             RemahanSir20::where('id_produksi_sir20', $id)->delete();
             AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
             BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
-            
-            // 4. Hapus Header Produksi Pabrik
             $produksi->delete();
 
+            // 4. SINKRONISASI WIP (BAHAN PROSES)
+            $bahanController = new BahanProsesController();
+            $bahanController->syncChainData($oldDate);
+
             DB::commit();
-            return redirect()->back()->with('success', 'Produksi Dibatalkan: Stok kembali ke Maturasi & Pallet dihapus dari Gudang!');
+            return redirect()->back()->with('success', 'Produksi Dibatalkan: Stok kembali ke Maturasi, WIP dibersihkan, dan Hutang Manual dibuka kembali!');
+
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Gagal Membatalkan Produksi: ' . $e->getMessage());
@@ -587,5 +655,78 @@ class ProduksiSir20Controller extends Controller
             // Ini akan menggantikan puluhan baris logika manual yang sebelumnya ada di sini
             $this->syncMaturasi($maturasi->id_maturasi, $tanggal);
         }
+    }
+
+    // Tambahkan di dalam class ProduksiSir20Controller
+    // =========================================================================
+    // 🔥 CETAK PDF PER ID (SATU SHIFT)
+    // =========================================================================
+    public function cetakPdf($id)
+    {
+        // Menggunakan relasi yang sudah Maswi definisikan
+        $data = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])->findOrFail($id);
+
+        // Kirim dalam array agar seragam dengan view cetak teman
+        $dataProduksi = [$data->shift_kerja => $data];
+        $tanggal = $data->tanggal_produksi;
+
+        // Siapkan wadah suhu & bahan bakar
+        $temps = [$data->shift_kerja => [
+            'b1_start' => '', 'b1_end' => '', 'b2_start' => '', 'b2_end' => '', 'cycle_start' => '', 'cycle_end' => ''
+        ]];
+        $bbs = [$data->shift_kerja => ['solar' => 0, 'batubara' => 0, 'cangkang' => 0]];
+
+        foreach ($data->aktualTemperature as $t) {
+            if ($t->jenis == 'Burner 1') { $temps[$data->shift_kerja]['b1_start'] = $t->nilai_start; $temps[$data->shift_kerja]['b1_end'] = $t->nilai_end; }
+            if ($t->jenis == 'Burner 2') { $temps[$data->shift_kerja]['b2_start'] = $t->nilai_start; $temps[$data->shift_kerja]['b2_end'] = $t->nilai_end; }
+            if ($t->jenis == 'Cycle Time') { $temps[$data->shift_kerja]['cycle_start'] = $t->nilai_start; $temps[$data->shift_kerja]['cycle_end'] = $t->nilai_end; }
+        }
+
+        foreach ($data->bahanBakar as $b) {
+            if ($b->bahan_bakar == 'Solar') $bbs[$data->shift_kerja]['solar'] = $b->digunakan;
+            if ($b->bahan_bakar == 'Batu Bara') $bbs[$data->shift_kerja]['batubara'] = $b->digunakan;
+            if ($b->bahan_bakar == 'Cangkang') $bbs[$data->shift_kerja]['cangkang'] = $b->digunakan;
+        }
+
+        return view('Cetak.cetak-pdf-sir20', compact('dataProduksi', 'tanggal', 'temps', 'bbs'));
+    }
+
+    // =========================================================================
+    // 🔥 CETAK PDF REKAP HARIAN (3 SHIFT SEKALIGUS)
+    // =========================================================================
+    public function cetakHarian(Request $request)
+    {
+        $tanggal = $request->tanggal;
+
+        $produksi = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])
+                    ->whereDate('tanggal_produksi', $tanggal)
+                    ->get();
+
+        if ($produksi->isEmpty()) {
+            return redirect()->back()->with('error', 'Data produksi pada tanggal ' . date('d-m-Y', strtotime($tanggal)) . ' tidak ditemukan.');
+        }
+
+        $dataProduksi = $produksi->keyBy('shift_kerja');
+        $temps = [];
+        $bbs = [];
+
+        foreach ($dataProduksi as $shift => $data) {
+            $temps[$shift] = [
+                'b1_start' => $data->aktualTemperature->where('jenis', 'Burner 1')->first()->nilai_start ?? '',
+                'b1_end'   => $data->aktualTemperature->where('jenis', 'Burner 1')->first()->nilai_end ?? '',
+                'b2_start' => $data->aktualTemperature->where('jenis', 'Burner 2')->first()->nilai_start ?? '',
+                'b2_end'   => $data->aktualTemperature->where('jenis', 'Burner 2')->first()->nilai_end ?? '',
+                'cycle_start' => $data->aktualTemperature->where('jenis', 'Cycle Time')->first()->nilai_start ?? '',
+                'cycle_end'   => $data->aktualTemperature->where('jenis', 'Cycle Time')->first()->nilai_end ?? '',
+            ];
+
+            $bbs[$shift] = [
+                'solar'    => $data->bahanBakar->where('bahan_bakar', 'Solar')->first()->digunakan ?? 0,
+                'batubara' => $data->bahanBakar->where('bahan_bakar', 'Batu Bara')->first()->digunakan ?? 0,
+                'cangkang' => $data->bahanBakar->where('bahan_bakar', 'Cangkang')->first()->digunakan ?? 0,
+            ];
+        }
+
+        return view('Cetak.cetak-pdf-sir20', compact('dataProduksi', 'tanggal', 'temps', 'bbs'));
     }
 }

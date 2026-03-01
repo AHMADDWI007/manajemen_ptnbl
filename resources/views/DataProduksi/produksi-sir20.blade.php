@@ -60,9 +60,12 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="m-0 text-success fw-bold">Data Produksi SIR 20</h1>
+                {{-- 🔥 HANYA TAMPIL JIKA BUKAN USER --}}
+                @if(auth()->user()->role != 'user')
                 <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm" data-toggle="modal" data-target="#modalInputLaporan">
                     <i class="fas fa-plus-circle"></i> Input Laporan Baru
                 </button>
+                @endif
             </div>
         </div>
 
@@ -74,6 +77,19 @@
                         <strong class="my-auto">Riwayat Produksi</strong>
                     </div>
                     <div class="card-body">
+                        <div class="row mb-3 align-items-end">
+                            <div class="col-auto">
+                                <form action="{{ route('produksi-sir20.cetak-harian') }}" method="GET" target="_blank" class="d-flex align-items-end" style="gap: 5px;">
+                                    <div>
+                                        <label class="form-label small fw-bold mb-1">Cetak Tanggal:</label>
+                                        <input type="date" name="tanggal" value="{{ date('Y-m-d') }}" class="form-control form-control-sm" required style="width: 140px;">
+                                    </div>
+                                    <button type="submit" class="btn btn-danger btn-sm fw-bold">
+                                        <i class="fas fa-file-pdf"></i> Cetak Rekap Harian
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                         
                         {{-- 🔥 TAMBAHAN: FILTER TANGGAL (Gaya Laboratorium) --}}
                             <div class="row mb-3 align-items-end">
@@ -109,7 +125,8 @@
                                         <th>Pallet</th>         {{-- 🔥 KOLOM BARU --}}
                                         <th>Jam Kerja</th>
                                         <th>Petugas</th> {{-- 🔥 TAMBAHAN 1: Header Kolom Petugas --}}
-                                        <th style="width: 10%;">Aksi</th>
+                                        {{-- Lebar kolom aksi disesuaikan: 5% untuk user (1 tombol), 10% untuk admin (3 tombol) --}}
+                                        <th style="width: {{ auth()->user()->role == 'user' ? '5%' : '10%' }};">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -142,19 +159,27 @@
                                                     <i class="fas fa-eye"></i>
                                                 </button>
 
-                                                {{-- Tombol Edit --}}
-                                                <button class="btn btn-warning btn-sm btn-edit text-white" data-id="{{ $item->id_produksi_sir20 }}" title="Edit Data">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-
-                                                {{-- 🔥 TOMBOL HAPUS/BATAL --}}
-                                                <form action="{{ route('produksi-sir20.destroy', $item->id_produksi_sir20) }}" method="POST" class="delete-form" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan produksi ini? Stok akan dikembalikan ke Maturasi dan Pallet akan dihapus.')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger btn-sm" title="Hapus/Batalkan Produksi">
-                                                        <i class="fas fa-trash"></i>
+                                                {{-- 🔥 TOMBOL EDIT & HAPUS: HANYA UNTUK NON-USER --}}
+                                                @if(auth()->user()->role != 'user')
+                                                    {{-- Tombol Edit --}}
+                                                    <button class="btn btn-warning btn-sm btn-edit text-white" data-id="{{ $item->id_produksi_sir20 }}" title="Edit Data">
+                                                        <i class="fas fa-edit"></i>
                                                     </button>
-                                                </form>
+
+                                                    {{-- 🔥 TOMBOL CETAK PDF BARU --}}
+                                                    <a href="{{ route('produksi-sir20.cetak', $item->id_produksi_sir20) }}" target="_blank" class="btn btn-danger btn-sm" title="Cetak Laporan Ini">
+                                                        <i class="fas fa-print"></i>
+                                                    </a>
+
+                                                    {{-- 🔥 TOMBOL HAPUS/BATAL --}}
+                                                    <form action="{{ route('produksi-sir20.destroy', $item->id_produksi_sir20) }}" method="POST" class="delete-form" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan produksi ini? Stok akan dikembalikan ke Maturasi dan Pallet akan dihapus.')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus/Batalkan Produksi">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -411,15 +436,17 @@
                                 </div>
                             </div>
 
-                            <label class="text-muted small font-weight-bold">DETAIL PACKING</label>
-                            <div class="form-group row align-items-center">
+                            <label class="text-muted small font-weight-bold">DETAIL PACKING & JENIS KEMASAN</label>
+                            <div class="form-group row align-items-center mb-2">
                                 <label class="col-4 font-weight-normal">Jml Pallet Diisi</label>
                                 <div class="col-5">
-                                    {{-- 🔥 ID ditambahkan untuk Selector JS --}}
                                     <input type="number" name="jml_pallet" id="inputJmlPallet" class="form-control form-control-sm calc-trigger" step="1" placeholder="Input Manual">
                                 </div>
-                                <div class="col-3 unit-label">SW</div>
+                                <div class="col-3 unit-label text-muted small italic">Tentukan jenis per pallet ↓</div>
                             </div>
+
+                            <div id="palletTypeRowsContainer">
+                                </div>
                             {{-- <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Total Nomor</label>
                                 <div class="col-5"><input type="number" name="total_nomor" class="form-control form-control-sm"></div>
@@ -833,6 +860,30 @@
 
 <script>
     $(document).ready(function() {
+
+        $('#inputJmlPallet').on('input', function() {
+            var jml = parseInt($(this).val()) || 0;
+            var container = $('#palletTypeRowsContainer');
+            container.empty();
+
+            if (jml > 0) {
+                for (var i = 0; i < jml; i++) {
+                    // Kita buat per baris sejajar agar rapi
+                    container.append(`
+                        <div class="form-group row align-items-center mb-1">
+                            <label class="col-4 font-weight-normal small pl-4">Jenis Pallet #${i+1}</label>
+                            <div class="col-5">
+                                <select name="jenis_pallets[]" class="form-control form-control-sm">
+                                    <option value="SW" selected>SW (Standard Wrapping)</option>
+                                    <option value="MB5">MB5 (Metal Box 5)</option>
+                                </select>
+                            </div>
+                            <div class="col-3 unit-label text-success small font-weight-bold">MANTAP</div>
+                        </div>
+                    `);
+                }
+            }
+        });
         
         // --- Notifikasi SweetAlert ---
         @if (session('success')) Swal.fire({ icon: 'success', title: 'Berhasil!', text: "{{ session('success') }}", showConfirmButton: false, timer: 2000 }); @endif

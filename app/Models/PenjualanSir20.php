@@ -13,6 +13,11 @@ class PenjualanSir20 extends Model
     protected $primaryKey = 'id_penjualan_sir20';
     protected $guarded = [];
 
+    protected $fillable = [
+        'tanggal', 'uraian', 'no_kontrak', 'no_invoice', 
+        'pallet', 'hari_ini', 'harga', 'no_palet_list', 'is_summary'
+    ];
+
     protected $casts = [
         'tanggal' => 'date',
         'sd_bulan_lalu' => 'float', 'bln_ini_lalu' => 'float', 'hari_ini' => 'float',

@@ -23,7 +23,7 @@
         /* Style untuk Grid Nomor Palet */
         .pallet-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
             gap: 8px;
             max-height: 180px;
             overflow-y: auto;
@@ -60,9 +60,12 @@
         <div class="content-header">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h3 class="mb-0 text-success fw-bold">Penjualan SIR 20</h3>
-                <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm" id="btnInputBaru">
-                    <i class="fas fa-plus-circle"></i> Input Penjualan
-                </button>
+                {{-- 🔥 HANYA TAMPIL JIKA BUKAN USER --}}
+                @if(auth()->user()->role != 'user')
+                    <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm" id="btnInputBaru">
+                        <i class="fas fa-plus-circle"></i> Input Penjualan
+                    </button>
+                @endif
             </div>
         </div>
 
@@ -184,28 +187,30 @@
                                                 </button>
 
                                                 {{-- 2. TOMBOL EDIT --}}
-                                                <button type="button" class="btn btn-warning btn-xs btn-edit text-white" title="Edit Administrasi"
-                                                    data-id_penjualan="{{ $kontrak->id_penjualan_sir20 }}"
-                                                    data-no_kontrak="{{ $kontrak->no_kontrak }}" 
-                                                    data-no_invoice="{{ $kontrak->no_invoice }}"
-                                                    data-harga_raw="{{ $kontrak->harga }}"
-                                                    data-uraian="{{ $kontrak->uraian }}"
-                                                    data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}"
-                                                    data-pallet="{{ $kontrak->pallet }}"
-                                                    data-hari_ini="{{ number_format($kontrak->hari_ini, 0, ',', '.') }}"
-                                                    data-no_palet_list="{{ $kontrak->no_palet_list }}">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-
-                                                {{-- 3. TOMBOL HAPUS --}}
-                                                <form action="{{ route('penjualan-sir20.destroy', $kontrak->id_penjualan_sir20) }}" method="POST" class="m-0 p-0 form-hapus">
-                                                    @csrf 
-                                                    @method('DELETE')
-                                                    <button type="button" class="btn btn-danger btn-xs btn-hapus" title="Hapus Data">
-                                                        <i class="fas fa-trash"></i> Hapus
+                                                {{-- 🔥 TOMBOL EDIT & HAPUS: Hanya untuk Admin --}}
+                                                @if(auth()->user()->role != 'user')
+                                                    <button type="button" class="btn btn-warning btn-xs btn-edit text-white" title="Edit Administrasi"
+                                                        data-id_penjualan="{{ $kontrak->id_penjualan_sir20 }}"
+                                                        data-no_kontrak="{{ $kontrak->no_kontrak }}" 
+                                                        data-no_invoice="{{ $kontrak->no_invoice }}"
+                                                        data-harga_raw="{{ $kontrak->harga }}"
+                                                        data-uraian="{{ $kontrak->uraian }}"
+                                                        data-tanggal="{{ \Carbon\Carbon::parse($kontrak->tanggal)->format('d-m-Y') }}"
+                                                        data-pallet="{{ $kontrak->pallet }}"
+                                                        data-hari_ini="{{ number_format($kontrak->hari_ini, 0, ',', '.') }}"
+                                                        data-no_palet_list="{{ $kontrak->no_palet_list }}">
+                                                        <i class="fas fa-edit"></i> Edit
                                                     </button>
-                                                </form>
 
+                                                    {{-- 3. TOMBOL HAPUS --}}
+                                                    <form action="{{ route('penjualan-sir20.destroy', $kontrak->id_penjualan_sir20) }}" method="POST" class="m-0 p-0 form-hapus">
+                                                        @csrf 
+                                                        @method('DELETE')
+                                                        <button type="button" class="btn btn-danger btn-xs btn-hapus" title="Hapus Data">
+                                                            <i class="fas fa-trash"></i> Hapus
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -274,6 +279,23 @@
                             <span class="text-muted small">Memuat daftar palet dari lab...</span>
                         </div>
                         <small class="text-muted">*Hanya menampilkan palet yang sudah diuji Lab dengan PRI &ge; 40.</small>
+                    </div>
+
+                    <hr>
+                    {{-- 🔥 FORM INPUT MANUAL (Untuk Pallet yang Belum Ready di Lab) --}}
+                    <div class="form-group mb-3 p-2" style="background-color: #f0f9ff; border: 1px dashed #007bff; border-radius: 5px;">
+                        <label class="font-weight-bold text-primary"><i class="fas fa-edit"></i> Input Manual (Pallet Belum Ready)</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <label class="small">Jml Pallet Manual</label>
+                                <input type="number" name="pallet_manual" id="inputPalletManual" class="form-control form-control-sm" placeholder="0" min="0">
+                            </div>
+                            <div class="col-6">
+                                <label class="small">Berat Manual (Kg)</label>
+                                <input type="number" name="berat_manual" id="inputBeratManual" class="form-control form-control-sm" placeholder="0" readonly>
+                                <small class="text-muted" style="font-size: 10px;">*Auto: Jml x 1260 Kg</small>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -456,19 +478,20 @@
                     var bookedArr = response.booked_pallets ? response.booked_pallets : [];
 
                     if (response.list_pallet && response.list_pallet.length > 0) {
-                        $.each(response.list_pallet, function(i, val) {
+                        $.each(response.list_pallet, function(i, obj) {
+                            // obj sekarang berisi {no_pallet, jenis, is_booked}
+                            var val = obj.no_pallet;
+                            var jenis = obj.jenis;
                             
-                            // 🔥 CEK APAKAH PALLET INI ADA DI LIST BOOKING
-                            // Kita pakai toString() agar perbandingan datanya akurat
                             var isBooked = bookedArr.includes(val.toString());
                             var checkedAttr = isBooked ? 'checked' : '';
                             var selectedClass = isBooked ? 'selected' : '';
 
                             grid.append(`
-                                <label class="pallet-item ${selectedClass}">
+                                <label class="pallet-item ${selectedClass}" title="Jenis: ${jenis}">
                                     <input type="checkbox" name="selected_pallets[]" 
                                         class="pallet-check" value="${val}" ${checkedAttr}>
-                                    <span>#${val}</span>
+                                    <span>#${val} <small class="text-muted">(${jenis})</small></span>
                                 </label>
                             `);
                         });
@@ -489,18 +512,35 @@
         }
 
         function updateCalculation() {
+            // 1. Hitung Pallet Fisik (yang dicentang)
             var selected = $('.pallet-check:checked');
-            var count = selected.length;
-            var totalKg = count * 1260; 
+            var countFisik = selected.length;
+            var beratFisik = countFisik * 1260; 
 
-            $('#inputPallet').val(count);
+            // 2. Ambil Nilai Manual
+            var countManual = parseInt($('#inputPalletManual').val()) || 0;
+            var beratManual = countManual * 1260;
+
+            // 3. Update Kolom Berat Manual (Kg)
+            $('#inputBeratManual').val(beratManual);
+
+            // 4. Update TOTAL GABUNGAN (Fisik + Manual)
+            var totalCount = countFisik + countManual;
+            var totalKg = beratFisik + beratManual;
+
+            $('#inputPallet').val(totalCount);
             $('#inputHariIni').val(totalKg);
 
+            // Styling CSS untuk item yang terpilih
             $('.pallet-item').removeClass('selected');
             selected.closest('.pallet-item').addClass('selected');
 
-            $('#btnSimpan').prop('disabled', count === 0);
+            // Aktifkan tombol simpan jika ada isi (baik fisik maupun manual)
+            $('#btnSimpan').prop('disabled', totalCount === 0);
         }
+
+        // Tambahkan ini di bawah event handler pallet-check
+        $(document).on('input', '#inputPalletManual', updateCalculation);
 
         // Event Handlers untuk Input
         $(document).on('change', '.pallet-check', updateCalculation);

@@ -94,21 +94,33 @@ class PenjualanSir20Controller extends Controller
         try {
             $tgl = $request->query('date');
 
-            // 1. Ambil pallet yang benar-benar belum terjual (tanggal_penjualan is NULL)
-            $availablePallets = Pallet::whereNull('tanggal_penjualan')
-                ->pluck('no_pallet')
+            // 1. Ambil pallet yang belum terjual beserta kolom jenis_pallet
+            $available = Pallet::whereNull('tanggal_penjualan')->get(['id_pallet', 'no_pallet', 'jenis_pallet']);
+
+            // 2. Ambil ID pallet yang di-booking (per baris)
+            $bookedIds = DB::table('booking_pallet')
+                ->where('tanggal', $tgl)
+                ->pluck('id_pallet')
                 ->toArray();
 
-            // 2. Ambil list pallet yang di-booking dari mobile untuk tanggal tersebut
-            $bookedData = DB::table('booking_pallet')->where('tanggal', $tgl)->first();
-            $bookedPallets = $bookedData ? explode(',', $bookedData->no_palet_list) : [];
+            $listData = [];
+            foreach($available as $p) {
+                $listData[] = [
+                    'no_pallet' => $p->no_pallet,
+                    'jenis'     => $p->jenis_pallet ?? 'SW', // Ambil jenis pallet
+                    'is_booked' => in_array($p->id_pallet, $bookedIds) 
+                ];
+            }
 
-            sort($availablePallets, SORT_NATURAL);
+            // Urutkan secara natural berdasarkan nomor pallet
+            usort($listData, function($a, $b) {
+                return strnatcmp($a['no_pallet'], $b['no_pallet']);
+            });
 
             return response()->json([
-                'list_pallet' => array_values($availablePallets),
-                'booked_pallets' => $bookedPallets, // Daftar ID untuk dicentang otomatis oleh JS
-                'count' => count($availablePallets)
+                'list_pallet' => $listData, // Kirim object lengkap, bukan hanya nomor
+                'booked_pallets' => array_column(array_filter($listData, function($i){return $i['is_booked'];}), 'no_pallet'),
+                'count' => count($listData)
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -130,49 +142,46 @@ class PenjualanSir20Controller extends Controller
         DB::beginTransaction();
         try {
             $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
-            $kgTerjual = $request->hari_ini;
-            $palletTerjual = count($request->selected_pallets);
+            $selectedPallets = $request->selected_pallets; // Ini array nomor pallet
 
-            // 1. Simpan Detail Penjualan (Untuk Arsip Invoice/Kontrak)
-            PenjualanSir20::create([
+            // 1. Simpan Invoice Utama (Tetap sama)
+            $invoice = PenjualanSir20::create([
                 'tanggal'     => $tgl,
                 'uraian'      => $request->uraian,
                 'no_kontrak'  => $request->no_kontrak,
                 'no_invoice'  => $request->no_invoice,
-                'pallet'      => $palletTerjual,
-                'hari_ini'    => $kgTerjual,
+                'pallet'      => count($selectedPallets) + (int)($request->pallet_manual ?? 0),
+                'hari_ini'    => $request->hari_ini,
                 'harga'       => $request->harga,
-                'no_palet_list' => implode(',', $request->selected_pallets),
+                'no_palet_list' => implode(',', $selectedPallets),
                 'is_summary'  => 0 
             ]);
 
-            // 2. Sinkronisasi ke Summary Penjualan (Tabel V - Laporan Penjualan)
-            $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
-                ->where('uraian', $request->uraian)
-                ->where('is_summary', 0)
-                ->sum('hari_ini');
-            
-            $this->recalculateAndSave($tgl, $request->uraian, $totalKgHariIni);
+            // 2. Update status pallet menjadi TERJUAL (Tetap sama)
+            Pallet::whereIn('no_pallet', $selectedPallets)->update(['tanggal_penjualan' => $tgl]);
 
-            // 3. UPDATE STATUS PALLET MENJADI TERJUAL
-            Pallet::whereIn('no_pallet', $request->selected_pallets)
-                ->update([
-                    'tanggal_penjualan' => $tgl
+            // 3. 🔥 PERBAIKAN: Hapus booking pallet berdasarkan ID yang dipilih
+            $palletIds = Pallet::whereIn('no_pallet', $selectedPallets)->pluck('id_pallet');
+            DB::table('booking_pallet')->whereIn('id_pallet', $palletIds)->delete();
+
+            // 4. Jika ada input manual, buat baris hutang (Penting untuk alur pelunasan)
+            if ((int)$request->pallet_manual > 0) {
+                DB::table('penjualan_manual_sir20')->insert([
+                    'id_penjualan_sir20' => $invoice->id_penjualan_sir20,
+                    'tanggal'            => $tgl,
+                    'pallet_manual'      => $request->pallet_manual,
+                    'status'             => 'Pending',
+                    'created_at' => now(), 'updated_at' => now()
                 ]);
+            }
 
-            // =========================================================================
-            // 🔥 TAMBAHAN PERBAIKAN: HAPUS DATA BOOKING DARI MOBILE 🔥
-            // =========================================================================
-            // Setelah sukses jadi penjualan resmi, hapus draft booking di tabel sementara
-            // agar tidak membingungkan atau tercentang lagi di masa depan.
-            DB::table('booking_pallet')->where('tanggal', $tgl)->delete();
+            $this->recalculateAndSave($tgl, $request->uraian, $request->hari_ini);
 
             DB::commit();
-            return redirect()->back()->with('success', 'Penjualan berhasil disimpan. Stok gudang terpotong & data booking dibersihkan!');
-
+            return redirect()->back()->with('success', 'Penjualan Berhasil!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal: ' . $e->getMessage());
+            return back()->with('error', $e->getMessage());
         }
     }
 
@@ -254,37 +263,49 @@ class PenjualanSir20Controller extends Controller
         DB::beginTransaction();
         try {
             $data = PenjualanSir20::findOrFail($id);
-            
-            $palletsToRestore = explode(',', $data->no_palet_list);
-            
-            // 1. Kembalikan status pallet di gudang menjadi 'Belum Terjual'
-            if (!empty($palletsToRestore) && $data->no_palet_list != null) {
-                Pallet::whereIn('no_pallet', $palletsToRestore)->update([
-                    'tanggal_penjualan' => null
-                ]);
-            }
-
-            // 2. Simpan info untuk di-recalculate sebelum data dihapus
             $tgl = $data->tanggal;
             $uraian = $data->uraian;
             
-            // 3. Hapus data penjualan (invoice) tersebut
+            // 1. Ambil daftar pallet yang terjual di invoice ini
+            $palletsToRestore = array_filter(explode(',', $data->no_palet_list), 'strlen');
+            
+            if (!empty($palletsToRestore)) {
+                // A. Kembalikan status pallet menjadi READY (tanggal_penjualan NULL)
+                Pallet::whereIn('no_pallet', $palletsToRestore)->update([
+                    'tanggal_penjualan' => null
+                ]);
+
+                // B. 🔥 TAMBAHAN: Kembalikan ke daftar BOOKING agar di modal web otomatis tercentang lagi
+                foreach ($palletsToRestore as $noPallet) {
+                    $p = Pallet::where('no_pallet', $noPallet)->first();
+                    if ($p) {
+                        DB::table('booking_pallet')->updateOrInsert(
+                            ['id_pallet' => $p->id_pallet, 'tanggal' => $tgl],
+                            ['updated_at' => now(), 'created_at' => now()]
+                        );
+                    }
+                }
+            }
+
+            // 2. 🔥 TAMBAHAN: Hapus data HUTANG terkait jika ada
+            DB::table('penjualan_manual_sir20')->where('id_penjualan_sir20', $id)->delete();
+
+            // 3. Hapus invoice utama
             $data->delete();
 
-            // 4. 🔥 PERBAIKAN: Hitung ulang sisa penjualan murni HARI INI
+            // 4. Hitung ulang sisa penjualan murni hari ini (Sinkronisasi Tabel V)
             $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
                 ->where('uraian', $uraian)
                 ->where('is_summary', 0)
                 ->sum('hari_ini');
             
-            // Panggil fungsi sinkronisasi
             $this->recalculateAndSave($tgl, $uraian, $totalKgHariIni);
 
             DB::commit();
-            return back()->with('success', 'Penjualan dibatalkan! Pallet telah dikembalikan ke stok gudang.');
+            return back()->with('success', 'Penjualan dibatalkan! Pallet kembali ke stok booking.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+            return back()->with('error', 'Gagal: ' . $e->getMessage());
         }
     }
 }

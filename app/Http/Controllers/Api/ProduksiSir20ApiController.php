@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\BahanProsesApiController;
 use App\Http\Controllers\Controller;
 use App\Models\AktualTemperatureSir20;
 use App\Models\BahanBakarSir20;
@@ -143,7 +144,7 @@ class ProduksiSir20ApiController extends Controller
             // 1. Simpan Header Produksi
             $produksi = ProduksiSir20::create($this->filterRequest($request));
 
-            // 2. Simpan Remahan (Maturasi) & Potong Stok
+            // 2. Simpan Remahan & Trigger Maturasi
             if ($request->filled('maturasi') && is_array($request->maturasi)) {
                 foreach ($request->maturasi as $item) {
                     $namaRuang = $item['ruang_maturasi'] ?? $item['ruang'] ?? null;
@@ -152,24 +153,22 @@ class ProduksiSir20ApiController extends Controller
 
                     if (!empty($namaRuang) && $berat > 0) {
                         $beratBersih = $this->cleanNumber($berat);
-                        
                         RemahanSir20::create([
                             'id_produksi_sir20' => $produksi->id_produksi_sir20,
                             'ruang_maturasi'    => $namaRuang,
                             'berat'             => $beratBersih,
                             'umur'              => $this->cleanNumber($umur),
                         ]);
-
                         $this->triggerUpdateMaturasi($namaRuang, $request->tanggal_produksi, $beratBersih, 'tambah');
                     }
                 }
             }
 
-            // 3. Simpan Suhu & BB
+            // 3. Simpan Suhu & Bahan Bakar
             $this->saveTemperatures($produksi->id_produksi_sir20, $request);
             $this->saveBahanBakar($produksi->id_produksi_sir20, $request);
 
-            // 4. 🔥 GENERATE PALLET MENGGUNAKAN START & END DARI MOBILE 🔥
+            // 4. Generate Pallet Gudang
             $this->generatePalletsOtomatis(
                 $request->tanggal_produksi, 
                 $this->cleanNumber($request->kg_yang_dipress), 
@@ -178,8 +177,12 @@ class ProduksiSir20ApiController extends Controller
                 $request->nomor_end
             );
 
+            // 🔥 5. SINKRONISASI BAHAN PROSES (WIP) - SAMA DENGAN WEB
+            $bahanController = new BahanProsesApiController();
+            $bahanController->syncChainData($request->tanggal_produksi);
+
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Produksi berhasil disimpan & Pallet masuk Gudang.'], 201);
+            return response()->json(['success' => true, 'message' => 'Produksi berhasil disimpan & WIP terupdate.'], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -196,99 +199,75 @@ class ProduksiSir20ApiController extends Controller
         try {
             $produksi = ProduksiSir20::findOrFail($id);
             
-            // 1. AMBIL DATA LAMA SEBELUM DI-UPDATE 
+            // 1. DATA LAMA UNTUK REVERT
             $oldDate      = $produksi->tanggal_produksi; 
             $oldKgPress   = $produksi->kg_yang_dipress;
             $oldJmlPallet = $produksi->jumlah_pallet;
             $oldStart     = $produksi->nomor_start;
             $oldEnd       = $produksi->nomor_end;
 
-            // 2. Update Header Laporan Pabrik
+            // 2. UPDATE DATA INDUK
             $produksi->update($this->filterRequest($request));
 
-            // 3. Revert Stok Maturasi Lama
+            // 3. REVERT STOK MATURASI LAMA
             $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
             foreach($oldRemahan as $old) {
                 $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
             }
             RemahanSir20::where('id_produksi_sir20', $id)->delete();
 
-            // 4. Simpan Remahan Baru
+            // 4. SIMPAN REMAHAN BARU
             if ($request->filled('maturasi') && is_array($request->maturasi)) {
                 foreach ($request->maturasi as $item) {
                     $namaRuang = $item['ruang_maturasi'] ?? $item['ruang'] ?? null;
                     $berat = $item['berat'] ?? 0;
-                    $umur = $item['umur'] ?? 0;
-
                     if (!empty($namaRuang) && $berat > 0) {
                         $beratBersih = $this->cleanNumber($berat);
                         RemahanSir20::create([
                             'id_produksi_sir20' => $id, 
                             'ruang_maturasi'    => $namaRuang,
                             'berat'             => $beratBersih,
-                            'umur'              => $this->cleanNumber($umur),
+                            'umur'              => $this->cleanNumber($item['umur'] ?? 0),
                         ]);
                         $this->triggerUpdateMaturasi($namaRuang, $request->tanggal_produksi, $beratBersih, 'tambah');
                     }
                 }
             }
 
-            // 5. Update Suhu & BB
+            // 5. UPDATE DETAIL (SUHU & BB)
             AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
             $this->saveTemperatures($id, $request);
-
             BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
             $this->saveBahanBakar($id, $request);
 
-            // =========================================================================
-            // 🔥 6. SINKRONISASI GUDANG (REGENERATE PALLET JIKA ADA PERUBAHAN FISIK) 🔥
-            // =========================================================================
-            $newDate      = $produksi->tanggal_produksi;
-            $newKgPress   = $produksi->kg_yang_dipress;
-            $newJmlPallet = $produksi->jumlah_pallet;
-            $newStart     = $produksi->nomor_start;
-            $newEnd       = $produksi->nomor_end;
-
-            // 🔥 RADAR: Format Nomor PLT-YY-XXXX
-            $tahunLama = Carbon::parse($oldDate)->format('y');
-            $prefixLama  = 'PLT-' . $tahunLama . '-';
-            $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
-            $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
-            $palletFisikAda = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->exists();
-
-            if (!$palletFisikAda || $oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || $oldStart != $newStart || $oldEnd != $newEnd) {
-
-                // A. Kurangi Rekap Header Harian
+            // 6. SINKRONISASI GUDANG (REGENERATE PALLET)
+            $newDate = $produksi->tanggal_produksi;
+            if ($oldDate != $newDate || $oldKgPress != $produksi->kg_yang_dipress || $oldStart != $produksi->nomor_start) {
+                // A. Kurangi Header Lama
                 $oldHeader = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
                 if ($oldHeader) {
                     $oldHeader->decrement('kg', $oldKgPress);
                     $oldHeader->decrement('pallet', $oldJmlPallet);
-                    if ($oldHeader->pallet <= 0) {
-                        $oldHeader->delete();
-                    }
+                    if ($oldHeader->pallet <= 0) $oldHeader->delete();
                 }
-
-                // B. HAPUS FISIK PALLET LAMA
-                $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->get();
-                foreach($palletsLama as $pLama) {
-                    LokasiPallet::where('id_pallet', $pLama->id_pallet)->delete();
-                    KondisiPallet::where('id_pallet', $pLama->id_pallet)->delete();
-                    $pLama->delete();
-                }
-
-                // C. 🔥 GENERATE ULANG PALLET MENGGUNAKAN HELPER 🔥
-                $this->generatePalletsOtomatis($newDate, $newKgPress, $newJmlPallet, $newStart, $newEnd);
+                // B. Hapus Pallet Lama
+                $tahunLama = Carbon::parse($oldDate)->format('y');
+                $prefixLama = 'PLT-' . $tahunLama . '-';
+                Pallet::whereBetween('no_pallet', [$prefixLama.str_pad($oldStart, 4, '0', STR_PAD_LEFT), $prefixLama.str_pad($oldEnd, 4, '0', STR_PAD_LEFT)])
+                      ->where('tanggal_produksi', $oldDate)->delete();
+                // C. Generate Baru
+                $this->generatePalletsOtomatis($newDate, $produksi->kg_yang_dipress, $produksi->jumlah_pallet, $produksi->nomor_start, $produksi->nomor_end);
             }
 
-            // 🔥 SINKRONISASI KE BAHAN PROSES (WIP)
-            app(BahanProsesApiController::class)->recalculateAndSaveFlow(Carbon::parse($oldDate));
+            // 🔥 7. SINKRONISASI BAHAN PROSES (WIP)
+            $bahanApi = new BahanProsesApiController();
+            $bahanApi->syncChainData($newDate);
             if ($oldDate != $newDate) {
-                app(BahanProsesApiController::class)->recalculateAndSaveFlow(Carbon::parse($newDate));
+                $bahanApi->syncChainData($oldDate);
             }
 
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Produksi diperbarui & Gudang disinkronkan.']);
-
+            return response()->json(['success' => true, 'message' => 'Produksi API Berhasil Diperbarui.']);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -304,10 +283,6 @@ class ProduksiSir20ApiController extends Controller
         try {
             $produksi = ProduksiSir20::findOrFail($id);
             $oldDate = $produksi->tanggal_produksi;
-            $oldKgPress = $produksi->kg_yang_dipress;
-            $oldJmlPallet = $produksi->jumlah_pallet;
-            $oldStart = $produksi->nomor_start;
-            $oldEnd = $produksi->nomor_end;
 
             // 1. Revert Stok Maturasi
             $oldRemahan = RemahanSir20::where('id_produksi_sir20', $id)->get();
@@ -315,40 +290,34 @@ class ProduksiSir20ApiController extends Controller
                 $this->triggerUpdateMaturasi($old->ruang_maturasi, $oldDate, $old->berat, 'kurang');
             }
 
-            // 2. Hapus Rekap Gudang Harian
-            $oldHeader = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
-            if ($oldHeader) {
-                $oldHeader->decrement('kg', $oldKgPress);
-                $oldHeader->decrement('pallet', $oldJmlPallet);
-                if ($oldHeader->pallet <= 0) {
-                    $oldHeader->delete();
-                }
+            // 2. Bersihkan Gudang (Pallet) - Menggunakan Logika Web
+            $tahunPallet = Carbon::parse($oldDate)->format('y');
+            $prefix = 'PLT-' . $tahunPallet . '-';
+            $noStart = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
+            $noEnd   = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
+
+            $headerGudang = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
+            if ($headerGudang) {
+                $headerGudang->decrement('kg', $produksi->kg_yang_dipress);
+                $headerGudang->decrement('pallet', $produksi->jumlah_pallet);
+                if ($headerGudang->pallet <= 0) $headerGudang->delete();
             }
 
-            // 3. 🔥 HAPUS FISIK PALLET BERDASARKAN FORMAT PLT-YY-XXXX 🔥
-            $tahunLama = Carbon::parse($oldDate)->format('y');
-            $prefixLama = 'PLT-' . $tahunLama . '-';
-            $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
-            $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
+            Pallet::whereBetween('no_pallet', [$noStart, $noEnd])->where('tanggal_produksi', $oldDate)->delete();
 
-            $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])->get();
-            foreach($palletsLama as $pLama) {
-                LokasiPallet::where('id_pallet', $pLama->id_pallet)->delete();
-                KondisiPallet::where('id_pallet', $pLama->id_pallet)->delete();
-                $pLama->delete();
-            }
-
-            // 4. Hapus Data Induk dan Relasi
+            // 3. Hapus Data Produksi
             RemahanSir20::where('id_produksi_sir20', $id)->delete();
             AktualTemperatureSir20::where('id_produksi_sir20', $id)->delete();
             BahanBakarSir20::where('id_produksi_sir20', $id)->delete();
             $produksi->delete();
 
-            // 🔥 SINKRONISASI KE BAHAN PROSES (WIP)
-            app(BahanProsesApiController::class)->recalculateAndSaveFlow(Carbon::parse($oldDate));
+            // 🔥 4. SINKRONISASI BAHAN PROSES (WIP) - MEMBERSIHKAN DATA KOSONG
+            // Ini akan memicu logika 'delete()' jika $adaKegiatan = false
+            $bahanApi = new BahanProsesApiController();
+            $bahanApi->syncChainData($oldDate);
 
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Data produksi dan pallet gudang berhasil dihapus.']);
+            return response()->json(['success' => true, 'message' => 'Data produksi API berhasil dihapus total.']);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
