@@ -125,11 +125,26 @@ class ProduksiSir20Controller extends Controller
 
     public function show($id)
     {
+        // 1. Ambil data utama produksi
         $data = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])->findOrFail($id);
-        // 🔥 PENTING: Saat Edit, load opsi bak KHUSUS untuk tanggal produksi data tersebut!
+        
+        // 2. Load opsi maturasi sesuai tanggal produksi
         $tgl_produksi = Carbon::parse($data->tanggal_produksi)->startOfDay();
         $data->opsi_maturasi = $this->getBakAktifUntukTanggal($tgl_produksi);
-        
+
+        // 3. 🔥 AMBIL DATA PALLET DARI DATABASE (Nomor & Jenis)
+        // Kita cari pallet yang diproduksi pada tanggal dan range nomor tersebut
+        $tahunPallet = Carbon::parse($data->tanggal_produksi)->format('y');
+        // UBAH BAGIAN INI: Hilangkan 'PLT-'
+        $prefix = $tahunPallet . '-';
+        $noStart = $prefix . str_pad($data->nomor_start, 4, '0', STR_PAD_LEFT);
+        $noEnd = $prefix . str_pad($data->nomor_end, 4, '0', STR_PAD_LEFT);
+
+        $data->details_pallets = Pallet::whereBetween('no_pallet', [$noStart, $noEnd])
+            ->where('tanggal_produksi', $data->tanggal_produksi)
+            ->orderBy('no_pallet', 'asc')
+            ->get(['no_pallet', 'jenis_pallet']);
+
         return response()->json($data);
     }
 
@@ -300,8 +315,7 @@ class ProduksiSir20Controller extends Controller
         $kgPerPallet = $totalKg / $totalPallet;
         $tahunSingkat = Carbon::parse($tanggal)->format('y'); 
 
-        // 2. 🔥 AMBIL DAFTAR HUTANG PENJUALAN MANUAL YANG BELUM LUNAS
-        // Kita urutkan berdasarkan tanggal kontrak paling lama (FIFO)
+        // 2. AMBIL DAFTAR HUTANG (FIFO)
         $hutangManual = DB::table('penjualan_manual_sir20')
             ->where('status', 'Pending')
             ->orderBy('tanggal', 'asc')
@@ -310,30 +324,31 @@ class ProduksiSir20Controller extends Controller
         $idxHutang = 0;
         $sisaKebutuhanHutang = $hutangManual->count() > 0 ? $hutangManual[$idxHutang]->pallet_manual : 0;
 
-        // 3. LOOPING GENERATE PALLET FISIK
+        // 3. 🔥 LOOPING GENERATE PALLET FISIK
         for ($i = $nomorStart; $i <= $nomorEnd; $i++) {
-            // Ambil jenis pallet dari array input (MB5/SW)
-            $idxArr = $i - $nomorStart;
-            $jenisFix = isset($jenisArray[$idxArr]) ? $jenisArray[$idxArr] : 'SW';
             
-            $noPalletFix = 'PLT-' . $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
+            // --- 🚀 BAGIAN PENYESUAIAN JENIS PALLET 🚀 ---
+            // $i adalah nomor pallet (misal 1001), nomorStart adalah 1001.
+            // Maka index perulangan pertama adalah 0.
+            $idxArr = $i - $nomorStart;
+            
+            // Ambil dari array yang dikirim radio button, jika tidak ada default ke 'SW'
+            $jenisFix = isset($jenisArray[$idxArr]) ? $jenisArray[$idxArr] : 'SW';
+            // ----------------------------------------------
+
+            $noPalletFix = $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
             // --- 🛡️ LOGIKA PELUNASAN OTOMATIS 🛡️ ---
             $tglPenjualanOtomatis = null;
-
-            // Jika masih ada hutang yang harus dilunasi
             if ($hutangManual->count() > 0 && $idxHutang < $hutangManual->count()) {
                 $tglPenjualanOtomatis = $hutangManual[$idxHutang]->tanggal;
                 $sisaKebutuhanHutang--;
 
-                // Jika jatah hutang pada record ini sudah terpenuhi (sudah habis didebet)
                 if ($sisaKebutuhanHutang <= 0) {
-                    // Update status di tabel hutang menjadi Settled (Lunas)
                     DB::table('penjualan_manual_sir20')
                         ->where('id_penjualan_manual', $hutangManual[$idxHutang]->id_penjualan_manual)
                         ->update(['status' => 'Settled']);
                     
-                    // Pindah ke baris hutang berikutnya jika masih ada
                     $idxHutang++;
                     if ($idxHutang < $hutangManual->count()) {
                         $sisaKebutuhanHutang = $hutangManual[$idxHutang]->pallet_manual;
@@ -346,12 +361,12 @@ class ProduksiSir20Controller extends Controller
                 'id_produksi_sir'   => $header->id_produksi_sir,
                 'no_pallet'         => $noPalletFix,
                 'berat'             => $kgPerPallet,
-                'jenis_pallet'      => $jenisFix, // 🔥 Kolom baru MB5/SW
+                'jenis_pallet'      => $jenisFix, // 🔥 Sekarang sudah dinamis (MB5 atau SW)
                 'tanggal_produksi'  => $tanggal,
-                'tanggal_penjualan' => $tglPenjualanOtomatis // 🔥 Otomatis terisi jika melunasi hutang
+                'tanggal_penjualan' => $tglPenjualanOtomatis
             ]);
 
-            // Simpan Relasi Lokasi & Kondisi (Default: Di Gudang & Mutu Prima)
+            // ... simpan lokasi & kondisi tetap sama ...
             $lokasiAwal = Lokasi::firstOrCreate(['nama' => 'Di Gudang SIR']);
             $mutuPrima  = Mutu::firstOrCreate(['uraian' => 'Mutu Prima (siap jual)']);
 
@@ -476,14 +491,35 @@ class ProduksiSir20Controller extends Controller
                 }
             }
 
-            // 5. REGENERASI PALLET GUDANG (JIKA ADA PERUBAHAN TANGGAL/BERAT/NOMOR)
+            // =========================================================================
+            // 🔥 5. SINKRONISASI GUDANG (REGENERATE PALLET)
+            // =========================================================================
+            
             $newDate      = $produksi->tanggal_produksi;
             $newKgPress   = $produksi->kg_yang_dipress;
             $newJmlPallet = $produksi->jumlah_pallet;
             $newStart     = $produksi->nomor_start;
             $newEnd       = $produksi->nomor_end;
 
-            if ($oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || $oldStart != $newStart || $oldEnd != $newEnd) {
+            // Ambil data jenis pallet yang sudah ada di DB untuk dibandingkan
+            $tahunPallet = Carbon::parse($oldDate)->format('y');
+            // GANTI MENJADI:
+            $prefixLama  = $tahunPallet . '-';
+            $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
+            $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
+            
+            $currentPalletTypes = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])
+                                    ->where('tanggal_produksi', $oldDate)
+                                    ->orderBy('no_pallet', 'asc')
+                                    ->pluck('jenis_pallet')
+                                    ->toArray();
+
+            // 🔥 CEK PERUBAHAN: Jika Tanggal/Jumlah/Nomor berubah OR Jenis Pallet ada yang diganti
+            $isJenisChanged = $currentPalletTypes !== ($request->jenis_pallets ?? []);
+
+            if ($oldDate != $newDate || $oldKgPress != $newKgPress || $oldJmlPallet != $newJmlPallet || 
+                $oldStart != $newStart || $oldEnd != $newEnd || $isJenisChanged) {
+
                 // A. Kurangi Rekap Header Lama
                 $oldHeader = ProduksiSir::where('tanggal_produksi', $oldDate)->first();
                 if ($oldHeader) {
@@ -492,12 +528,7 @@ class ProduksiSir20Controller extends Controller
                     if ($oldHeader->pallet <= 0) $oldHeader->delete();
                 }
 
-                // B. Hapus Fisik Pallet LAMA (Berdasarkan Range Nomor Lama)
-                $tahunLama = Carbon::parse($oldDate)->format('y');
-                $prefixLama = 'PLT-' . $tahunLama . '-';
-                $noStartLama = $prefixLama . str_pad($oldStart, 4, '0', STR_PAD_LEFT);
-                $noEndLama   = $prefixLama . str_pad($oldEnd, 4, '0', STR_PAD_LEFT);
-
+                // B. Hapus Fisik Pallet LAMA
                 $palletsLama = Pallet::whereBetween('no_pallet', [$noStartLama, $noEndLama])
                                     ->where('tanggal_produksi', $oldDate)->get();
                 foreach($palletsLama as $pLama) {
@@ -506,8 +537,15 @@ class ProduksiSir20Controller extends Controller
                     $pLama->delete();
                 }
 
-                // C. Generate Ulang Pallet Baru
-                $this->generatePalletsOtomatis($newDate, $newKgPress, $newJmlPallet, $newStart, $newEnd);
+                // C. Generate Ulang Pallet Baru dengan Jenis Terbaru
+                $this->generatePalletsOtomatis(
+                    $newDate, 
+                    $newKgPress, 
+                    $newJmlPallet, 
+                    $newStart, 
+                    $newEnd,
+                    $request->jenis_pallets // 🔥 Kirim array jenis terbaru
+                );
             }
 
             // 🔥 6. SINKRONISASI WIP (BAHAN PROSES) 🔥
@@ -545,7 +583,8 @@ class ProduksiSir20Controller extends Controller
 
             // 2. BERSIHKAN DATA GUDANG (PALLET)
             $tahunPallet = Carbon::parse($oldDate)->format('y');
-            $prefix      = 'PLT-' . $tahunPallet . '-';
+            // GANTI MENJADI:
+            $prefix      = $tahunPallet . '-';
             $noStart     = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
             $noEnd       = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
 

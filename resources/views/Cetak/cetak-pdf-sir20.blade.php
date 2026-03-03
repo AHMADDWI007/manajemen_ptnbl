@@ -70,7 +70,13 @@
 
 @php
     function fmt($num, $dec = 0) { return ($num > 0) ? number_format($num, $dec, ',', '.') : '-'; }
-    function fmtB($num, $dec = 0) { return ($num > 0) ? number_format($num, $dec, ',', '.') : ''; }
+    function fmtB($num, $dec = 0) { 
+        // Jika num tidak ada, null, atau <= 0, kembalikan kosong
+        if (!$num || $num <= 0) {
+            return ''; 
+        }
+        return number_format($num, $dec, ',', '.'); 
+    }
 
     function fmtJam($waktu) { return $waktu ? date('H:i', strtotime($waktu)) : ''; }
 
@@ -265,9 +271,9 @@
             <td colspan="2" class="no-border" style="padding-left: 15px !important;">
                 <span style="display: inline-block; width: 25px;">B.</span> JUMLAH TROLLY DIISI/MASUK
             </td>
-            <td class="text-center">{{ $s1 ? $s1->jumlah_trolly_masuk : '' }}</td>
-            <td class="text-center">{{ $s2 ? $s2->jumlah_trolly_masuk : '' }}</td>
-            <td class="text-center">{{ $s3 ? $s3->jumlah_trolly_masuk : '' }}</td>
+            <td class="text-center">{{ $s1 ? fmtB($s1->jumlah_trolly_masuk) : '' }}</td>
+            <td class="text-center">{{ $s2 ? fmtB($s2->jumlah_trolly_masuk) : '' }}</td>
+            <td class="text-center">{{ $s3 ? fmtB($s3->jumlah_trolly_masuk) : '' }}</td>
             <td class="text-center"></td>
             <td class="no-border" style="padding-left: 5px !important;">Trolly</td>
         </tr>
@@ -305,7 +311,11 @@
                 ['E.(1)', 'BAHAN BAKAR : SOLAR', $s1 ? fmtB($bbs[1]['solar']??0) : '', $s2 ? fmtB($bbs[2]['solar']??0) : '', $s3 ? fmtB($bbs[3]['solar']??0) : '', 'Liter'],
                 ['E.(2)', 'BAHAN BAKAR : BATUBARA', $s1 ? fmtB($bbs[1]['batubara']??0) : '', $s2 ? fmtB($bbs[2]['batubara']??0) : '', $s3 ? fmtB($bbs[3]['batubara']??0) : '', 'Kg'],
                 ['E.(3)', 'BAHAN BAKAR : CANGKANG', $s1 ? fmtB($bbs[1]['cangkang']??0) : '', $s2 ? fmtB($bbs[2]['cangkang']??0) : '', $s3 ? fmtB($bbs[3]['cangkang']??0) : '', 'Kg'],
-                ['F.', 'JUMLAH TROLLY KELUAR', $s1 ? $s1->jumlah_trolly_keluar : '', $s2 ? $s2->jumlah_trolly_keluar : '', $s3 ? $s3->jumlah_trolly_keluar : '', 'Trolly'],
+                ['F.', 'JUMLAH TROLLY KELUAR', 
+                    $s1 ? fmtB($s1->jumlah_trolly_keluar) : '', 
+                    $s2 ? fmtB($s2->jumlah_trolly_keluar) : '', 
+                    $s3 ? fmtB($s3->jumlah_trolly_keluar) : '', 
+                    'Trolly'],
                  ['G.', 'JAM STOP DRYER', $s1 ? fmtJam($s1->jam_stop_dryer) : '', $s2 ? fmtJam($s2->jam_stop_dryer) : '', $s3 ? fmtJam($s3->jam_stop_dryer) : '', ''],
                 ['H.', 'JUMLAH JAM JALAN DRYER (G-A)', $s1 ? $s1->jumlah_jam_dryer : '', $s2 ? $s2->jumlah_jam_dryer : '', $s3 ? $s3->jumlah_jam_dryer : '', 'Jam'],
                 ['I.', 'JUMLAH BALES YANG DI PRESS', $s1 ? fmtB($s1->jumlah_bales_dipress) : '', $s2 ? fmtB($s2->jumlah_bales_dipress) : '', $s3 ? fmtB($s3->jumlah_bales_dipress) : '', 'Bales'],
@@ -313,14 +323,33 @@
                 ['K.', 'CAPACITY PER JAM (J:H)', $s1 ? fmtB($s1->capacity_per_jam) : '', $s2 ? fmtB($s2->capacity_per_jam) : '', $s3 ? fmtB($s3->capacity_per_jam) : '', 'Kg/Jam'],
                 ['L.', 'JAM KERJA', $s1 ? $s1->jam_kerja : '', $s2 ? $s2->jam_kerja : '', $s3 ? $s3->jam_kerja : '', 'Jam'],
                 ['M.', 'PRODUKSTIVITAS (Kg : Jam Kerja)', $s1 ? fmtB($s1->produktivitas) : '', $s2 ? fmtB($s2->produktivitas) : '', $s3 ? fmtB($s3->produktivitas) : '', 'Kg'],
-                ['N.', 'KG SIR 20 / Cake', $s1 ? $s1->kg_cake : '', $s2 ? $s2->kg_cake : '', $s3 ? $s3->kg_cake : '', 'Kg'],
+                ['N.', 'KG SIR 20 / Cake', 
+                    $s1 ? fmtB($s1->kg_cake, 2) : '', 
+                    $s2 ? fmtB($s2->kg_cake, 2) : '', 
+                    $s3 ? fmtB($s3->kg_cake, 2) : '', 
+                    'Kg'],
                 ['O.', 'HASIL BALES ADA KONTAMINASI', $s1 ? fmtB($s1->bales_terkontaminasi) : '', $s2 ? fmtB($s2->bales_terkontaminasi) : '', $s3 ? fmtB($s3->bales_terkontaminasi) : '', 'Bales'],
                 ['P.', 'BERAT KONTAMINAN', $s1 ? $s1->berat_kontaminan : '', $s2 ? $s2->berat_kontaminan : '', $s3 ? $s3->berat_kontaminan : '', 'Gram'],
-                ['Q.', 'JAM OPERASIONAL GENSET', $s1 ? $s1->jam_operasional_genset : '', $s2 ? $s2->jam_operasional_genset : '', $s3 ? $s3->jam_operasional_genset : '', 'Jam'],
-                ['R.(1)', 'SOLAR / TON', $s1 && $s1->kg_yang_dipress > 0 ? number_format((float)($bbs[1]['solar']??0)/$s1->kg_yang_dipress, 2, ',', '.') : '', $s2 && $s2->kg_yang_dipress > 0 ? number_format((float)($bbs[2]['solar']??0)/$s2->kg_yang_dipress, 2, ',', '.') : '', $s3 && $s3->kg_yang_dipress > 0 ? number_format((float)($bbs[3]['solar']??0)/$s3->kg_yang_dipress, 2, ',', '.') : '', 'Liter'],
-                ['R.(2)', 'BATUBARA / TON', $s1 && $s1->kg_yang_dipress > 0 ? number_format((float)($bbs[1]['batubara']??0)/$s1->kg_yang_dipress, 2, ',', '.') : '', $s2 && $s2->kg_yang_dipress > 0 ? number_format((float)($bbs[2]['batubara']??0)/$s2->kg_yang_dipress, 2, ',', '.') : '', $s3 && $s3->kg_yang_dipress > 0 ? number_format((float)($bbs[3]['batubara']??0)/$s3->kg_yang_dipress, 2, ',', '.') : '', 'Kg'],
-                ['R.(3)', 'CANGKANG / TON', $s1 && $s1->kg_yang_dipress > 0 ? number_format((float)($bbs[1]['cangkang']??0)/$s1->kg_yang_dipress, 2, ',', '.') : '', $s2 && $s2->kg_yang_dipress > 0 ? number_format((float)($bbs[2]['cangkang']??0)/$s2->kg_yang_dipress, 2, ',', '.') : '', $s3 && $s3->kg_yang_dipress > 0 ? number_format((float)($bbs[3]['cangkang']??0)/$s3->kg_yang_dipress, 2, ',', '.') : '', 'Kg'],
-                ['S.', 'PEMAKAIAN LISTRIK PLN', $s1 ? fmtB($s1->pemakaian_listrik_pln) : '', $s2 ? fmtB($s2->pemakaian_listrik_pln) : '', $s3 ? fmtB($s3->pemakaian_listrik_pln) : '', 'KWH'],
+                ['Q.', 'JAM OPERASIONAL GENSET', 
+                    $s1 ? fmtB($s1->jam_operasional_genset, 2) : '', 
+                    $s2 ? fmtB($s2->jam_operasional_genset, 2) : '', 
+                    $s3 ? fmtB($s3->jam_operasional_genset, 2) : '', 
+                    'Jam'],
+                ['R.(1)', 'SOLAR / TON', 
+                    ($s1 && $s1->kg_yang_dipress > 0) ? fmtB((float)($bbs[1]['solar']??0) / ($s1->kg_yang_dipress / 1000), 2) : '',
+                    ($s2 && $s2->kg_yang_dipress > 0) ? fmtB((float)($bbs[2]['solar']??0) / ($s2->kg_yang_dipress / 1000), 2) : '',
+                    ($s3 && $s3->kg_yang_dipress > 0) ? fmtB((float)($bbs[3]['solar']??0) / ($s3->kg_yang_dipress / 1000), 2) : '', 
+                    'Liter'],
+                ['R.(2)', 'BATUBARA / TON', 
+                    ($s1 && $s1->kg_yang_dipress > 0) ? fmtB((float)($bbs[1]['batubara']??0) / ($s1->kg_yang_dipress / 1000), 2) : '',
+                    ($s2 && $s2->kg_yang_dipress > 0) ? fmtB((float)($bbs[2]['batubara']??0) / ($s2->kg_yang_dipress / 1000), 2) : '',
+                    ($s3 && $s3->kg_yang_dipress > 0) ? fmtB((float)($bbs[3]['batubara']??0) / ($s3->kg_yang_dipress / 1000), 2) : '', 
+                    'Kg'],
+                ['R.(3)', 'CANGKANG / TON', 
+                    ($s1 && $s1->kg_yang_dipress > 0) ? fmtB((float)($bbs[1]['cangkang']??0) / ($s1->kg_yang_dipress / 1000), 2) : '', 
+                    ($s2 && $s2->kg_yang_dipress > 0) ? fmtB((float)($bbs[2]['cangkang']??0) / ($s2->kg_yang_dipress / 1000), 2) : '', 
+                    ($s3 && $s3->kg_yang_dipress > 0) ? fmtB((float)($bbs[3]['cangkang']??0) / ($s3->kg_yang_dipress / 1000), 2) : '', 
+                    'Kg'],
             ];
         @endphp
 
@@ -357,9 +386,9 @@
             <td colspan="2" class="no-border" style="padding-left: 15px !important;">
                 <span style="display: inline-block; width: 25px;">A.</span> JUMLAH PALLET DIISI
             </td>
-            <td class="text-center">{{ $s1 ? $s1->jumlah_pallet : '' }}</td>
-            <td class="text-center">{{ $s2 ? $s2->jumlah_pallet : '' }}</td>
-            <td class="text-center">{{ $s3 ? $s3->jumlah_pallet : '' }}</td>
+            <td class="text-center">{{ $s1 ? fmtB($s1->jumlah_pallet) : '' }}</td>
+            <td class="text-center">{{ $s2 ? fmtB($s2->jumlah_pallet) : '' }}</td>
+            <td class="text-center">{{ $s3 ? fmtB($s3->jumlah_pallet) : '' }}</td>
             <td class="text-center"></td>
             <td class="no-border" style="padding-left: 5px !important;">SW</td>
         </tr>

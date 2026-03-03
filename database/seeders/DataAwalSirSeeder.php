@@ -60,7 +60,7 @@ class DataAwalSirSeeder extends Seeder
 
         for ($i = 1; $i <= $totalPallet; $i++) {
             // Hasil: PLT-25-0001, PLT-25-0002, dst
-            $noPallet = 'PLT-' . $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
+            $noPallet = $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
             $pallet = Pallet::create([
                 'id_produksi_sir'  => $idProduksi,
@@ -89,6 +89,6 @@ class DataAwalSirSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        $this->command->info("BERHASIL: Saldo Awal (125 Pallet dengan format PLT-25-XXXX) telah dibuat!");
+        $this->command->info("BERHASIL: Saldo Awal(125 Pallet dengan format YY-XXXX) telah dibuat!");
     }
 }

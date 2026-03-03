@@ -202,12 +202,12 @@
 
                 {{-- LOGOUT --}}
                 <li class="nav-item mt-4 mb-5">
-                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin ingin logout?');">
+                    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                         @csrf
-                        <button type="submit" class="nav-link logout-btn w-100 text-left border-0" style="cursor: pointer;">
-                            <i class="nav-icon fas fa-sign-out-alt"></i> <p>Logout</p>
-                        </button>
                     </form>
+                    <a href="javascript:void(0)" id="btn-logout" class="nav-link logout-btn w-100 text-left border-0" style="cursor: pointer;">
+                        <i class="nav-icon fas fa-sign-out-alt"></i> <p>Logout</p>
+                    </a>
                 </li>
             </ul>
         </nav>
@@ -292,3 +292,26 @@
         .sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); border-radius: 10px; }
     </style>
 </aside>
+
+<script>
+    document.getElementById('btn-logout').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        Swal.fire({
+            title: 'Apakah Maswi yakin?',
+            text: "Sesi kerja Anda akan diakhiri!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745', // Warna sukses (Hijau)
+            cancelButtonColor: '#d33',    // Warna bahaya (Merah)
+            confirmButtonText: 'Ya, Logout!',
+            cancelButtonText: 'Batal',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Jika klik Ya, jalankan form logout
+                document.getElementById('logout-form').submit();
+            }
+        })
+    });
+</script>

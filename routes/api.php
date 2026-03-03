@@ -182,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Route untuk mengambil daftar maturasi aktif di form input mobile
     Route::get('/produksi-sir20/maturasi-aktif', [ProduksiSir20ApiController::class, 'getActiveMaturasi']);
+    Route::get('produksi-sir20/{id}', [ProduksiSir20ApiController::class, 'show']);
 
     // Route API untuk Cetak PDF Laporan
     

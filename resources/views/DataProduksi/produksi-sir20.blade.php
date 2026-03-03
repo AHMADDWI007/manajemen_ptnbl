@@ -440,12 +440,12 @@
                             <div class="form-group row align-items-center mb-2">
                                 <label class="col-4 font-weight-normal">Jml Pallet Diisi</label>
                                 <div class="col-5">
-                                    <input type="number" name="jml_pallet" id="inputJmlPallet" class="form-control form-control-sm calc-trigger" step="1" placeholder="Input Manual">
+                                    <input type="number" name="jml_pallet" id="inputJmlPallet" class="form-control form-control-sm calc-trigger" step="1">
                                 </div>
                                 <div class="col-3 unit-label text-muted small italic">Tentukan jenis per pallet ↓</div>
                             </div>
 
-                            <div id="palletTypeRowsContainer">
+                            <div id="palletTypeRowsContainer" style="max-height: 200px; overflow-y: auto; overflow-x: hidden;">
                                 </div>
                             {{-- <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Total Nomor</label>
@@ -722,6 +722,8 @@
                                 <div class="col-3 unit-label">SW</div>
                             </div>
 
+                            <div id="palletTypeRowsContainerEdit" style="max-height: 200px; overflow-y: auto; overflow-x: hidden;">
+                                </div>
                             <div class="row mb-1 align-items-center">
                                 <label class="col-4 font-weight-normal">Nomor</label>
                                 <div class="col-2 pr-0">
@@ -861,24 +863,65 @@
 <script>
     $(document).ready(function() {
 
+        // --- LOGIKA RADIO BUTTON MODAL TAMBAH ---
         $('#inputJmlPallet').on('input', function() {
             var jml = parseInt($(this).val()) || 0;
-            var container = $('#palletTypeRowsContainer');
+            var container = $('#palletTypeRowsContainer'); // Pastikan ID container di modal tambah benar
             container.empty();
 
+            var startNum = parseInt($('#outNomorStart').val()) || 0;
+
             if (jml > 0) {
+                // MODAL TAMBAH
                 for (var i = 0; i < jml; i++) {
-                    // Kita buat per baris sejajar agar rapi
+                    var currentPalletNo = startNum + i;
                     container.append(`
-                        <div class="form-group row align-items-center mb-1">
-                            <label class="col-4 font-weight-normal small pl-4">Jenis Pallet #${i+1}</label>
-                            <div class="col-5">
-                                <select name="jenis_pallets[]" class="form-control form-control-sm">
-                                    <option value="SW" selected>SW (Standard Wrapping)</option>
-                                    <option value="MB5">MB5 (Metal Box 5)</option>
-                                </select>
+                        <div class="form-group row align-items-center mb-1 bg-light p-2 rounded border-bottom">
+                            <label class="col-5 font-weight-bold small pl-4 text-success">${currentPalletNo}</label>
+                            <div class="col-7 d-flex" style="gap: 25px;"> 
+                                <div class="custom-control custom-radio">
+                                    <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="rb_sw_${i}" value="SW" required>
+                                    <label class="custom-control-label small font-weight-bold" for="rb_sw_${i}">SW</label>
+                                </div>
+                                <div class="custom-control custom-radio">
+                                    <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="rb_mb5_${i}" value="MB5" required>
+                                    <label class="custom-control-label small font-weight-bold" for="rb_mb5_${i}">MB5</label>
+                                </div>
                             </div>
-                            <div class="col-3 unit-label text-success small font-weight-bold">MANTAP</div>
+                        </div>
+                    `);
+                }
+            }
+        });
+
+        // --- LOGIKA RADIO BUTTON MODAL EDIT ---
+        // Tambahkan ID container khusus di Modal Edit jika ingin muncul juga saat edit, 
+        // misalnya id="palletTypeRowsContainerEdit"
+        $('#edit_inputJmlPallet').on('input', function() {
+            var jml = parseInt($(this).val()) || 0;
+            var container = $('#palletTypeRowsContainerEdit'); 
+            if(container.length === 0) return; // Skip jika container tidak ada di modal edit
+            
+            container.empty();
+            var startNum = parseInt($('#edit_outNomorStart').val()) || 0;
+
+            if (jml > 0) {
+                // MODAL EDIT (Saat jumlah diubah manual)
+                for (var i = 0; i < jml; i++) {
+                    var currentPalletNo = startNum + i;
+                    container.append(`
+                        <div class="form-group row align-items-center mb-1 bg-light p-2 rounded border-bottom">
+                            <label class="col-5 font-weight-bold small pl-4 text-success">${currentPalletNo}</label>
+                            <div class="col-7 d-flex" style="gap: 25px;"> 
+                                <div class="custom-control custom-radio">
+                                    <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="edit_rb_sw_${i}" value="SW" required>
+                                    <label class="custom-control-label small font-weight-bold" for="edit_rb_sw_${i}">SW</label>
+                                </div>
+                                <div class="custom-control custom-radio">
+                                    <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="edit_rb_mb5_${i}" value="MB5" required>
+                                    <label class="custom-control-label small font-weight-bold" for="edit_rb_mb5_${i}">MB5</label>
+                                </div>
+                            </div>
                         </div>
                     `);
                 }
@@ -1337,9 +1380,81 @@
 
                     // Map Packing
                     $('#edit_inputJmlPallet').val(data.jumlah_pallet);
+                    // 🔥 LOGIKA BARU: Generate Pilihan Jenis Pallet saat Edit dibuka 🔥
+                    var jml = parseInt(data.jumlah_pallet) || 0;
+                    var container = $('#palletTypeRowsContainerEdit');
+                    container.empty();
+                    
+                    var startNum = parseInt(data.nomor_start) || 0;
+
+                    if (jml > 0) {
+                        // Asumsikan data pallet detail dikirim dari server, 
+                        // Jika tidak ada, kita buat default radio button
+                        // MODAL EDIT (Saat pertama kali modal muncul dari AJAX)
+                        for (var i = 0; i < data.jumlah_pallet; i++) {
+                            var currentPalletNo = startNum + i;
+                            // Bersihkan prefix PLT-26- secara paksa dengan regex
+                            var cleanNo = String(currentPalletNo).replace(/PLT-\d{2}-/g, '').replace('PLT-', '');
+
+                            container.append(`
+                                <div class="form-group row align-items-center mb-1 bg-light p-2 rounded border-bottom">
+                                    <label class="col-5 font-weight-bold small pl-4 text-success">${cleanNo}</label>
+                                    <div class="col-7 d-flex" style="gap: 25px;"> 
+                                        <div class="custom-control custom-radio">
+                                            <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="edit_rb_sw_${i}" value="SW" ${currentJenis == 'SW' ? 'checked' : ''} required>
+                                            <label class="custom-control-label small font-weight-bold" for="edit_rb_sw_${i}">SW</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input class="custom-control-input" type="radio" name="jenis_pallets[${i}]" id="edit_rb_mb5_${i}" value="MB5" ${currentJenis == 'MB5' ? 'checked' : ''} required>
+                                            <label class="custom-control-label small font-weight-bold" for="edit_rb_mb5_${i}">MB5</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                        }
+                    }
                     $('#edit_outNomorStart').val(data.nomor_start);
                     $('#edit_outNomorEnd').val(data.nomor_end);
                     $('#edit_outTotalAkhir').val(data.total_nomor_akhir);
+
+                    // 2. 🔥 LOGIKA PERBAIKAN RENDER (Sesuai Controller Show Maswi) 🔥
+                    var container = $('#palletTypeRowsContainerEdit');
+                    container.empty();
+                    var startNum = parseInt(data.nomor_start) || 0;
+
+                    if (data.jumlah_pallet > 0) {
+                        for (var i = 0; i < data.jumlah_pallet; i++) {
+                            var currentPalletNo = startNum + i;
+                            
+                            // 🔥 Perhatikan: Maswi pakai 'details_pallets' di Controller (dengan S)
+                            // Ambil jenis dari database, jika tidak ada default ke SW
+                            var currentJenis = (data.details_pallets && data.details_pallets[i]) 
+                                            ? data.details_pallets[i].jenis_pallet 
+                                            : 'SW';
+
+                            container.append(`
+                                <div class="form-group row align-items-center mb-1 bg-light p-2 rounded border-bottom">
+                                    <label class="col-5 font-weight-bold small pl-4 text-success">${String(currentPalletNo).replace(/PLT-\d{2}-/g, '').replace('PLT-', '')}</label>
+                                    <div class="col-7 d-flex" style="gap: 25px;"> 
+                                        <div class="custom-control custom-radio">
+                                            <input class="custom-control-input" type="radio" 
+                                                name="jenis_pallets[${i}]" 
+                                                id="edit_rb_sw_${i}" 
+                                                value="SW" ${currentJenis == 'SW' ? 'checked' : ''} required>
+                                            <label class="custom-control-label small font-weight-bold" for="edit_rb_sw_${i}">SW</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input class="custom-control-input" type="radio" 
+                                                name="jenis_pallets[${i}]" 
+                                                id="edit_rb_mb5_${i}" 
+                                                value="MB5" ${currentJenis == 'MB5' ? 'checked' : ''} required>
+                                            <label class="custom-control-label small font-weight-bold" for="edit_rb_mb5_${i}">MB5</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                        }
+                    }
 
                     // Jalankan kalkulasi setelah semua data masuk
                     calculateTotalsEdit();
