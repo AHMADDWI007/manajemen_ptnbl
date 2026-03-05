@@ -145,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ✅ AKHIR PERBAIKAN
 
     // [GUDANG SIR]
+    Route::get('lokasi/all', [GudangSirApiController::class, 'getAllLokasi']);
     Route::get('gudang-sir', [GudangSirApiController::class, 'index']);
     Route::post('gudang-sir', [GudangSirApiController::class, 'store']);
     // 🔥 TAMBAHKAN 3 ROUTE INI 🔥
@@ -153,6 +154,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('gudang-sir/update-mutu', [GudangSirApiController::class, 'updateStatusMutu']);
 
     // [PENJUALAN SIR]
+    Route::post('penjualan/cancel-booking', [PenjualanSirApiController::class, 'cancelBooking']);
     Route::get('penjualan-sir20/available-stock', [PenjualanSirApiController::class, 'getAvailableStock']);
     Route::get('penjualan-sir20', [PenjualanSirApiController::class, 'index']);
     Route::post('penjualan-sir20', [PenjualanSirApiController::class, 'store']);

@@ -46,6 +46,7 @@ return new class extends Migration
             $table->integer('total_nomor_akhir')->default(0);
             
             $table->string('petugas')->nullable();
+            $table->text('keterangan')->nullable(); // 🔥 TAMBAHKAN BARIS INI
             $table->timestamps();
         });
 

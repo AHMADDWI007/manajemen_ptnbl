@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Exports\LaporanBulananExport;
 use App\Exports\LaporanHarianExport;
+use App\Http\Controllers\Controller;
 use App\Models\BahanProses;
 use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\HasilUjiLabMaturasi;
+use App\Models\Lokasi;
 use App\Models\Maturasi;
+use App\Models\Mutu;
+use App\Models\Pallet;
 use App\Models\Pengaturan;
 use App\Models\PengolahanBasah;
 use App\Models\PengolahanMaturasi;
@@ -19,6 +23,7 @@ use App\Traits\MaturasiSyncTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class LaporanController extends Controller
@@ -169,6 +174,16 @@ class LaporanController extends Controller
         if ($stokAkhir <= 0.01 && $stokAwal <= 0.01) return '-';
 
         try {
+
+        // 🔥 PERBAIKAN 3: Cek metadata "Jenis" di keterangan log (Logika Mutasi)
+            $logMutasi = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
+                ->whereDate('tgl_laporan', '<=', $filterDate)
+                ->where('keterangan', 'LIKE', '%Jenis: %')
+                ->orderBy('tgl_laporan', 'desc')->first();
+
+            if ($logMutasi && preg_match('/Jenis: ([^)]+)/', $logMutasi->keterangan, $matches)) {
+                return trim($matches[1]);
+            }
             $realBatchStartDate = $filterDate->copy();
             
             $logs = PengolahanMaturasi::where('id_maturasi', $maturasi->id_maturasi)
@@ -269,12 +284,18 @@ class LaporanController extends Controller
                     $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
                     $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
 
+                    // 🔥 PRIORITAS 1: Jika ada masuk Fresh (dari Timbang/Lab)
                     if ($in_fresh > 0.01) {
                         $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
                             ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
                         $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
                     } 
-                    elseif ($running_stock <= 0.01 && $mutasi_in > 0.01) {
+                    // 🔥 PRIORITAS 2: Baca teks Asal TANPA mempedulikan angka netto mutasi (Anti-Bug)
+                    elseif (preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $log->keterangan, $matches)) {
+                        $tgl_basis = Carbon::parse($matches[1]);
+                    } 
+                    // 🔥 PRIORITAS 3: Fallback jika mutasi masuk tapi gak ada keterangan asal
+                    elseif ($mutasi_in > 0.01 && !$tgl_basis) {
                         $tgl_basis = $logDate;
                     }
 
@@ -282,24 +303,42 @@ class LaporanController extends Controller
                     if ($running_stock <= 0.01) $tgl_basis = null;
                 }
 
-                if (!$tgl_basis && $stok_awal > 0.01) {
-                    // 🔥 GANTI: Gunakan fungsi pusat dari Trait
-                    $historyDate = $this->getHistoryDateFromLog($bak->id_maturasi, $tanggal);
-                    $tgl_basis = $historyDate ? $historyDate : (!empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at));
+                // 🔥 PERBAIKAN: Cek Log Hari Ini (Pisahkan Identitas Pagi vs Status Akhir)
+                $logToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                    ->whereDate('tgl_laporan', $tglStr)->first();
+                    
+                $adaPenerimaanMutasi = false;
+                $tgl_mutasi_hari_ini = null;
+
+                if ($logToday && preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $logToday->keterangan, $matches)) {
+                    $adaPenerimaanMutasi = true;
+                    $tgl_mutasi_hari_ini = Carbon::parse($matches[1]);
+                    
+                    // TAHAN UMUR AWAL: Jangan timpa identitas utama (tgl_basis) jika pagi harinya 
+                    // bak sudah punya stok (stok_awal > 0). 
+                    if ($stok_awal <= 0.01) {
+                        $tgl_basis = $tgl_mutasi_hari_ini;
+                    }
                 }
 
+                // Fallback ke Master jika tgl_basis masih kosong
+                if (!$tgl_basis && $stok_awal > 0.01) {
+                    $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at);
+                }
+
+                // VISUALISASI STOK AWAL
                 $tgl_masuk_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->toDateString() : null;
                 $umur_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->diffInDays($tanggal) : 0;
 
-                // 6. Logika Keterangan
+                // 6. Logika Keterangan Akhir
                 $keterangan_visual = 'KOSONG';
                 if ($stok_akhir > 0.01) {
                     if ($masuk_hi_today > 0.01) {
                         $labToday = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', $tglStr)->first();
                         $keterangan_date = $labToday ? Carbon::parse($labToday->tanggal) : $tanggal;
                         $keterangan_visual = strtoupper($keterangan_date->format('d M Y'));
-                    } elseif ($trans_mutasi < -0.01) { // Mutasi masuk
-                        $keterangan_visual = strtoupper($tanggal->format('d M Y'));
+                    } elseif ($adaPenerimaanMutasi) { // 🔥 Ambil dari Tgl Mutasi Baru
+                        $keterangan_visual = strtoupper($tgl_mutasi_hari_ini->format('d M Y'));
                     } else {
                         $keterangan_visual = $tgl_basis ? strtoupper($tgl_basis->format('d M Y')) : '-';
                     }
@@ -415,114 +454,168 @@ class LaporanController extends Controller
     // =========================================================================
     // D & F. LOGIKA GUDANG & MUTU (TABEL IV & VI)
     // =========================================================================
+    // =========================================================================
+    // D & F. LOGIKA GUDANG & MUTU (TABEL IV & VI)
+    // =========================================================================
     private function getDataGudangMutu($tanggal)
     {
         $tglStr = $tanggal->format('Y-m-d');
         $startOfMonth = $tanggal->copy()->startOfMonth()->format('Y-m-d');
+        $dateAkhirBulanLalu = $tanggal->copy()->startOfMonth()->subDay()->format('Y-m-d');
 
-        // 1. Ambil Master Data
-        $lokasiList = \App\Models\Lokasi::all();
-        $mutuList   = \App\Models\Mutu::all();
+        $lokasiList = Lokasi::all();
+        $mutuList   = Mutu::all();
 
-        // 2. Ambil Pallet yang EXIST pada tanggal laporan
-        // Syarat: Tgl Produksi <= Tgl Laporan DAN (Belum dijual ATAU Dijual setelah Tgl Laporan)
-        // Ini dipakai untuk menghitung Saldo Akhir (Stok Fisik)
-        $activePallets = \App\Models\Pallet::whereDate('tanggal_produksi', '<=', $tglStr)
-            ->where(function($q) use ($tglStr) {
+        // 1. Ambil Pallet Aktif (Termasuk yang terjual setelah tanggal filter agar histori akurat)
+        $activePallets = Pallet::where(function($q) use ($tglStr) {
                 $q->whereNull('tanggal_penjualan')
-                  ->orWhereDate('tanggal_penjualan', '>', $tglStr);
+                  ->orWhereDate('tanggal_penjualan', '>=', $tglStr);
             })->get();
 
-        // 🔥 3. Ambil Pallet yang TERJUAL PADA TANGGAL LAPORAN (Untuk Kolom Pengiriman) 🔥
-        $soldPalletsToday = \App\Models\Pallet::whereDate('tanggal_penjualan', $tglStr)->get();
+        $soldPalletsToday = Pallet::whereDate('tanggal_penjualan', $tglStr)->get();
+        $soldPalletsSdKemarin = Pallet::whereBetween(DB::raw('DATE(tanggal_penjualan)'), [
+            $startOfMonth, 
+            $tanggal->copy()->subDay()->format('Y-m-d')
+        ])->get();
 
-        // ---------------------------------------------------------------------
-        // BAGIAN 1: GUDANG (TABEL IV)
-        // ---------------------------------------------------------------------
-        $dataGudang = [];
+        // 2. SALDO AWAL (H-1)
+        $subQueryKemarin = DB::table('lokasi_pallet')
+            ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+            ->whereDate('tanggal', '<', $tglStr)
+            ->groupBy('id_pallet');
+
+        $saldoAwalList = DB::table('lokasi_pallet as lp')
+            ->joinSub($subQueryKemarin, 'latest', function ($join) {
+                $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+            })
+            ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+            ->where(function($q) use ($tglStr) {
+                $q->whereNull('p.tanggal_penjualan')
+                  ->orWhereDate('p.tanggal_penjualan', '>=', $tglStr);
+            })
+            ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+            ->groupBy('lp.id_lokasi')
+            ->pluck('total_berat', 'id_lokasi');
+
+        // 3. SALDO AWAL BULAN
+        $subQueryAwalBulan = DB::table('lokasi_pallet')
+            ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+            ->whereDate('tanggal', '<=', $dateAkhirBulanLalu)
+            ->groupBy('id_pallet');
+
+        $saldoAwalBulanList = DB::table('lokasi_pallet as lp')
+            ->joinSub($subQueryAwalBulan, 'latest', function ($join) {
+                $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+            })
+            ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+            ->where(function($q) use ($startOfMonth) {
+                $q->whereNull('p.tanggal_penjualan')
+                  ->orWhereDate('p.tanggal_penjualan', '>=', $startOfMonth);
+            })
+            ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+            ->groupBy('lp.id_lokasi')
+            ->pluck('total_berat', 'id_lokasi');
+
+        $dataGudang = []; // Diubah dari collect() jadi array biasa agar sesuai dengan LaporanHarianExport
+        $lainnya_saldo_awal = 0;
+        $lainnya_masuk = 0;
+        $lainnya_sd_hi = 0;
+        $lainnya_yg_lalu = 0;
+        $lainnya_keluar = 0;
+        $lainnya_saldo_akhir = 0;
 
         foreach ($lokasiList as $lokasi) {
-            $saldo_akhir = 0;
-            $pengiriman = 0;
+            $saldo_awal_kg = $saldoAwalList->get($lokasi->id_lokasi, 0);
+            $saldo_awal_bulan_kg = $saldoAwalBulanList->get($lokasi->id_lokasi, 0);
 
-            // A. Hitung Saldo Akhir (Posisi pada Tanggal Laporan)
+            $saldo_akhir_kg = 0;
             foreach($activePallets as $p) {
-                // Cari lokasi terakhir pallet ini PADA SAAT TANGGAL LAPORAN
                 $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $p->id_pallet)
-                            ->whereDate('tanggal', '<=', $tglStr) 
+                            ->whereDate('tanggal', '<=', $tglStr)
                             ->orderBy('id_lokasi_pallet', 'desc')
                             ->first();
-                
                 if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
-                    $saldo_akhir += $p->berat;
+                    $saldo_akhir_kg += $p->berat;
                 }
             }
 
-            // 🔥 B. Hitung Pengiriman (Barang Keluar Hari Ini) 🔥
+            $keluar_kg = 0; 
             foreach($soldPalletsToday as $sold) {
-                // Cek lokasi terakhir pallet sebelum dijual
                 $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
                             ->whereDate('tanggal', '<=', $tglStr)
                             ->orderBy('id_lokasi_pallet', 'desc')
                             ->first();
-
                 if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
-                    $pengiriman += $sold->berat;
+                    $keluar_kg += $sold->berat;
                 }
             }
 
-            // C. Masuk Hari Ini (Sesuai Tanggal Laporan)
-            $masuk = \App\Models\LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
-                        ->whereDate('tanggal', $tglStr)
-                        ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
-                        ->sum('pallet.berat');
+            $pengiriman_sd_kemarin_kg = 0;
+            foreach($soldPalletsSdKemarin as $sold) {
+                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
+                            ->whereDate('tanggal', '<=', $tglStr)
+                            ->orderBy('id_lokasi_pallet', 'desc')
+                            ->first();
+                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                    $pengiriman_sd_kemarin_kg += $sold->berat;
+                }
+            }
 
-            // D. Produksi s/d HI (Akumulasi Bulan Laporan)
-            $sd_hi = \App\Models\LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
-                        ->whereBetween('tanggal', [$startOfMonth, $tglStr])
-                        ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
-                        ->sum('pallet.berat');
+            // RUMUS NET MATEMATIKA
+            $net_masuk_kg = $saldo_akhir_kg - $saldo_awal_kg + $keluar_kg;
+            $masuk_kg = $net_masuk_kg > 0 ? $net_masuk_kg : 0;
 
-            // E. Hitung Mundur
-            $prod_lalu  = $sd_hi - $masuk;
-            
-            // Saldo Awal = Akhir - Masuk + Keluar
-            $stok_awal = $saldo_akhir - $masuk + $pengiriman;
+            $net_yg_lalu_kg = $saldo_awal_kg - $saldo_awal_bulan_kg + $pengiriman_sd_kemarin_kg;
+            $yg_lalu_kg = $net_yg_lalu_kg > 0 ? $net_yg_lalu_kg : 0;
 
+            $sd_hi_kg = $yg_lalu_kg + $masuk_kg;
+
+            if (in_array($lokasi->id_lokasi, [1, 2])) {
+                // Di LaporanController, data gudang biasanya diekspektasikan sbg Object
+                $dataGudang[] = (object)[
+                    'uraian'        => $lokasi->nama,
+                    'stok_awal'     => $saldo_awal_kg,
+                    'prod_hi'       => $masuk_kg,
+                    'prod_sdhi'     => $sd_hi_kg,
+                    'prod_bln_lalu' => $yg_lalu_kg,
+                    'pengiriman'    => $keluar_kg,
+                    'stok_akhir'    => $saldo_akhir_kg
+                ];
+            } else {
+                $lainnya_saldo_awal += $saldo_awal_kg;
+                $lainnya_masuk += $masuk_kg;
+                $lainnya_yg_lalu += $yg_lalu_kg;
+                $lainnya_sd_hi += $sd_hi_kg;
+                $lainnya_keluar += $keluar_kg;
+                $lainnya_saldo_akhir += $saldo_akhir_kg;
+            }
+        }
+
+        if (count($lokasiList) > 2) {
             $dataGudang[] = (object)[
-                'uraian'        => $lokasi->nama,
-                'stok_awal'     => $stok_awal,
-                'prod_hi'       => $masuk,
-                'prod_sdhi'     => $sd_hi,
-                'prod_bln_lalu' => $prod_lalu,
-                'pengiriman'    => $pengiriman, // 🔥 Sekarang variabel ini sudah terisi
-                'stok_akhir'    => $saldo_akhir
+                'uraian'        => 'Lainnya',
+                'stok_awal'     => $lainnya_saldo_awal,
+                'prod_hi'       => $lainnya_masuk,
+                'prod_sdhi'     => $lainnya_sd_hi,
+                'prod_bln_lalu' => $lainnya_yg_lalu,
+                'pengiriman'    => $lainnya_keluar,
+                'stok_akhir'    => $lainnya_saldo_akhir
             ];
         }
 
-        // ---------------------------------------------------------------------
-        // BAGIAN 2: MUTU (TABEL VI) - (Tetap Sama)
-        // ---------------------------------------------------------------------
+        // =====================================================================
+        // BAGIAN MUTU (Tetap Sama)
+        // =====================================================================
         $dataMutu = [];
-
         foreach ($mutuList as $m) {
-            $kg = 0;
-            $palletCount = 0;
-
+            $kg = 0; $palletCount = 0;
             foreach($activePallets as $p) {
-                // Cari kondisi mutu terakhir PADA SAAT TANGGAL LAPORAN
                 $lastMutu = \App\Models\KondisiPallet::where('id_pallet', $p->id_pallet)
-                            ->whereDate('tanggal', '<=', $tglStr)
-                            ->orderBy('id_kondisi_pallet', 'desc')
-                            ->first();
-                
+                            ->whereDate('tanggal', '<=', $tglStr)->orderBy('id_kondisi_pallet', 'desc')->first();
                 if ($lastMutu && $lastMutu->id_mutu == $m->id_mutu) {
-                    $kg += $p->berat;
-                    $palletCount++;
+                    $kg += $p->berat; $palletCount++;
                 }
             }
-
-            // Format array: [Uraian, Kg, Jumlah Pallet]
             $dataMutu[] = [$m->uraian, $kg, $palletCount];
         }
 

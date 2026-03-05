@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use App\Models\Mutu;
 use App\Models\Lokasi;
 use App\Models\Pallet;
-use App\Models\BahanProses;
 use App\Models\ProduksiSir;
 use App\Models\LokasiPallet;
 use Illuminate\Http\Request;
@@ -23,72 +22,169 @@ class GudangSirApiController extends Controller
             $dateStr = $request->query('date', Carbon::today()->format('Y-m-d'));
             $selectedDate = Carbon::parse($dateStr);
             $formattedDate = $selectedDate->format('Y-m-d');
+            
+            // Tentukan Tanggal Awal Bulan & Akhir Bulan Lalu
             $startOfMonth = $selectedDate->copy()->startOfMonth()->format('Y-m-d');
+            $dateAkhirBulanLalu = $selectedDate->copy()->startOfMonth()->subDay()->format('Y-m-d');
 
             // 1. Ambil Master Data
             $lokasiList = Lokasi::all();
             $mutuList = Mutu::all();
             
-            // 2. Ambil SEMUA Pallet Aktif & Terjual Hari Ini
-            $allActivePallets = Pallet::whereNull('tanggal_penjualan')->get();
+            // 2. Ambil SEMUA Pallet Aktif & Terjual (Filter Histori Akurat)
+            $allActivePallets = Pallet::where(function($q) use ($formattedDate) {
+                $q->whereNull('tanggal_penjualan')
+                  ->orWhereDate('tanggal_penjualan', '>=', $formattedDate);
+            })->get();
+            
             $soldPalletsToday = Pallet::whereDate('tanggal_penjualan', $formattedDate)->get();
+            $soldPalletsSdKemarin = Pallet::whereBetween(DB::raw('DATE(tanggal_penjualan)'), [
+                $startOfMonth, 
+                Carbon::parse($formattedDate)->subDay()->format('Y-m-d')
+            ])->get();
 
             // =================================================================
-            // 🔥 SUSUN TABEL IV (GUDANG / LOKASI) DARI TRACKING PALLET
+            // 🔥 LOGIKA SALDO AWAL (SUBQUERY DB)
+            // =================================================================
+            // A. Saldo Awal Kemarin
+            $subQueryKemarin = DB::table('lokasi_pallet')
+                ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+                ->whereDate('tanggal', '<', $formattedDate)
+                ->groupBy('id_pallet');
+
+            $saldoAwalList = DB::table('lokasi_pallet as lp')
+                ->joinSub($subQueryKemarin, 'latest', function ($join) {
+                    $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+                })
+                ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+                ->where(function($q) use ($formattedDate) {
+                    $q->whereNull('p.tanggal_penjualan')
+                      ->orWhereDate('p.tanggal_penjualan', '>=', $formattedDate);
+                })
+                ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+                ->groupBy('lp.id_lokasi')
+                ->pluck('total_berat', 'id_lokasi');
+
+            // B. Saldo Awal Bulan
+            $subQueryAwalBulan = DB::table('lokasi_pallet')
+                ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+                ->whereDate('tanggal', '<=', $dateAkhirBulanLalu)
+                ->groupBy('id_pallet');
+
+            $saldoAwalBulanList = DB::table('lokasi_pallet as lp')
+                ->joinSub($subQueryAwalBulan, 'latest', function ($join) {
+                    $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+                })
+                ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+                ->where(function($q) use ($startOfMonth) {
+                    $q->whereNull('p.tanggal_penjualan')
+                      ->orWhereDate('p.tanggal_penjualan', '>=', $startOfMonth);
+                })
+                ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+                ->groupBy('lp.id_lokasi')
+                ->pluck('total_berat', 'id_lokasi');
+
+            // =================================================================
+            // 🔥 SUSUN TABEL IV (GUDANG / LOKASI) FULL NET MOVEMENT
             // =================================================================
             $listGudang = [];
             $saldoGudangUtama = 0;
+            $no = 1;
+
+            $lainnya_saldo_awal = 0;
+            $lainnya_masuk = 0;
+            $lainnya_sd_hi = 0;
+            $lainnya_yg_lalu = 0;
+            $lainnya_keluar = 0;
+            $lainnya_saldo_akhir = 0;
 
             foreach ($lokasiList as $lokasi) {
-                $saldo_akhir_kg = 0;
-                
+                $saldo_awal_kg = $saldoAwalList->get($lokasi->id_lokasi, 0);
+                $saldo_awal_bulan_kg = $saldoAwalBulanList->get($lokasi->id_lokasi, 0);
+
                 // Saldo Akhir Real-time
+                $saldo_akhir_kg = 0;
                 foreach($allActivePallets as $p) {
-                    $lastLoc = LokasiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_lokasi_pallet', 'desc')->first();
+                    $lastLoc = LokasiPallet::where('id_pallet', $p->id_pallet)
+                                ->whereDate('tanggal', '<=', $formattedDate)
+                                ->orderBy('id_lokasi_pallet', 'desc')
+                                ->first();
                     if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
                         $saldo_akhir_kg += $p->berat;
                     }
                 }
 
-                // Masuk Hari Ini
-                $masuk_kg = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
-                                ->whereDate('tanggal', $formattedDate)
-                                ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
-                                ->sum('pallet.berat');
-
-                // Produksi s/d HI
-                $sd_hi_kg = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)
-                                ->whereBetween('tanggal', [$startOfMonth, $formattedDate])
-                                ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')
-                                ->sum('pallet.berat');
-
-                $yg_lalu_kg = $sd_hi_kg - $masuk_kg;
+                // Pengiriman Hari Ini
                 $keluar_kg = 0; 
-
-                // Pengiriman
                 foreach($soldPalletsToday as $sold) {
-                    $lastLoc = LokasiPallet::where('id_pallet', $sold->id_pallet)->orderBy('id_lokasi_pallet', 'desc')->first();
+                    $lastLoc = LokasiPallet::where('id_pallet', $sold->id_pallet)
+                                ->whereDate('tanggal', '<=', $formattedDate)
+                                ->orderBy('id_lokasi_pallet', 'desc')
+                                ->first();
                     if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
                         $keluar_kg += $sold->berat;
                     }
                 }
 
-                $saldo_awal_kg = $saldo_akhir_kg - $masuk_kg + $keluar_kg;
+                // Pengiriman s/d Kemarin
+                $pengiriman_sd_kemarin_kg = 0;
+                foreach($soldPalletsSdKemarin as $sold) {
+                    $lastLoc = LokasiPallet::where('id_pallet', $sold->id_pallet)
+                                ->whereDate('tanggal', '<=', $formattedDate)
+                                ->orderBy('id_lokasi_pallet', 'desc')
+                                ->first();
+                    if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                        $pengiriman_sd_kemarin_kg += $sold->berat;
+                    }
+                }
+
+                // RUMUS NET MATEMATIKA (Anti Minus & Double Count)
+                $net_masuk_kg = $saldo_akhir_kg - $saldo_awal_kg + $keluar_kg;
+                $masuk_kg = $net_masuk_kg > 0 ? $net_masuk_kg : 0; 
+
+                $net_yg_lalu_kg = $saldo_awal_kg - $saldo_awal_bulan_kg + $pengiriman_sd_kemarin_kg;
+                $yg_lalu_kg = $net_yg_lalu_kg > 0 ? $net_yg_lalu_kg : 0; 
+
+                $sd_hi_kg = $yg_lalu_kg + $masuk_kg;
 
                 if ($lokasi->nama == 'Di Gudang SIR') {
                     $saldoGudangUtama = $saldo_akhir_kg;
                 }
 
+                if (in_array($lokasi->id_lokasi, [1, 2])) {
+                    $listGudang[] = [
+                        'no'            => '4.'.$no++,
+                        'uraian'        => $lokasi->nama,
+                        'saldo_awal'    => (float)$saldo_awal_kg,
+                        'masuk'         => (float)$masuk_kg,
+                        'total'         => (float)($saldo_awal_kg + $masuk_kg),
+                        'prod_bln_lalu' => (float)$yg_lalu_kg,
+                        'prod_sd_hi'    => (float)$sd_hi_kg,
+                        'pengiriman'    => (float)$keluar_kg,
+                        'saldo_akhir'   => (float)$saldo_akhir_kg,
+                        'keterangan'    => '-'
+                    ];
+                } else {
+                    $lainnya_saldo_awal += $saldo_awal_kg;
+                    $lainnya_masuk += $masuk_kg;
+                    $lainnya_yg_lalu += $yg_lalu_kg;
+                    $lainnya_sd_hi += $sd_hi_kg;
+                    $lainnya_keluar += $keluar_kg;
+                    $lainnya_saldo_akhir += $saldo_akhir_kg;
+                }
+            }
+
+            if (count($lokasiList) > 2) {
                 $listGudang[] = [
-                    'no'            => '4.'.$lokasi->id_lokasi,
-                    'uraian'        => $lokasi->nama,
-                    'saldo_awal'    => (float)$saldo_awal_kg,
-                    'masuk'         => (float)$masuk_kg,
-                    'total'         => (float)($saldo_awal_kg + $masuk_kg),
-                    'prod_bln_lalu' => (float)$yg_lalu_kg,
-                    'prod_sd_hi'    => (float)$sd_hi_kg,
-                    'pengiriman'    => (float)$keluar_kg,
-                    'saldo_akhir'   => (float)$saldo_akhir_kg,
+                    'no'            => '4.'.$no++,
+                    'uraian'        => 'Lainnya',
+                    'saldo_awal'    => (float)$lainnya_saldo_awal,
+                    'masuk'         => (float)$lainnya_masuk,
+                    'total'         => (float)($lainnya_saldo_awal + $lainnya_masuk),
+                    'prod_bln_lalu' => (float)$lainnya_yg_lalu,
+                    'prod_sd_hi'    => (float)$lainnya_sd_hi,
+                    'pengiriman'    => (float)$lainnya_keluar,
+                    'saldo_akhir'   => (float)$lainnya_saldo_akhir,
                     'keterangan'    => '-'
                 ];
             }
@@ -97,14 +193,17 @@ class GudangSirApiController extends Controller
             // 🔥 SUSUN TABEL VI (MUTU) DARI TRACKING PALLET
             // =================================================================
             $listMutu = [];
-            $no = 1;
+            $noMutu = 1;
 
             foreach ($mutuList as $mutu) {
                 $kg = 0;
                 $palletCount = 0;
 
                 foreach($allActivePallets as $p) {
-                    $lastMutu = KondisiPallet::where('id_pallet', $p->id_pallet)->orderBy('id_kondisi_pallet', 'desc')->first();
+                    $lastMutu = KondisiPallet::where('id_pallet', $p->id_pallet)
+                                ->whereDate('tanggal', '<=', $formattedDate)
+                                ->orderBy('id_kondisi_pallet', 'desc')
+                                ->first();
                     if ($lastMutu && $lastMutu->id_mutu == $mutu->id_mutu) {
                         $kg += $p->berat;
                         $palletCount++;
@@ -112,7 +211,7 @@ class GudangSirApiController extends Controller
                 }
 
                 $listMutu[] = [
-                    'no'         => '6.'.$no++,
+                    'no'         => '6.'.$noMutu++,
                     'uraian'     => $mutu->uraian,
                     'kg'         => (float)$kg,
                     'pallet'     => (int)$palletCount,
@@ -353,6 +452,19 @@ class GudangSirApiController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // =========================================================================
+    // API: AMBIL MASTER DATA LOKASI UNTUK DROPDOWN
+    // =========================================================================
+    public function getAllLokasi()
+    {
+        try {
+            $lokasi = Lokasi::orderBy('id_lokasi', 'asc')->get();
+            return response()->json(['success' => true, 'data' => $lokasi], 200);
+        } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

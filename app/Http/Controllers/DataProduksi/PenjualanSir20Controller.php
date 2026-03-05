@@ -135,36 +135,50 @@ class PenjualanSir20Controller extends Controller
             'tanggal'    => 'required|date',
             'uraian'     => 'required', 
             'selected_pallets' => 'required|array',
-            'hari_ini'   => 'required|numeric', // Nilai Kg Penjualan
+            'hari_ini'   => 'required|numeric', 
             'harga'      => 'required|numeric',
         ]);
 
         DB::beginTransaction();
         try {
             $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
-            $selectedPallets = $request->selected_pallets; // Ini array nomor pallet
+            $selectedPallets = $request->selected_pallets; 
 
-            // 1. Simpan Invoice Utama (Tetap sama)
+            // 1. Simpan Invoice Utama
             $invoice = PenjualanSir20::create([
-                'tanggal'     => $tgl,
-                'uraian'      => $request->uraian,
-                'no_kontrak'  => $request->no_kontrak,
-                'no_invoice'  => $request->no_invoice,
-                'pallet'      => count($selectedPallets) + (int)($request->pallet_manual ?? 0),
-                'hari_ini'    => $request->hari_ini,
-                'harga'       => $request->harga,
+                'tanggal'      => $tgl,
+                'uraian'       => $request->uraian,
+                'no_kontrak'   => $request->no_kontrak,
+                'no_invoice'   => $request->no_invoice,
+                'pallet'       => count($selectedPallets) + (int)($request->pallet_manual ?? 0),
+                'hari_ini'     => $request->hari_ini,
+                'harga'        => $request->harga,
                 'no_palet_list' => implode(',', $selectedPallets),
-                'is_summary'  => 0 
+                'is_summary'   => 0 
             ]);
 
-            // 2. Update status pallet menjadi TERJUAL (Tetap sama)
+            // 2. Update status pallet menjadi TERJUAL
             Pallet::whereIn('no_pallet', $selectedPallets)->update(['tanggal_penjualan' => $tgl]);
 
-            // 3. 🔥 PERBAIKAN: Hapus booking pallet berdasarkan ID yang dipilih
-            $palletIds = Pallet::whereIn('no_pallet', $selectedPallets)->pluck('id_pallet');
-            DB::table('booking_pallet')->whereIn('id_pallet', $palletIds)->delete();
+            // =========================================================================
+            // 🔥 LOGIKA SAPU JAGAT: Bersihkan Booking yang Terpakai & yang Batal 🔥
+            // =========================================================================
+            
+            // A. Ambil semua ID Pallet yang terpilih untuk dijual
+            $selectedIds = Pallet::whereIn('no_pallet', $selectedPallets)->pluck('id_pallet')->toArray();
 
-            // 4. Jika ada input manual, buat baris hutang (Penting untuk alur pelunasan)
+            // B. Ambil SEMUA ID Pallet yang saat ini terdaftar di booking_pallet
+            $bookedIdsBefore = DB::table('booking_pallet')->pluck('id_pallet')->toArray();
+
+            // C. Gabungkan ID yang dipilih dan ID yang tadinya ter-booking untuk dibersihkan total
+            // Dengan begini, yang tidak dipilih oleh Admin akan otomatis terhapus dari daftar booking.
+            $idsToClean = array_unique(array_merge($selectedIds, $bookedIdsBefore));
+
+            DB::table('booking_pallet')->whereIn('id_pallet', $idsToClean)->delete();
+
+            // =========================================================================
+
+            // 3. Jika ada input manual, buat baris hutang
             if ((int)$request->pallet_manual > 0) {
                 DB::table('penjualan_manual_sir20')->insert([
                     'id_penjualan_sir20' => $invoice->id_penjualan_sir20,
@@ -178,7 +192,7 @@ class PenjualanSir20Controller extends Controller
             $this->recalculateAndSave($tgl, $request->uraian, $request->hari_ini);
 
             DB::commit();
-            return redirect()->back()->with('success', 'Penjualan Berhasil!');
+            return redirect()->back()->with('success', 'Penjualan Berhasil & Antrian Booking Dibersihkan!');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', $e->getMessage());

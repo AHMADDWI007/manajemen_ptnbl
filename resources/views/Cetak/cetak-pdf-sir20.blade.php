@@ -463,7 +463,23 @@
 
     <div style="margin-top: 4px;">
         Catatan:<br>
-        @for($i=0; $i<6; $i++) <div style="border-bottom: 1px solid #000; height: 15px; width: 100%;"></div> @endfor
+        @php
+            $listCatatan = [];
+            // Tarik data catatan tiap shift
+            foreach([1, 2, 3] as $shift) {
+                if(isset($dataProduksi[$shift]) && !empty(trim($dataProduksi[$shift]->keterangan)) && trim($dataProduksi[$shift]->keterangan) !== '-') {
+                    $listCatatan[] = "Shift {$shift}: " . trim($dataProduksi[$shift]->keterangan);
+                }
+            }
+            // Pastikan minimal selalu ada 6 baris (sesuai format asli Maswi)
+            $totalBaris = max(6, count($listCatatan));
+        @endphp
+
+        @for($i=0; $i<$totalBaris; $i++) 
+            <div style="border-bottom: 1px solid #000; height: 15px; width: 100%; box-sizing: border-box; padding-top: 1px; padding-left: 5px; font-size: 10px;">
+                {{ isset($listCatatan[$i]) ? $listCatatan[$i] : '' }}
+            </div> 
+        @endfor
     </div>
 </div>
 <script>

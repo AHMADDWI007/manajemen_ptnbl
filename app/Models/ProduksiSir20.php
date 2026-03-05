@@ -17,7 +17,7 @@ class ProduksiSir20 extends Model
         'jumlah_trolly_keluar', 'jam_stop_dryer', 'jumlah_jam_dryer', 'jumlah_bales_dipress',
         'kg_yang_dipress', 'capacity_per_jam', 'jam_kerja', 'produktivitas', 'kg_cake',
         'bales_terkontaminasi', 'berat_kontaminan', 'jam_operasional_genset', 'pemakaian_listrik_pln',
-        'jumlah_pallet', 'total_nomor', 'mc_val', 'nomor_start', 'nomor_end', 'total_nomor_akhir', 'petugas',
+        'jumlah_pallet', 'total_nomor', 'mc_val', 'nomor_start', 'nomor_end', 'total_nomor_akhir', 'petugas', 'keterangan',// 🔥 TAMBAHKAN BARIS INI
     ];
 
     public function remahan()

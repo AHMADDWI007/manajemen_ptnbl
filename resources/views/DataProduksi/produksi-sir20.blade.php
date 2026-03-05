@@ -491,6 +491,15 @@
                                     </select>
                                 </div>
                             </div>
+
+                            {{-- 🔥 KODE TAMBAHAN: FORM CATATAN 🔥 --}}
+                            <div class="row mb-1 mt-2 align-items-start">
+                                <label class="col-4 font-weight-normal">Catatan</label>
+                                <div class="col-8">
+                                    <textarea name="keterangan" class="form-control form-control-sm" rows="2" placeholder="Tambahkan catatan jika ada..."></textarea>
+                                </div>
+                            </div>
+                            {{-- 🔥 AKHIR KODE TAMBAHAN 🔥 --}}
                         </div>
                     </div>
                 </div>
@@ -753,6 +762,15 @@
                                     </select>
                                 </div>
                             </div>
+
+                            {{-- 🔥 KODE TAMBAHAN: FORM CATATAN EDIT 🔥 --}}
+                            <div class="row mb-1 mt-2 align-items-start">
+                                <label class="col-4 font-weight-normal">Catatan</label>
+                                <div class="col-8">
+                                    <textarea name="keterangan" id="edit_keterangan" class="form-control form-control-sm" rows="2" placeholder="Tambahkan catatan jika ada..."></textarea>
+                                </div>
+                            </div>
+                            {{-- 🔥 AKHIR KODE TAMBAHAN 🔥 --}}
                         </div>
                     </div>
                 </div>
@@ -841,6 +859,13 @@
                             <div><strong>Nomor:</strong> <span id="detNomor"></span></div>
                             <div><strong>Total Akhir:</strong> <span id="detTotalAkhir"></span> WP</div>
                         </div>
+
+                        {{-- 🔥 KODE TAMBAHAN: TAMPILAN CATATAN DETAIL 🔥 --}}
+                        <h6 class="font-weight-bold border-bottom border-info pb-1 mt-3">6. CATATAN</h6>
+                        <div class="bg-white p-2 border rounded small text-muted" style="min-height: 40px;">
+                            <span id="detCatatan">-</span>
+                        </div>
+                        {{-- 🔥 AKHIR KODE TAMBAHAN 🔥 --}}
                     </div>
                 </div>
             </div>
@@ -1332,6 +1357,9 @@
                     $('#edit_shift_kerja').val(data.shift_kerja);
                     $('#edit_petugas').val(data.petugas);
 
+                    // 🔥 TAMBAHAN UNTUK CATATAN
+                    $('#edit_keterangan').val(data.keterangan);
+
                     // Map Maturasi
                     $('#maturasiContainerEdit').empty();
                     if(data.remahan && data.remahan.length > 0) {
@@ -1517,6 +1545,8 @@
                     $('#detPallet').text(data.jumlah_pallet || 0);
                     $('#detNomor').text(`${data.nomor_start || ''} s/d ${data.nomor_end || ''}`);
                     $('#detTotalAkhir').text(data.total_nomor_akhir || 0);
+                    // 🔥 TAMBAHAN UNTUK CATATAN
+                    $('#detCatatan').text(data.keterangan || '-');
 
                     $('#modalDetailData').modal('show');
                 }

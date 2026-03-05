@@ -66,14 +66,23 @@ class ProduksiSir20Controller extends Controller
                     $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
                     $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
 
-                    // 🔥 PERBAIKAN: Pokoknya setiap ada MASUK FRESH, umur untuk besok otomatis reset!
+                    // 🔥 PRIORITAS 1: Jika ada masuk Fresh (dari Timbang/Lab)
                     if ($in_fresh > 0.01) {
                         $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
                             ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
                         $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
                     } 
-                    elseif ($running_stock <= 0.01 && $mutasi_in > 0.01) {
+                    // 🔥 PRIORITAS 2: Baca teks Asal TANPA mempedulikan angka netto mutasi (Anti-Bug)
+                    elseif (preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $log->keterangan, $matches)) {
+                        $tgl_basis = Carbon::parse($matches[1]);
+                    } 
+                    // 🔥 PRIORITAS 3: Fallback jika mutasi masuk tapi gak ada keterangan asal
+                    elseif ($mutasi_in > 0.01 && !$tgl_basis) {
                         $tgl_basis = $logDate;
+                    }
+                    // 🔥 PRIORITAS 4: Log Saldo Awal (Disamakan dengan Mobile)
+                    elseif ($log->keterangan == 'Saldo Awal Tahun' && !$tgl_basis) {
+                        $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : $logDate;
                     }
 
                     $running_stock = $running_stock + $in_fresh + $mutasi_in - $out;
@@ -212,6 +221,7 @@ class ProduksiSir20Controller extends Controller
                 'nomor_end'             => $request->nomor_end,
                 'total_nomor_akhir'     => $this->cleanNumber($request->total_nomor_akhir),
                 'petugas'               => $request->petugas,
+                'keterangan'            => $request->keterangan, // 🔥 TAMBAHKAN BARIS INI
             ]);
 
             // 2. Simpan Remahan & Trigger Maturasi
@@ -432,6 +442,7 @@ class ProduksiSir20Controller extends Controller
                 'nomor_end'             => $request->nomor_end,
                 'total_nomor_akhir'     => $this->cleanNumber($request->total_nomor_akhir),
                 'petugas'               => $request->petugas,
+                'keterangan'            => $request->keterangan, // 🔥 TAMBAHKAN BARIS INI
             ]);
 
             // 3. REVERT STOK MATURASI LAMA & SIMPAN YANG BARU

@@ -38,7 +38,7 @@ class DummyLHPSeeder extends Seeder
         // =================================================================
         // 1.B ISI MASTER LOKASI & MUTU
         // =================================================================
-        $lokasi = ['Di Gudang SIR', 'Di Areal Press Bale', 'Di Gudang TOH 1', 'Di Gudang TOH 2', 'Area Repacking'];
+        $lokasi = ['Di Gudang SIR', 'Di Areal Press Bale'];
         foreach ($lokasi as $l) Lokasi::create(['nama' => $l]);
 
         $mutu = ['Mutu Prima (siap jual)', 'PO / PRI Low', 'WhiteSpot (WS)', 'Kontaminasi', 'Repacking On Hold'];

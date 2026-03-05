@@ -3,25 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Carbon\Carbon;
-use Illuminate\Support\Collection;
-
-// 🔥 PASTIKAN SEMUA MODEL INI ADA
-use App\Models\TransaksiApiBokar;
-use App\Models\PengolahanBasah;
-use App\Models\RektifikasiStok;
-use App\Models\Maturasi;
-use App\Models\PengolahanMaturasi;
-use App\Models\HasilUjiLabBokarDiolah;
 use App\Models\BahanProses;
-use App\Models\ProduksiSir20; 
+use App\Models\HasilUjiLabBokarDiolah;
+use App\Models\HasilUjiLabMaturasi;
+use App\Models\Maturasi;
+use App\Models\PengolahanBasah;
+use App\Models\PengolahanMaturasi;
 use App\Models\PenjualanSir20;
-use App\Models\Lokasi;
-use App\Models\Mutu;
-use App\Models\Pallet;
-use App\Models\LokasiPallet;
-use App\Models\KondisiPallet;
+use App\Models\ProduksiSir20; 
+use App\Models\RektifikasiStok;
+use App\Models\TransaksiApiBokar;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class LaporanApiController extends Controller
 {
@@ -137,11 +132,11 @@ class LaporanApiController extends Controller
             if (!$hasLog) {
                 $row = $this->createMaturasiObj($bak, 0, 0, 0, 0, 0, null, 0, 'KOSONG');
                 $row->asal_bokar = '-';
+                $row->k3_olah = 0; $row->po = '-'; $row->pri = '-';
             } else {
-                // 1. Hitung Stok Awal Snapshot
-                $sums = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<', $tglStr)
+                $sumsAwal = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', '<', $tglStr)
                     ->selectRaw('COALESCE(SUM(masuk_hi),0) as m, COALESCE(SUM(diolah),0) as d, COALESCE(SUM(mutasi),0) as u')->first();
-                $stok_awal = $sums ? ($sums->m - $sums->d - $sums->u) : 0;
+                $stok_awal = $sumsAwal ? ($sumsAwal->m - $sumsAwal->d - $sumsAwal->u) : 0;
 
                 $s = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tgl_laporan', $tglStr)
                     ->selectRaw('COALESCE(SUM(masuk_hi),0) as m, COALESCE(SUM(diolah),0) as d, COALESCE(SUM(mutasi),0) as u')->first();
@@ -150,10 +145,11 @@ class LaporanApiController extends Controller
                 $trans_diolah = (float)($s->d ?? 0);
                 $trans_mutasi = (float)($s->u ?? 0);
 
-                $masuk_hi_today = $trans_masuk;
-                $stok_akhir = $stok_awal + $masuk_hi_today - $trans_diolah - $trans_mutasi;
+                $masuk_from_uji = (float) HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', $tglStr)->sum('netto_kering');
+                $masuk_hi_today = max($trans_masuk, $masuk_from_uji);
+                
+                $stok_akhir = round($stok_awal + $masuk_hi_today - $trans_diolah - $trans_mutasi, 2);
 
-                // 2. 🔥 LOGIKA UMUR (SINKRON 100% DENGAN WEB)
                 $tgl_basis = null;
                 $logsBeforeToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
                     ->whereDate('tgl_laporan', '<', $tglStr)
@@ -162,28 +158,74 @@ class LaporanApiController extends Controller
                 $running_stock = 0;
                 foreach($logsBeforeToday as $log) {
                     $logDate = Carbon::parse($log->tgl_laporan);
-                    if ($log->masuk_hi > 0.01) {
+                    $in_fresh = $log->masuk_hi;
+                    $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
+                    $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
+
+                    if ($in_fresh > 0.01) {
                         $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
                             ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
                         $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
-                    } elseif ($running_stock <= 0.01 && $log->mutasi < -0.01) {
+                    } 
+                    elseif (preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $log->keterangan, $matches)) {
+                        $tgl_basis = Carbon::parse($matches[1]);
+                    } 
+                    elseif ($mutasi_in > 0.01 && !$tgl_basis) {
                         $tgl_basis = $logDate;
                     }
-                    $running_stock += ($log->masuk_hi + ($log->mutasi < 0 ? abs($log->mutasi) : 0) - ($log->diolah + ($log->mutasi > 0 ? $log->mutasi : 0)));
+
+                    $running_stock = $running_stock + $in_fresh + $mutasi_in - $out;
                     if ($running_stock <= 0.01) $tgl_basis = null;
+                }
+
+                $logToday = PengolahanMaturasi::where('id_maturasi', $bak->id_maturasi)
+                    ->whereDate('tgl_laporan', $tglStr)->first();
+                    
+                $adaPenerimaanMutasi = false;
+                $tgl_mutasi_hari_ini = null;
+
+                if ($logToday && preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $logToday->keterangan, $matches)) {
+                    $adaPenerimaanMutasi = true;
+                    $tgl_mutasi_hari_ini = Carbon::parse($matches[1]);
+                    
+                    if ($stok_awal <= 0.01) {
+                        $tgl_basis = $tgl_mutasi_hari_ini;
+                    }
                 }
 
                 if (!$tgl_basis && $stok_awal > 0.01) {
                     $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at);
                 }
 
+                $tgl_masuk_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->toDateString() : null;
                 $umur_visual = ($stok_awal > 0.01 && $tgl_basis) ? $tgl_basis->diffInDays($tanggal) : 0;
-                $keterangan_visual = ($stok_akhir <= 0.01) ? 'KOSONG' : ($tgl_basis ? strtoupper($tgl_basis->format('d M Y')) : '-');
 
-                $row = $this->createMaturasiObj($bak, $stok_awal, $trans_diolah, $trans_mutasi, $masuk_hi_today, $stok_akhir, ($tgl_basis ? $tgl_basis->toDateString() : null), $umur_visual, $keterangan_visual);
+                $keterangan_visual = 'KOSONG';
+                if ($stok_akhir > 0.01) {
+                    if ($masuk_hi_today > 0.01) {
+                        $labToday = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', $tglStr)->first();
+                        $keterangan_date = $labToday ? Carbon::parse($labToday->tanggal) : $tanggal;
+                        $keterangan_visual = strtoupper($keterangan_date->format('d M Y'));
+                    } elseif ($adaPenerimaanMutasi) { 
+                        $keterangan_visual = strtoupper($tgl_mutasi_hari_ini->format('d M Y'));
+                    } else {
+                        $keterangan_visual = $tgl_basis ? strtoupper($tgl_basis->format('d M Y')) : '-';
+                    }
+                }
+
+                $row = $this->createMaturasiObj($bak, $stok_awal, $trans_diolah, $trans_mutasi, $masuk_hi_today, $stok_akhir, $tgl_masuk_visual, $umur_visual, $keterangan_visual);
                 
-                // 3. SINKRONISASI LABEL ASAL BOKAR (CMP TRACING)
                 $row->asal_bokar = $this->getDetailedAsalBokarStringLaporan($bak, $stok_akhir, $stok_awal, $tanggal);
+                if ($stok_akhir <= 0.01) {
+                    $row->asal_bokar = '-';
+                    $row->keterangan = 'KOSONG';
+                }
+
+                // Masukkan data K3 agar API komplit
+                $ujiLab = HasilUjiLabMaturasi::where('id_maturasi', $bak->id_maturasi)->whereDate('tanggal', '<=', $tglStr)->orderBy('tanggal', 'desc')->first();
+                $row->k3_olah = $ujiLab->k3 ?? 0;
+                $row->po      = $ujiLab->po ?? '-';
+                $row->pri     = $ujiLab->pri ?? '-';
             }
             
             $dataMaturasi->push($row);
@@ -205,6 +247,7 @@ class LaporanApiController extends Controller
 
             $currentTracingStock = ($stokAkhir > 0.01) ? $stokAkhir : ($stokAwal + 0.1);
             $akumulasiKeluar = 0; 
+            $mutasiTerimaLog = null; 
 
             foreach ($logs as $log) {
                 $realBatchStartDate = Carbon::parse($log->tgl_laporan);
@@ -216,8 +259,14 @@ class LaporanApiController extends Controller
                 $akumulasiKeluar += $keluar; 
                 $prevStock = $currentTracingStock - ($masuk + $mutasiMasuk) + $keluar;
 
-                // LOGIKA RESET ULTIMATE (SINKRON DENGAN MATURASI CONTROLLER)
-                if (($masuk + $mutasiMasuk) > 0.01 && $akumulasiKeluar > 0.01) {
+                // 🔥 SINKRONISASI: Pakai Regex Anti-Jebol & Deteksi dari teks (bukan cuma angka)
+                $adaTeksJenis = preg_match('/Jenis:\s*(.*?)(?=\)\s*(?:\||$))/', $log->keterangan);
+
+                if (($mutasiMasuk > 0.01 || $adaTeksJenis) && !$mutasiTerimaLog) {
+                    $mutasiTerimaLog = $log;
+                }
+
+                if (($masuk + $mutasiMasuk > 0.01 || $adaTeksJenis) && $akumulasiKeluar > 0.01) {
                     break; 
                 }
 
@@ -225,15 +274,28 @@ class LaporanApiController extends Controller
                 $currentTracingStock = $prevStock;
             }
 
+            // PRIORITAS 1: Ambil murni dari PENGOLAHAN BASAH / LAB BOKAR
             $jenisList = HasilUjiLabBokarDiolah::where('id_maturasi', $maturasi->id_maturasi)
                 ->whereDate('tanggal', '>=', $realBatchStartDate)
                 ->whereDate('tanggal', '<=', $filterDate)
                 ->pluck('jenis')
                 ->map(function($v) { return strtoupper(trim($v)); })
-                ->unique()->filter()->sort()->values()->toArray();
+                ->filter(function($v) { return $v !== 'PENDING' && $v !== ''; })
+                ->unique()->sort()->values()->toArray();
 
             if (!empty($jenisList)) {
                 return count($jenisList) > 1 ? 'CMP (' . implode(', ', $jenisList) . ')' : $jenisList[0];
+            }
+
+            // PRIORITAS 2: Jika kosong, baca dari LOG MUTASI pakai Regex Super
+            if ($mutasiTerimaLog && preg_match('/Jenis:\s*(.*?)(?=\)\s*(?:\||$))/', $mutasiTerimaLog->keterangan, $matches)) {
+                return trim($matches[1]);
+            }
+            
+            // Fallback (Edge case): Cek log hari ini jika mutasi terjadi persis di hari filter
+            $logToday = $logs->firstWhere('tgl_laporan', $filterDate->toDateString());
+            if ($logToday && preg_match('/Jenis:\s*(.*?)(?=\)\s*(?:\||$))/', $logToday->keterangan, $matches)) {
+                return trim($matches[1]);
             }
 
             return $maturasi->asal_bokar ?? '-';
@@ -315,44 +377,140 @@ class LaporanApiController extends Controller
     {
         $tglStr = $tanggal->format('Y-m-d');
         $startOfMonth = $tanggal->copy()->startOfMonth()->format('Y-m-d');
+        $dateAkhirBulanLalu = $tanggal->copy()->startOfMonth()->subDay()->format('Y-m-d');
 
-        $lokasiList = Lokasi::all();
-        $mutuList   = Mutu::all();
+        $lokasiList = \App\Models\Lokasi::all();
+        $mutuList   = \App\Models\Mutu::all();
 
-        $activePallets = Pallet::whereDate('tanggal_produksi', '<=', $tglStr)
-            ->where(function($q) use ($tglStr) {
-                $q->whereNull('tanggal_penjualan')->orWhereDate('tanggal_penjualan', '>', $tglStr);
+        $activePallets = \App\Models\Pallet::where(function($q) use ($tglStr) {
+                $q->whereNull('tanggal_penjualan')
+                  ->orWhereDate('tanggal_penjualan', '>=', $tglStr);
             })->get();
 
-        $soldPalletsToday = Pallet::whereDate('tanggal_penjualan', $tglStr)->get();
+        $soldPalletsToday = \App\Models\Pallet::whereDate('tanggal_penjualan', $tglStr)->get();
+        $soldPalletsSdKemarin = \App\Models\Pallet::whereBetween(DB::raw('DATE(tanggal_penjualan)'), [
+            $startOfMonth, 
+            $tanggal->copy()->subDay()->format('Y-m-d')
+        ])->get();
 
-        $dataGudang = [];
+        $subQueryKemarin = DB::table('lokasi_pallet')
+            ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+            ->whereDate('tanggal', '<', $tglStr)
+            ->groupBy('id_pallet');
+
+        $saldoAwalList = DB::table('lokasi_pallet as lp')
+            ->joinSub($subQueryKemarin, 'latest', function ($join) {
+                $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+            })
+            ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+            ->where(function($q) use ($tglStr) {
+                $q->whereNull('p.tanggal_penjualan')
+                  ->orWhereDate('p.tanggal_penjualan', '>=', $tglStr);
+            })
+            ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+            ->groupBy('lp.id_lokasi')
+            ->pluck('total_berat', 'id_lokasi');
+
+        $subQueryAwalBulan = DB::table('lokasi_pallet')
+            ->select('id_pallet', DB::raw('MAX(id_lokasi_pallet) as last_id'))
+            ->whereDate('tanggal', '<=', $dateAkhirBulanLalu)
+            ->groupBy('id_pallet');
+
+        $saldoAwalBulanList = DB::table('lokasi_pallet as lp')
+            ->joinSub($subQueryAwalBulan, 'latest', function ($join) {
+                $join->on('lp.id_lokasi_pallet', '=', 'latest.last_id');
+            })
+            ->join('pallet as p', 'lp.id_pallet', '=', 'p.id_pallet')
+            ->where(function($q) use ($startOfMonth) {
+                $q->whereNull('p.tanggal_penjualan')
+                  ->orWhereDate('p.tanggal_penjualan', '>=', $startOfMonth);
+            })
+            ->select('lp.id_lokasi', DB::raw('SUM(p.berat) as total_berat'))
+            ->groupBy('lp.id_lokasi')
+            ->pluck('total_berat', 'id_lokasi');
+
+        $dataGudang = []; // Format Array agar aman ditarik JSON
+        $lainnya_saldo_awal = 0;
+        $lainnya_masuk = 0;
+        $lainnya_sd_hi = 0;
+        $lainnya_yg_lalu = 0;
+        $lainnya_keluar = 0;
+        $lainnya_saldo_akhir = 0;
+
         foreach ($lokasiList as $lokasi) {
-            $saldo_akhir = 0; $pengiriman = 0;
+            $saldo_awal_kg = $saldoAwalList->get($lokasi->id_lokasi, 0);
+            $saldo_awal_bulan_kg = $saldoAwalBulanList->get($lokasi->id_lokasi, 0);
 
+            $saldo_akhir_kg = 0;
             foreach($activePallets as $p) {
-                $lastLoc = LokasiPallet::where('id_pallet', $p->id_pallet)->whereDate('tanggal', '<=', $tglStr) 
-                            ->orderBy('id_lokasi_pallet', 'desc')->first();
-                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) $saldo_akhir += $p->berat;
+                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $p->id_pallet)
+                            ->whereDate('tanggal', '<=', $tglStr)
+                            ->orderBy('id_lokasi_pallet', 'desc')
+                            ->first();
+                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                    $saldo_akhir_kg += $p->berat;
+                }
             }
 
+            $keluar_kg = 0; 
             foreach($soldPalletsToday as $sold) {
-                $lastLoc = LokasiPallet::where('id_pallet', $sold->id_pallet)->whereDate('tanggal', '<=', $tglStr)
-                            ->orderBy('id_lokasi_pallet', 'desc')->first();
-                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) $pengiriman += $sold->berat;
+                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
+                            ->whereDate('tanggal', '<=', $tglStr)
+                            ->orderBy('id_lokasi_pallet', 'desc')
+                            ->first();
+                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                    $keluar_kg += $sold->berat;
+                }
             }
 
-            $masuk = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)->whereDate('tanggal', $tglStr)
-                        ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')->sum('pallet.berat');
+            $pengiriman_sd_kemarin_kg = 0;
+            foreach($soldPalletsSdKemarin as $sold) {
+                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
+                            ->whereDate('tanggal', '<=', $tglStr)
+                            ->orderBy('id_lokasi_pallet', 'desc')
+                            ->first();
+                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
+                    $pengiriman_sd_kemarin_kg += $sold->berat;
+                }
+            }
 
-            $sd_hi = LokasiPallet::where('id_lokasi', $lokasi->id_lokasi)->whereBetween('tanggal', [$startOfMonth, $tglStr])
-                        ->join('pallet', 'lokasi_pallet.id_pallet', '=', 'pallet.id_pallet')->sum('pallet.berat');
+            $net_masuk_kg = $saldo_akhir_kg - $saldo_awal_kg + $keluar_kg;
+            $masuk_kg = $net_masuk_kg > 0 ? $net_masuk_kg : 0;
 
-            $stok_awal = $saldo_akhir - $masuk + $pengiriman;
+            $net_yg_lalu_kg = $saldo_awal_kg - $saldo_awal_bulan_kg + $pengiriman_sd_kemarin_kg;
+            $yg_lalu_kg = $net_yg_lalu_kg > 0 ? $net_yg_lalu_kg : 0;
 
+            $sd_hi_kg = $yg_lalu_kg + $masuk_kg;
+
+            if (in_array($lokasi->id_lokasi, [1, 2])) {
+                $dataGudang[] = (object)[
+                    'uraian'        => $lokasi->nama,
+                    'stok_awal'     => $saldo_awal_kg,
+                    'prod_hi'       => $masuk_kg,
+                    'prod_sdhi'     => $sd_hi_kg,
+                    'prod_bln_lalu' => $yg_lalu_kg,
+                    'pengiriman'    => $keluar_kg,
+                    'stok_akhir'    => $saldo_akhir_kg
+                ];
+            } else {
+                $lainnya_saldo_awal += $saldo_awal_kg;
+                $lainnya_masuk += $masuk_kg;
+                $lainnya_yg_lalu += $yg_lalu_kg;
+                $lainnya_sd_hi += $sd_hi_kg;
+                $lainnya_keluar += $keluar_kg;
+                $lainnya_saldo_akhir += $saldo_akhir_kg;
+            }
+        }
+
+        if (count($lokasiList) > 2) {
             $dataGudang[] = (object)[
-                'uraian' => $lokasi->nama, 'stok_awal' => $stok_awal, 'prod_hi' => $masuk,
-                'prod_sdhi' => $sd_hi, 'prod_bln_lalu' => $sd_hi - $masuk, 'pengiriman' => $pengiriman, 'stok_akhir' => $saldo_akhir
+                'uraian'        => 'Lainnya',
+                'stok_awal'     => $lainnya_saldo_awal,
+                'prod_hi'       => $lainnya_masuk,
+                'prod_sdhi'     => $lainnya_sd_hi,
+                'prod_bln_lalu' => $lainnya_yg_lalu,
+                'pengiriman'    => $lainnya_keluar,
+                'stok_akhir'    => $lainnya_saldo_akhir
             ];
         }
 
@@ -360,8 +518,8 @@ class LaporanApiController extends Controller
         foreach ($mutuList as $m) {
             $kg = 0; $palletCount = 0;
             foreach($activePallets as $p) {
-                $lastMutu = KondisiPallet::where('id_pallet', $p->id_pallet)->whereDate('tanggal', '<=', $tglStr)
-                            ->orderBy('id_kondisi_pallet', 'desc')->first();
+                $lastMutu = \App\Models\KondisiPallet::where('id_pallet', $p->id_pallet)
+                            ->whereDate('tanggal', '<=', $tglStr)->orderBy('id_kondisi_pallet', 'desc')->first();
                 if ($lastMutu && $lastMutu->id_mutu == $m->id_mutu) {
                     $kg += $p->berat; $palletCount++;
                 }

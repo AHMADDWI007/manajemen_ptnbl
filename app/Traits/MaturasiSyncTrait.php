@@ -66,6 +66,7 @@ trait MaturasiSyncTrait
      */
     private function updateLabelMaturasi($id_maturasi, $tanggal)
     {
+        // 1. Cari dulu dari tabel Pengolahan Basah (Data Fresh)
         $listJenis = PengolahanBasah::where('id_maturasi', $id_maturasi)
             ->whereDate('tanggal', $tanggal)
             ->pluck('jenis')
@@ -75,16 +76,39 @@ trait MaturasiSyncTrait
             ->unique()->sort()->values();
 
         $labelAkhir = null;
-        if ($listJenis->count() > 1) {
-            $labelAkhir = "CMP (" . $listJenis->implode(', ') . ")";
-        } elseif ($listJenis->count() == 1) {
-            $labelAkhir = $listJenis->first();
+
+        if ($listJenis->count() > 0) {
+            // Jika ada data di Pengolahan Basah, pakai itu
+            if ($listJenis->count() > 1) {
+                $labelAkhir = "CMP (" . $listJenis->implode(', ') . ")";
+            } else {
+                $labelAkhir = $listJenis->first();
+            }
+        } else {
+            // 🔥 2. Jika tidak ada di tabel Basah, cek Log Mutasi (PengolahanMaturasi)
+            $logMutasi = PengolahanMaturasi::where('id_maturasi', $id_maturasi)
+                ->whereDate('tgl_laporan', $tanggal)
+                ->where('keterangan', 'LIKE', '%Jenis: %')
+                ->first();
+
+            if ($logMutasi) {
+                // Ambil info Jenis dari string keterangan pakai regex
+                // 🔥 PERBAIKAN REGEX: Ambil semua teks sampai ketemu kurung tutup yang ada di akhir kalimat atau sebelum tanda pipa (|)
+                if (preg_match('/Jenis:\s*(.*?)(?=\)\s*(?:\||$))/', $logMutasi->keterangan, $matches)) {
+                    $labelAkhir = trim($matches[1]);
+                }
+            }
         }
 
-        $bak = Maturasi::find($id_maturasi);
-        if ($bak) {
-            $bak->asal_bokar = $labelAkhir;
-            $bak->save();
+        // 3. Update ke Master Bak jika label ditemukan
+        // Jika labelAkhir tetap null, jangan langsung hapus, 
+        // biarkan logic refreshMasterStokMaturasi yang menghapus jika stok benar-benar 0
+        if ($labelAkhir) {
+            $bak = Maturasi::find($id_maturasi);
+            if ($bak) {
+                $bak->asal_bokar = $labelAkhir;
+                $bak->save();
+            }
         }
     }
 

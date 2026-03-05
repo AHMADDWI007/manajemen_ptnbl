@@ -51,7 +51,8 @@ class ProduksiSir20ApiController extends Controller
             $produksi = ProduksiSir20::with(['remahan', 'aktualTemperature', 'bahanBakar'])->findOrFail($id);
             
             $tahunProduksi = Carbon::parse($produksi->tanggal_produksi)->format('y');
-            $prefix = 'PLT-' . $tahunProduksi . '-';
+            // 🔥 PERBAIKAN: Hilangkan 'PLT-' agar sesuai dengan database baru
+            $prefix = $tahunProduksi . '-';
 
             $noStartStr = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
             $noEndStr   = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
@@ -124,17 +125,33 @@ class ProduksiSir20ApiController extends Controller
                         $mutasi_in = $log->mutasi < -0.01 ? abs($log->mutasi) : 0;
                         $out = $log->diolah + ($log->mutasi > 0.01 ? $log->mutasi : 0);
 
+                        // 🔥 PRIORITAS 1: Jika ada masuk Fresh (dari Timbang/Lab)
                         if ($in_fresh > 0.01) {
                             $lab = HasilUjiLabBokarDiolah::where('id_maturasi', $bak->id_maturasi)
-                                ->whereDate('tanggal', '<=', $logDate->toDateString())->orderBy('tanggal', 'desc')->first();
+                                ->whereDate('tanggal', '<=', $logDate->toDateString())
+                                ->orderBy('tanggal', 'desc')->first();
                             $tgl_basis = $lab ? Carbon::parse($lab->tanggal) : $logDate;
                         } 
-                        elseif ($running_stock <= 0.01 && $mutasi_in > 0.01) {
+                        // 🔥 PRIORITAS 2: Baca teks Asal TANPA mempedulikan angka netto mutasi (Anti-Bug)
+                        elseif (preg_match('/Asal: (\d{4}-\d{2}-\d{2})/', $log->keterangan, $matches)) {
+                            $tgl_basis = Carbon::parse($matches[1]);
+                        } 
+                        // 🔥 PRIORITAS 3: Fallback jika mutasi masuk tapi gak ada keterangan asal
+                        elseif ($mutasi_in > 0.01 && !$tgl_basis) {
                             $tgl_basis = $logDate;
+                        }
+                        // 🔥 PRIORITAS 4: Log Saldo Awal (Disamakan dengan Web)
+                        elseif ($log->keterangan == 'Saldo Awal Tahun' && !$tgl_basis) {
+                            $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : $logDate;
                         }
 
                         $running_stock = $running_stock + $in_fresh + $mutasi_in - $out;
                         if ($running_stock <= 0.01) $tgl_basis = null;
+                    }
+
+                    // Fallback Terakhir jika perulangan selesai tgl_basis masih kosong
+                    if (!$tgl_basis) {
+                        $tgl_basis = !empty($bak->tgl_masuk) ? Carbon::parse($bak->tgl_masuk) : Carbon::parse($bak->created_at);
                     }
 
                     // 🔥 PERBAIKAN DI SINI: Panggil fungsi dari Trait menggunakan $this->
@@ -281,7 +298,7 @@ class ProduksiSir20ApiController extends Controller
 
             // 🔥 LOGIKA BARU: Cek apakah jenis pallet diubah dari Mobile
             $tahunPallet = Carbon::parse($oldDate)->format('y');
-            $prefixLama = 'PLT-' . $tahunPallet . '-';
+            $prefixLama = $tahunPallet . '-';
             $currentPalletTypes = Pallet::whereBetween('no_pallet', [$prefixLama.str_pad($oldStart, 4, '0', STR_PAD_LEFT), $prefixLama.str_pad($oldEnd, 4, '0', STR_PAD_LEFT)])
                                     ->where('tanggal_produksi', $oldDate)
                                     ->orderBy('no_pallet', 'asc')
@@ -341,7 +358,7 @@ class ProduksiSir20ApiController extends Controller
 
             // 2. Bersihkan Gudang (Pallet) & REVERT HUTANG MANUAL (Disamakan dengan Web)
             $tahunPallet = Carbon::parse($oldDate)->format('y');
-            $prefix      = 'PLT-' . $tahunPallet . '-';
+            $prefix      = $tahunPallet . '-';
             $noStart     = $prefix . str_pad($produksi->nomor_start, 4, '0', STR_PAD_LEFT);
             $noEnd       = $prefix . str_pad($produksi->nomor_end, 4, '0', STR_PAD_LEFT);
 
@@ -502,7 +519,7 @@ class ProduksiSir20ApiController extends Controller
             $idxArr = $i - $nomorStart;
             $jenisFix = isset($jenisArray[$idxArr]) ? $jenisArray[$idxArr] : 'SW';
 
-            $noPalletFix = 'PLT-' . $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
+            $noPalletFix = $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
             $pallet = Pallet::create([
                 'id_produksi_sir'  => $header->id_produksi_sir,

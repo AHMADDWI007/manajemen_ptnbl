@@ -427,4 +427,23 @@ class PenjualanSirApiController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    // [DELETE] Membatalkan booking pallet tertentu (Sapu bersih per pallet)
+    public function cancelBooking(Request $request)
+    {
+        $request->validate(['no_pallet' => 'required']);
+
+        try {
+            $pallet = Pallet::where('no_pallet', $request->no_pallet)->first();
+            
+            if ($pallet) {
+                DB::table('booking_pallet')->where('id_pallet', $pallet->id_pallet)->delete();
+                return response()->json(['success' => true, 'message' => 'Booking dibatalkan!']);
+            }
+            
+            return response()->json(['success' => false, 'message' => 'Pallet tidak ditemukan'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
