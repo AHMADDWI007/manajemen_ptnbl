@@ -38,28 +38,28 @@ class DataAwalSirSeeder extends Seeder
         $mutuRepack  = Mutu::create(['uraian' => 'Repacking On Hold']);
 
         // =====================================================================
-        // 🔥 GENERATE SALDO AWAL (CUT OFF 31 DESEMBER 2025) 🔥
+        // 🔥 GENERATE SALDO AWAL (CUT OFF 28 FEBRUARI 2026) 🔥
         // =====================================================================
         
-        $tanggalCutOff = '2025-12-31'; 
-        $totalPallet   = 125;
-        $beratPerPallet= 1260; // 157.500 / 125
+        $tanggalCutOff = '2026-02-28'; 
+        $totalPallet   = 83;
+        $beratPerPallet= 1260; // 104.580 / 83
         $totalKg       = $totalPallet * $beratPerPallet;
 
         $idProduksi = DB::table('produksi_sir')->insertGetId([
             'tanggal_produksi' => $tanggalCutOff,
             'kg'               => $totalKg,
             'pallet'           => $totalPallet,
-            'keterangan'       => 'Saldo Awal Tahun 2026 (Cut Off)',
+            'keterangan'       => 'Saldo Awal Bulan Maret 2026 (Cut Off)',
             'created_at'       => now(),
             'updated_at'       => now(),
         ]);
 
-        // 🔥 PERBAIKAN: Generate 125 Pallet Fisik dengan format PLT-YY-XXXX
-        $tahunSingkat = Carbon::parse($tanggalCutOff)->format('y'); // Menghasilkan "25"
+        // 🔥 PERBAIKAN: Generate 83 Pallet Fisik dengan format YY-XXXX
+        $tahunSingkat = Carbon::parse($tanggalCutOff)->format('y'); // Menghasilkan "26"
 
         for ($i = 1; $i <= $totalPallet; $i++) {
-            // Hasil: PLT-25-0001, PLT-25-0002, dst
+            // Hasil: 26-0001, 26-0002, dst
             $noPallet = $tahunSingkat . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
 
             $pallet = Pallet::create([
@@ -89,6 +89,6 @@ class DataAwalSirSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        $this->command->info("BERHASIL: Saldo Awal(125 Pallet dengan format YY-XXXX) telah dibuat!");
+        $this->command->info("BERHASIL: Saldo Awal(83 Pallet dengan format YY-XXXX) telah dibuat!");
     }
 }

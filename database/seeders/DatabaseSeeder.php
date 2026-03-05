@@ -35,6 +35,9 @@ class DatabaseSeeder extends Seeder
 
             // 7. Pengolahan Basah (Saldo Awal Bokar)
             PengolahanBasahSeeder::class,
+
+            // 8. Data Penjualan SIR
+            PenjualanSir20Seeder::class,
         ]);
     }
 }

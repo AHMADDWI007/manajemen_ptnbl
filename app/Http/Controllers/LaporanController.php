@@ -82,6 +82,9 @@ class LaporanController extends Controller
     // =========================================================================
     // 🔥 CORE LOGIC: PENGAMBILAN DATA (PUSAT DATA)
     // =========================================================================
+    // =========================================================================
+    // 🔥 CORE LOGIC: PENGAMBILAN DATA (PUSAT DATA)
+    // =========================================================================
     public function getDataLaporan($tglInput)
     {
         $tanggal = $tglInput ? Carbon::parse($tglInput) : Carbon::today();
@@ -93,7 +96,29 @@ class LaporanController extends Controller
         $gudangMutu   = $this->getDataGudangMutu($tanggal); // Return array [gudang, mutu]
         $dataPenjualan = $this->getDataPenjualan($tanggal);
 
-        // 🔥 TAMBAHAN: Ambil data Tanda Tangan dari tabel pengaturan
+        // =====================================================================
+        // 🔥 TAMBAHAN: HITUNG TOTAL I s/d IV (TOTAL SALDO AKHIR)
+        // =====================================================================
+        // Total I: Bokar (Stok Awal + Masuk - Kering + Rektifikasi)
+        $totalBokar = 0;
+        foreach ($rekapBokar as $jenis => $val) {
+            $totalBokar += ($val['stok_awal'] + $val['masuk_hi'] - $val['kering_hi'] + $val['rektif']);
+        }
+        
+        // Total II: Maturasi
+        $totalMaturasi = $dataMaturasi->sum('stok_akhir');
+        
+        // Total III: WIP
+        $totalWip = collect($dataWip)->sum('stok_akhir');
+        
+        // Total IV: Gudang
+        $totalGudang = collect($gudangMutu['gudang'])->sum('stok_akhir');
+        
+        // Grand Total
+        $total_1_sd_4 = $totalBokar + $totalMaturasi + $totalWip + $totalGudang;
+        // =====================================================================
+
+        // Ambil data Tanda Tangan dari tabel pengaturan
         $ttd = Pengaturan::whereIn('kunci', [
             'ttd_kiri_nama', 
             'ttd_kiri_jabatan', 
@@ -110,7 +135,7 @@ class LaporanController extends Controller
             'dataGudang'    => $gudangMutu['gudang'],
             'dataMutu'      => $gudangMutu['mutu'],
             'dataPenjualan' => $dataPenjualan,
-            // 🔥 Kirim data TTD ke view
+            'total_1_sd_4'  => $total_1_sd_4, // 🔥 KIRIM KE BLADE
             'ttd_kiri_nama'     => $ttd->get('ttd_kiri_nama')->nilai ?? 'Sri Winarno',
             'ttd_kiri_jabatan'  => $ttd->get('ttd_kiri_jabatan')->nilai ?? 'Kadiv Pengolahan',
             'ttd_kanan_nama'    => $ttd->get('ttd_kanan_nama')->nilai ?? 'Sri Winarno',

@@ -32,7 +32,7 @@ class DummyLHPSeeder extends Seeder
         Mutu::truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        $targetDate = '2026-01-01'; 
+        $targetDate = '2026-03-01'; 
         $this->command->info("Seeding LHP KHUSUS MATURASI - Target: $targetDate");
 
         // =================================================================
@@ -57,48 +57,25 @@ class DummyLHPSeeder extends Seeder
         }
 
         // =================================================================
-        // 3. INPUT DATA REAL
+        // 3. INPUT DATA REAL (Berdasarkan Bagian II Excel)
         // =================================================================
-        // Kita gunakan kode singkat, nanti fungsi updateBakMaturasi yang menerjemahkannya
         $dataReal = [
-            // --- BARIS KIRI ---
-            2  => [5654, '2025-12-26', 'CMP INHUT'], // Campuran DS & INHUT
-            3  => [5629, '2025-12-26', 'CMP INHUT'],
-            4  => [5468, '2025-12-26', 'CMP INHUT'],
-            5  => [5528, '2025-12-25', 'CMP PT'],    // Campuran DS & PT
-            7  => [5455, '2025-12-25', 'CMP PT'],
-            
-            // ANOMALI
-            14 => [-10,  null,         null], 
-            16 => [13,   null,         null], 
-
-            17 => [5289, '2025-12-24', 'CMP PT'],
-            19 => [4875, '2025-12-25', 'CMP PT'],
-            20 => [5671, '2025-12-22', 'CMP PT'],
-            21 => [6091, '2025-12-31', 'DS'],        // Murni DS
-            22 => [5562, '2025-12-25', 'CMP PT'],
-            23 => [2570, '2025-12-31', 'DS'],
-            24 => [5449, '2025-12-25', 'CMP PT'],
-            25 => [5548, '2025-12-25', 'CMP PT'],
-
-            // --- BARIS KANAN ---
-            33 => [5675, '2025-12-30', 'DS'],
-            34 => [5333, '2025-12-18', 'CMP INHUT'],
-            35 => [6251, '2025-12-31', 'DS'],
-            36 => [5113, '2025-12-29', 'CMP PT'],
-            37 => [5546, '2025-12-26', 'CMP PT'],
-            38 => [5440, '2025-12-24', 'CMP PT'],
-            39 => [3936, '2025-12-23', 'CMP PT'],
-            40 => [5613, '2025-12-31', 'DS'],
-            41 => [5409, '2025-12-22', 'CMP PT'],
-            42 => [5535, '2025-12-26', 'CMP PT'],
-            43 => [5665, '2025-12-29', 'CMP PT'],
-            44 => [5672, '2025-12-30', 'DS'],
-            45 => [5936, '2025-12-29', 'CMP PT'], 
-            46 => [5744, '2025-12-29', 'CMP PT'],
-            47 => [5914, '2025-12-31', 'DS'],
-            48 => [5701, '2025-12-31', 'DS'],
-            49 => [5120, '2025-12-13', 'CMP PT'],
+            7  => [5379, '2026-02-24', 'CMP INHUT'],
+            17 => [4893, '2026-02-28', 'CMP PT'],
+            20 => [5260, '2026-02-24', 'CMP INHUT'],
+            21 => [5569, '2026-02-23', 'CMP INHUT'],
+            22 => [5209, '2026-02-26', 'CMP PT'],
+            25 => [5373, '2026-02-26', 'CMP PT'],
+            37 => [2746, '2026-02-28', 'CMP PT'],
+            38 => [5519, '2026-02-28', 'CMP PT'],
+            39 => [5234, '2026-02-27', 'CMP INHUT'],
+            40 => [4931, '2026-02-27', 'CMP INHUT'],
+            41 => [5253, '2026-02-26', 'CMP PT'],
+            43 => [5448, '2026-02-27', 'CMP INHUT'],
+            45 => [5248, '2026-02-26', 'CMP INHUT'],
+            46 => [5316, '2026-02-25', 'CMP INHUT'],
+            48 => [5398, '2026-02-25', 'CMP PT'],
+            49 => [5141, '2026-02-28', 'CMP PT'],
         ];
 
         foreach ($dataReal as $noBak => $val) {
@@ -134,7 +111,7 @@ class DummyLHPSeeder extends Seeder
         // 2. Hitung Umur & Tanggal
         $umur = 0;
         $keterangan = 'KOSONG';
-        $tglInject = '2025-12-31';
+        $tglInject = '2026-02-28';
 
         if ($tglMasuk) {
             $diff = Carbon::parse($tglMasuk)->diffInDays(Carbon::parse($targetDate));
@@ -193,7 +170,7 @@ class DummyLHPSeeder extends Seeder
             'masuk_hi'    => $berat,
             'diolah'      => 0,
             'mutasi'      => 0,
-            'keterangan'  => 'Saldo Awal Tahun'
+            'keterangan'  => 'Saldo Awal Bulan Maret'
         ]);
     }
 }

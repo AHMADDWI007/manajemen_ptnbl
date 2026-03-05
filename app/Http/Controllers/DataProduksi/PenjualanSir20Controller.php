@@ -21,46 +21,64 @@ class PenjualanSir20Controller extends Controller
             : Carbon::today();
 
         // Ambil stok resmi Mutu Prima dari tabel Gudang & Mutu (Data Gudang)
-        // Cari ID untuk "Mutu Prima" dulu
         $mutuPrima = Mutu::where('uraian', 'LIKE', '%Prima%')->first();
         $idMutuPrima = $mutuPrima ? $mutuPrima->id_mutu : 0;
 
-        // Hitung Pallet yang: 
-        // 1. Belum Terjual (tanggal_penjualan NULL)
-        // 2. Mutu TERAKHIR-nya adalah Prima
+        // Hitung Pallet yang Belum Terjual & Mutu TERAKHIR-nya adalah Prima
         $mutuTersedia = Pallet::whereNull('tanggal_penjualan')->count();
-        
-        // Ambil semua pallet aktif
         $pallets = Pallet::whereNull('tanggal_penjualan')->get();
         
         foreach($pallets as $p) {
-            // Cek kondisi terakhir pallet ini
             $lastKondisi = KondisiPallet::where('id_pallet', $p->id_pallet)
                             ->orderBy('id_kondisi_pallet', 'desc')
                             ->first();
             
-            // Jika kondisi terakhirnya Prima, hitung
             if ($lastKondisi && $lastKondisi->id_mutu == $idMutuPrima) {
                 $mutuTersedia++;
             }
         }
 
-        // Data Summary (Tabel V) - Logika tetap sama
+        // =====================================================================
+        // 🔥 LOGIKA BARU: HITUNG AKUMULASI TAHUNAN (RESET SAAT JANUARI) 🔥
+        // =====================================================================
+        $startOfYear = $selectedDate->copy()->startOfYear(); // 1 Januari tahun berjalan
+        $startOfMonth = $selectedDate->copy()->startOfMonth(); // Tanggal 1 bulan berjalan
         $dataDB = PenjualanSir20::whereDate('tanggal', $selectedDate)->where('is_summary', 1)->get()->keyBy('uraian');
-        $dataKemarin = PenjualanSir20::whereDate('tanggal', $selectedDate->copy()->subDay())->where('is_summary', 1)->get()->keyBy('uraian');
-        $dataBulanLalu = PenjualanSir20::whereDate('tanggal', $selectedDate->copy()->subMonth()->endOfMonth())->where('is_summary', 1)->get()->keyBy('uraian');
 
         $masterUraian = ['5.1' => 'SIR20 PTNBL', '5.2' => 'SIR20 PTPN4'];
         $tabelSummary = new Collection();
 
         foreach ($masterUraian as $no => $uraian) {
             $itemToday = $dataDB->get($uraian);
-            $itemKemarin = $dataKemarin->get($uraian);
-            $itemBulanLalu = $dataBulanLalu->get($uraian);
 
-            $sd_bln_lalu = $itemToday ? $itemToday->sd_bulan_lalu : ($itemBulanLalu->total_sd_hari_ini ?? 0);
-            $bln_ini_lalu = ($selectedDate->day == 1) ? 0 : ($itemToday ? $itemToday->bln_ini_lalu : (($itemKemarin->bln_ini_lalu ?? 0) + ($itemKemarin->hari_ini ?? 0)));
-            $hari_ini = $itemToday ? $itemToday->hari_ini : 0;
+            // 1. Total S/D Bulan Lalu 
+            // Jika Januari, otomatis 0. Jika bukan, sum dari 1 Januari s/d akhir bulan lalu.
+            if ($selectedDate->month == 1) {
+                $sd_bln_lalu = 0;
+            } else {
+                $sd_bln_lalu = PenjualanSir20::where('uraian', $uraian)
+                    ->where('is_summary', 0)
+                    ->whereBetween('tanggal', [
+                        $startOfYear->format('Y-m-d'), 
+                        $startOfMonth->copy()->subDay()->format('Y-m-d')
+                    ])
+                    ->sum('hari_ini');
+            }
+
+            // 2. Total Bulan Ini Yg Lalu = SUM dari tgl 1 bulan ini sampai H-1
+            $bln_ini_lalu = PenjualanSir20::where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->whereBetween('tanggal', [
+                    $startOfMonth->format('Y-m-d'), 
+                    $selectedDate->copy()->subDay()->format('Y-m-d')
+                ])
+                ->sum('hari_ini');
+
+            // 3. Hari Ini
+            $hari_ini = PenjualanSir20::where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->whereDate('tanggal', $selectedDate)
+                ->sum('hari_ini');
 
             $tabelSummary->push((object)[
                 'id_penjualan_sir20' => $itemToday->id_penjualan_sir20 ?? null,
@@ -77,27 +95,29 @@ class PenjualanSir20Controller extends Controller
 
         $riwayatKontrak = PenjualanSir20::where('is_summary', 0)->orderBy('tanggal', 'desc')->get();
 
+        // Header dinamis: Jika bulan Januari, tampilkan string kosong atau '-' agar tidak muncul 's/d Desember'
+        if ($selectedDate->month == 1) {
+            $headerBulanLalu = $selectedDate->translatedFormat('F Y'); // Menghasilkan: Januari 2026
+        } else {
+            $headerBulanLalu = $selectedDate->copy()->subMonth()->translatedFormat('F Y'); // Menghasilkan bulan lalu
+        }
+
         return view('DataProduksi.penjualan-sir20', [
             'tabelSummary'    => $tabelSummary,
             'riwayatKontrak'  => $riwayatKontrak,
             'selected_date'   => $selectedDate->format('Y-m-d'),
             'mutuTersedia'    => $mutuTersedia,
-            'headerBulanLalu' => $selectedDate->copy()->subMonth()->translatedFormat('F Y')
+            'headerBulanLalu' => $headerBulanLalu
         ]);
     }
 
-    /**
-     * AJAX: Mengambil palet yang sudah TERUJI di Lab dan PRI >= 40
-     */
     public function getAvailableStock(Request $request)
     {
         try {
             $tgl = $request->query('date');
 
-            // 1. Ambil pallet yang belum terjual beserta kolom jenis_pallet
             $available = Pallet::whereNull('tanggal_penjualan')->get(['id_pallet', 'no_pallet', 'jenis_pallet']);
 
-            // 2. Ambil ID pallet yang di-booking (per baris)
             $bookedIds = DB::table('booking_pallet')
                 ->where('tanggal', $tgl)
                 ->pluck('id_pallet')
@@ -107,18 +127,17 @@ class PenjualanSir20Controller extends Controller
             foreach($available as $p) {
                 $listData[] = [
                     'no_pallet' => $p->no_pallet,
-                    'jenis'     => $p->jenis_pallet ?? 'SW', // Ambil jenis pallet
+                    'jenis'     => $p->jenis_pallet ?? 'SW', 
                     'is_booked' => in_array($p->id_pallet, $bookedIds) 
                 ];
             }
 
-            // Urutkan secara natural berdasarkan nomor pallet
             usort($listData, function($a, $b) {
                 return strnatcmp($a['no_pallet'], $b['no_pallet']);
             });
 
             return response()->json([
-                'list_pallet' => $listData, // Kirim object lengkap, bukan hanya nomor
+                'list_pallet' => $listData, 
                 'booked_pallets' => array_column(array_filter($listData, function($i){return $i['is_booked'];}), 'no_pallet'),
                 'count' => count($listData)
             ]);
@@ -144,7 +163,6 @@ class PenjualanSir20Controller extends Controller
             $tgl = Carbon::parse($request->tanggal)->format('Y-m-d');
             $selectedPallets = $request->selected_pallets; 
 
-            // 1. Simpan Invoice Utama
             $invoice = PenjualanSir20::create([
                 'tanggal'      => $tgl,
                 'uraian'       => $request->uraian,
@@ -157,28 +175,14 @@ class PenjualanSir20Controller extends Controller
                 'is_summary'   => 0 
             ]);
 
-            // 2. Update status pallet menjadi TERJUAL
             Pallet::whereIn('no_pallet', $selectedPallets)->update(['tanggal_penjualan' => $tgl]);
 
-            // =========================================================================
-            // 🔥 LOGIKA SAPU JAGAT: Bersihkan Booking yang Terpakai & yang Batal 🔥
-            // =========================================================================
-            
-            // A. Ambil semua ID Pallet yang terpilih untuk dijual
             $selectedIds = Pallet::whereIn('no_pallet', $selectedPallets)->pluck('id_pallet')->toArray();
-
-            // B. Ambil SEMUA ID Pallet yang saat ini terdaftar di booking_pallet
             $bookedIdsBefore = DB::table('booking_pallet')->pluck('id_pallet')->toArray();
-
-            // C. Gabungkan ID yang dipilih dan ID yang tadinya ter-booking untuk dibersihkan total
-            // Dengan begini, yang tidak dipilih oleh Admin akan otomatis terhapus dari daftar booking.
             $idsToClean = array_unique(array_merge($selectedIds, $bookedIdsBefore));
 
             DB::table('booking_pallet')->whereIn('id_pallet', $idsToClean)->delete();
 
-            // =========================================================================
-
-            // 3. Jika ada input manual, buat baris hutang
             if ((int)$request->pallet_manual > 0) {
                 DB::table('penjualan_manual_sir20')->insert([
                     'id_penjualan_sir20' => $invoice->id_penjualan_sir20,
@@ -200,32 +204,37 @@ class PenjualanSir20Controller extends Controller
     }
 
     // =========================================================================
-    // 🔥 FUNGSI RECALCULATE (Sinkronisasi Tabel V) 🔥
+    // 🔥 FUNGSI RECALCULATE JUGA DIUPDATE RESET TAHUNANNYA 🔥
     // =========================================================================
     public function recalculateAndSave($tgl, $uraian, $hari_ini, $keterangan = null)
     {
         $tglCarbon = Carbon::parse($tgl);
-        
-        // 1. Ambil Total s/d Bulan Lalu (Dari hari terakhir bulan sebelumnya)
-        $lastMonthDate = $tglCarbon->copy()->subMonth()->endOfMonth();
-        $dataBulanLalu = PenjualanSir20::where('uraian', $uraian)
-            ->whereDate('tanggal', $lastMonthDate)
-            ->where('is_summary', 1)
-            ->first();
-        
-        $sd_bulan_lalu = $dataBulanLalu ? $dataBulanLalu->total_sd_hari_ini : 0;
-
-        // 2. 🔥 PERBAIKAN: Hitung Ulang Total Penjualan Bulan Ini secara Murni!
-        // Alih-alih bergantung pada H-1 yang rawan putus saat dihapus,
-        // Kita jumlahkan langsung SEMUA invoice (is_summary = 0) dari tgl 1 sampai sebelum HARI INI.
+        $startOfYear = $tglCarbon->copy()->startOfYear();
         $startOfMonth = $tglCarbon->copy()->startOfMonth();
-        
+
+        // 1. S/d Bulan Lalu (Reset 0 jika bulan Januari)
+        if ($tglCarbon->month == 1) {
+            $sd_bulan_lalu = 0;
+        } else {
+            $sd_bulan_lalu = PenjualanSir20::where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->whereBetween('tanggal', [
+                    $startOfYear->format('Y-m-d'), 
+                    $startOfMonth->copy()->subDay()->format('Y-m-d')
+                ])
+                ->sum('hari_ini');
+        }
+
+        // 2. Penjualan dari tgl 1 sampai H-1
         $bln_ini_lalu = PenjualanSir20::where('uraian', $uraian)
             ->where('is_summary', 0)
-            ->whereBetween('tanggal', [$startOfMonth->format('Y-m-d'), $tglCarbon->copy()->subDay()->format('Y-m-d')])
+            ->whereBetween('tanggal', [
+                $startOfMonth->format('Y-m-d'), 
+                $tglCarbon->copy()->subDay()->format('Y-m-d')
+            ])
             ->sum('hari_ini');
 
-        // 3. Simpan atau Update Baris Summary (Tabel V) HARI INI
+        // 3. Simpan Update Baris Summary (Tabel V) HARI INI
         PenjualanSir20::updateOrCreate(
             ['tanggal' => $tglCarbon->format('Y-m-d'), 'uraian' => $uraian, 'is_summary' => 1],
             [
@@ -239,9 +248,6 @@ class PenjualanSir20Controller extends Controller
         );
     }
 
-    // =========================================================================
-    // 🔥 FUNGSI UPDATE (Hanya untuk mengedit Info Administratif) 🔥
-    // =========================================================================
     public function update(Request $request, $id)
     {
         $request->validate([
@@ -254,7 +260,6 @@ class PenjualanSir20Controller extends Controller
         try {
             $penjualan = PenjualanSir20::findOrFail($id);
             
-            // Kita hanya update info administratifnya saja
             $penjualan->update([
                 'no_kontrak' => $request->no_kontrak,
                 'no_invoice' => $request->no_invoice,
@@ -269,9 +274,6 @@ class PenjualanSir20Controller extends Controller
         }
     }
 
-    // =========================================================================
-    // 🔥 FUNGSI HAPUS (Membatalkan Penjualan & Mengembalikan Stok Pallet) 🔥
-    // =========================================================================
     public function destroy($id)
     {
         DB::beginTransaction();
@@ -280,16 +282,13 @@ class PenjualanSir20Controller extends Controller
             $tgl = $data->tanggal;
             $uraian = $data->uraian;
             
-            // 1. Ambil daftar pallet yang terjual di invoice ini
             $palletsToRestore = array_filter(explode(',', $data->no_palet_list), 'strlen');
             
             if (!empty($palletsToRestore)) {
-                // A. Kembalikan status pallet menjadi READY (tanggal_penjualan NULL)
                 Pallet::whereIn('no_pallet', $palletsToRestore)->update([
                     'tanggal_penjualan' => null
                 ]);
 
-                // B. 🔥 TAMBAHAN: Kembalikan ke daftar BOOKING agar di modal web otomatis tercentang lagi
                 foreach ($palletsToRestore as $noPallet) {
                     $p = Pallet::where('no_pallet', $noPallet)->first();
                     if ($p) {
@@ -301,13 +300,9 @@ class PenjualanSir20Controller extends Controller
                 }
             }
 
-            // 2. 🔥 TAMBAHAN: Hapus data HUTANG terkait jika ada
             DB::table('penjualan_manual_sir20')->where('id_penjualan_sir20', $id)->delete();
-
-            // 3. Hapus invoice utama
             $data->delete();
 
-            // 4. Hitung ulang sisa penjualan murni hari ini (Sinkronisasi Tabel V)
             $totalKgHariIni = PenjualanSir20::whereDate('tanggal', $tgl)
                 ->where('uraian', $uraian)
                 ->where('is_summary', 0)

@@ -15,21 +15,21 @@ class PerbaikanDataSaldoSeeder extends Seeder
     public function run()
     {
         // --- KONFIGURASI TANGGAL ---
-        // PENTING: Kita set ke 31 Des 2025 agar menjadi Saldo Awal di 01 Jan 2026
-        $targetDate = '2025-12-31'; 
+        // PENTING: Kita set ke 28 Feb 2026 agar menjadi Saldo Awal di 01 Mar 2026
+        $targetDate = '2026-02-28'; 
         
         $this->command->info("Memulai seeding data saldo akhir untuk tanggal: $targetDate");
 
-        // Data Benar sesuai Gambar Excel yang Abang kirim (16.094 Total)
+        // Data Benar sesuai Gambar Excel Bagian III
         $dataBenar = [
-            'Lantai Umpan Kering'                    => 0,
-            'Di Blending Tank 4'                     => 2975,
-            'Di Lump Breaker-2 (Di Blending Tank-4)' => 100,
-            'Di Pre Breaker-2 (Di Blending Tank-5)'  => 50,
-            'Di Hammer Mill-2 (Di Blending Tank-6)'  => 50,
-            'Di Blending Tank-7'                     => 39,
-            'Di Trolley'                             => 735,
-            'Di Dalam Dryer/Press Bale'              => 12145,
+            'Lantai Umpan Kering'                    => 1834,
+            'Di Blending Tank 4'                     => 4000,
+            'Di Lump Breaker-2 (Di Blending Tank-4)' => 400,
+            'Di Pre Breaker-2 (Di Blending Tank-5)'  => 300,
+            'Di Hammer Mill-2 (Di Blending Tank-6)'  => 200,
+            'Di Blending Tank-7'                     => 100,
+            'Di Trolley'                             => 1470,
+            'Di Dalam Dryer/Press Bale'              => 12110,
             'Di Reproses Ex WS.'                     => 0,
         ];
 
@@ -47,7 +47,7 @@ class PerbaikanDataSaldoSeeder extends Seeder
                     'produksi_sir20' => 0,
                     'rekfif'         => 0,  // Sesuai typo kolom di DB Abang ('rekfif')
                     'saldo_akhir'    => $saldoBenar,
-                    'keterangan'     => 'Saldo Awal 2026 (Seeder)',
+                    'keterangan'     => 'Saldo Awal Maret 2026 (Seeder)',
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ]
@@ -57,6 +57,6 @@ class PerbaikanDataSaldoSeeder extends Seeder
         }
 
         $this->command->info("------------------------------------------------");
-        $this->command->info("SUKSES! Silakan cek Laporan Tanggal 01/01/2026.");
+        $this->command->info("SUKSES! Silakan cek Laporan Tanggal 01/03/2026.");
     }
 }

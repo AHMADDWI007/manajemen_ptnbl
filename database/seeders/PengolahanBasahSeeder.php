@@ -15,13 +15,13 @@ class PengolahanBasahSeeder extends Seeder
 
         $this->command->info('Menghitung Saldo Balancing (Metode Netto Kering)...');
 
-        $tanggalSaldo = '2025-12-31';
+        $tanggalSaldo = '2026-02-28';
 
-        // 1. Target Saldo Akhir Excel
+        // 1. Target Saldo Akhir Excel (Dari Bagian I: Pengadaan Bokar)
         $targetSaldoExcel = [
-            'DS'    => 39185,
-            'PT'    => 19520,
-            'INHUT' => 9394,
+            'DS'    => 6194,
+            'PT'    => 6109,
+            'INHUT' => 2017,
         ];
 
         // 2. Hitung Penggunaan Real (Berdasarkan Netto Kering)

@@ -352,7 +352,9 @@
                                                 <td class="text-center">{{ number_format(collect($dataGudang)->sum('prod_sdhi'), 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ number_format(collect($dataGudang)->sum('pengiriman'), 0, ',', '.') }}</td>
                                                 <td class="text-center">{{ number_format(collect($dataGudang)->sum('stok_akhir'), 0, ',', '.') }}</td>
-                                                <td></td>
+                                                <td class="text-center text-dark font-weight-bold" style="background-color: yellow;">
+                                                    {{ number_format($total_1_sd_4, 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
