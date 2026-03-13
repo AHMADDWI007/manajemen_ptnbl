@@ -173,8 +173,7 @@
         <div class="row mb-4">
             
             {{-- 1. Bokar Masuk --}}
-            <div class="col-xl-3 col-md-6 mb-3">
-                <div class="card stat-card border-left-primary h-100 py-2">
+            <div class="col-xl-4 col-md-6 mb-3"> <div class="card stat-card border-left-primary h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
@@ -191,8 +190,7 @@
             </div>
 
             {{-- 2. Bokar Diolah --}}
-            <div class="col-xl-3 col-md-6 mb-3">
-                <div class="card stat-card border-left-info h-100 py-2">
+            <div class="col-xl-4 col-md-6 mb-3"> <div class="card stat-card border-left-info h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
@@ -208,9 +206,26 @@
                 </div>
             </div>
 
-            {{-- 3. Stok Maturasi --}}
-            <div class="col-xl-3 col-md-6 mb-3">
-                <div class="card stat-card border-left-success h-100 py-2">
+            {{-- 3. 🔥 CARD BARU: STOK BOKAR (SAAT INI) --}}
+            <div class="col-xl-4 col-md-6 mb-3">
+                <div class="card stat-card border-left-primary h-100 py-2" style="border-left-color: #6f42c1 !important;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="stat-label mb-1" style="color: #6f42c1;">Stok Bokar (Saat Ini)</div>
+                                <div class="stat-value">{{ number_format($statStokBokar, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-leaf fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                        <i class="fas fa-leaf stat-icon-bg"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 4. Stok Maturasi --}}
+            <div class="col-xl-4 col-md-6 mb-3"> <div class="card stat-card border-left-success h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
@@ -226,9 +241,8 @@
                 </div>
             </div>
 
-            {{-- 4. Gudang SIR 20 --}}
-            <div class="col-xl-3 col-md-6 mb-3">
-                <div class="card stat-card border-left-warning h-100 py-2">
+            {{-- 5. Gudang SIR 20 --}}
+            <div class="col-xl-4 col-md-6 mb-3"> <div class="card stat-card border-left-warning h-100 py-2">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
@@ -240,6 +254,24 @@
                             </div>
                         </div>
                         <i class="fas fa-box-open stat-icon-bg"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 6. 🔥 CARD BARU: TOTAL STOK KESELURUHAN --}}
+            <div class="col-xl-4 col-md-6 mb-3">
+                <div class="card stat-card border-left-warning h-100 py-2" style="border-left-color: #dc3545 !important;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="stat-label mb-1" style="color: #dc3545;">Total Stok Pabrik</div>
+                                <div class="stat-value">{{ number_format($statTotalStokKeseluruhan, 2, ',', '.') }} <small class="text-muted" style="font-size: 1rem">Ton</small></div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-chart-pie fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                        <i class="fas fa-chart-pie stat-icon-bg"></i>
                     </div>
                 </div>
             </div>
@@ -280,7 +312,16 @@
                 <div class="card card-modern text-white" style="background: linear-gradient(135deg, #0B6623 0%, #3BB143 100%);">
                     <div class="card-body">
                         <h5><i class="fas fa-info-circle"></i> Info Penting</h5>
-                        <p class="mb-0">Jadwal maintenance mesin Dryer akan dilakukan pada tanggal 25 bulan ini.</p>
+                        @if($infoPenting->isNotEmpty())
+                            @foreach($infoPenting as $info)
+                                <p class="mb-2 border-bottom border-white-50 pb-2">
+                                    <strong>{{ $info->tanggal->format('d/m/H:i') }}</strong>: <br>
+                                    {!! nl2br(e($info->isi_catatan)) !!}
+                                </p>
+                            @endforeach
+                        @else
+                            <p class="mb-0">Tidak ada informasi terbaru.</p>
+                        @endif
                     </div>
                 </div>
             </div>

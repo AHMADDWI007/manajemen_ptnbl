@@ -4,33 +4,22 @@ use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\DataLaboratorium\HasilUjiBokarController;
 use App\Http\Controllers\DataLaboratorium\HasilUjiBokarDiolahController;
 use App\Http\Controllers\DataLaboratorium\HasilUjiMaturasiController;
-
-// ==============================================================================
-//  IMPORT CONTROLLERS
-// ==============================================================================
-
-// --- UTAMA ---
 use App\Http\Controllers\DataLaboratorium\HasilUjiSir20Controller;
 use App\Http\Controllers\DataLaboratorium\HasilUjiTroliController;
 use App\Http\Controllers\DataPengolahan\BahanProsesController;
 use App\Http\Controllers\DataPengolahan\MaturasiController;
-
-// --- DATA PENGOLAHAN ---
 use App\Http\Controllers\DataPengolahan\PengolahanBasahController;
 use App\Http\Controllers\DataProduksi\DataProduksiSir20Controller; // Gudang & Mutu
 use App\Http\Controllers\DataProduksi\PenjualanSir20Controller;    // Penjualan
-
-// --- DATA LABORATORIUM ---
 use App\Http\Controllers\DataProduksi\ProduksiSir20Controller;     // Proses Produksi
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PengaturanController;
 use App\Http\Controllers\UserController;
-
-// --- DATA PRODUKSI ---
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 
@@ -161,20 +150,71 @@ Route::middleware(['auth'])->group(function () {
     // Sync Manual (API Bokar)
     Route::post('/sync-bokar-manual', function (Request $request) {
         try {
-            $tanggal = $request->input('tanggal'); 
+            // 1. Ambil tanggal dari inputan user, default ke hari ini
+            $tanggal = $request->input('tanggal') ? Carbon::parse($request->input('tanggal'))->format('Y-m-d') : date('Y-m-d');
             
-            if ($tanggal) {
-                Artisan::call('bokar:sync', ['date' => $tanggal]);
-            } else {
-                Artisan::call('bokar:sync');
+            // 2. Gunakan URL Pasti
+            $baseUrl = "https://crumbrubber.ptnb.co.id/api/get_bokar.php";
+            $kodeList = ['petani', 'inhut', 'ptpn', 'total'];
+            $berhasil = 0;
+
+            foreach ($kodeList as $kode) {
+                // Tambahkan param acak agar tembus Cache Server Kebun
+                $url = "{$baseUrl}?tgl={$tanggal}&kode={$kode}&_cb=" . time();
+
+                // 3. Tembak API Menyamar Sebagai Browser
+                $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                    ->withHeaders([
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept'     => 'application/json'
+                    ])
+                    ->timeout(15) // Batas tunggu 15 detik
+                    ->get($url);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    // Pastikan API membalas dengan struktur JSON yang benar
+                    if (isset($data['masuk_hi'])) {
+                        $masuk_sd_kemarin = (float) $data['masuk_sd_kemarin'];
+                        $masuk_hi         = (float) $data['masuk_hi'];
+
+                        // 🔥 4. TEKNIK OBLITERASI (HAPUS LALU BUAT BARU) 🔥
+                        // Kita hapus paksa baris lama di tanggal dan kode ini agar tidak ada drama "gagal timpa"
+                        DB::table('transaksi_api_bokar')
+                            ->where('tanggal', $tanggal)
+                            ->where('kode_api', $kode)
+                            ->delete();
+
+                        // Masukkan data murni hasil tarikan terbaru
+                        DB::table('transaksi_api_bokar')->insert([
+                            'tanggal'          => $tanggal,
+                            'kode_api'         => $kode,
+                            'masuk_sd_kemarin' => $masuk_sd_kemarin,
+                            'masuk_hi'         => $masuk_hi,
+                            'created_at'       => now(),
+                            'updated_at'       => now()
+                        ]);
+
+                        $berhasil++;
+                    }
+                }
             }
 
-            return response()->json([
-                'success' => true, 
-                'message' => 'Data API berhasil disinkronisasi untuk tanggal: ' . ($tanggal ?? 'Hari Ini')
-            ]);
+            if ($berhasil > 0) {
+                return response()->json([
+                    'success' => true, 
+                    'message' => "Sukses! Data API tanggal {$tanggal} berhasil ditarik dan diperbarui secara paksa."
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false, 
+                    'message' => "Gagal menarik data. Server kebun tidak mengembalikan format JSON yang valid."
+                ], 500);
+            }
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Gagal sinkronisasi: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Error Sistem: ' . $e->getMessage()], 500);
         }
     })->name('bokar.sync.manual');
 

@@ -22,6 +22,7 @@ class DataAwalSirSeeder extends Seeder
         Pallet::truncate();
         LokasiPallet::truncate();
         KondisiPallet::truncate();
+        DB::table('produksi_sir20')->truncate(); // 🔥 Tambahkan ini agar bersih
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // 2. Insert Master LOKASI
@@ -53,6 +54,20 @@ class DataAwalSirSeeder extends Seeder
             'keterangan'       => 'Saldo Awal Bulan Maret 2026 (Cut Off)',
             'created_at'       => now(),
             'updated_at'       => now(),
+        ]);
+
+        // =====================================================================
+        // 🚀 DATA PANCINGAN: AGAR MARET MULAI DARI 823 🚀
+        // =====================================================================
+        DB::table('produksi_sir20')->insert([
+            'tanggal_produksi'  => $tanggalCutOff,
+            'shift_kerja'       => 'Shift 1',
+            'nomor_start'       => 1,
+            'nomor_end'         => 822,
+            'total_nomor_akhir' => 822, // INI KUNCINYA, SISTEM AKAN MEMBACA INI!
+            'keterangan'        => 'Data Pancingan (Setup Saldo Awal)',
+            'created_at'        => now(),
+            'updated_at'        => now(),
         ]);
 
         // 🔥 PERBAIKAN: Generate 83 Pallet Fisik dengan format YY-XXXX

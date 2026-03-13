@@ -22,6 +22,26 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+Route::get('/informasi-penting', function() {
+    $data = \App\Models\Information::where('status', 'unhide')
+                ->orderBy('tanggal', 'desc')
+                ->get()
+                ->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        // 🔥 Paksa tanggal jadi string agar tidak error saat di-parsing Java
+                        'tanggal' => \Carbon\Carbon::parse($item->tanggal)->format('d M Y H:i'),
+                        'isi_catatan' => $item->isi_catatan,
+                        'status' => $item->status
+                    ];
+                });
+    
+    return response()->json([
+        'success' => true,
+        'data' => $data
+    ]);
+});
+
 // Rute login HARUS di luar middleware 'auth'
 Route::post('/login', [AuthController::class, 'login']);
 

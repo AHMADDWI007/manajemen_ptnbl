@@ -93,6 +93,13 @@ public function index(Request $request)
             $data['pri'] = 0;
         }
 
+        // 🔥 PERBAIKAN: Hardcode Nilai 0 untuk parameter yang di-hide
+        $data['dirt']     = 0;
+        $data['ash']      = 0;
+        $data['vm']       = 0;
+        $data['money']    = 0;
+        $data['nitrogen'] = 0;
+
         HasilUjiLabSIR20::create($data);
 
         return redirect()->route('hasil-uji-sir20.index')
@@ -147,6 +154,13 @@ public function index(Request $request)
         } else {
             $data['pri'] = 0;
         }
+
+        // 🔥 PERBAIKAN: Hardcode Nilai 0 untuk parameter yang di-hide
+        $data['dirt']     = 0;
+        $data['ash']      = 0;
+        $data['vm']       = 0;
+        $data['money']    = 0;
+        $data['nitrogen'] = 0;
 
         $hasilUji->update($data);
 

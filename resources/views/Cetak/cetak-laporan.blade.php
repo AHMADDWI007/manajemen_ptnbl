@@ -392,7 +392,7 @@
                     <th rowspan="2">Produksi SIR20</th> 
                     <th rowspan="2">Rektif</th> 
                     <th rowspan="2" colspan="2">Saldo Akhir</th> 
-                    <th rowspan="2" colspan="5">Keterangan</th> {{-- colspan dari 4 jadi 5 --}}
+                    <th rowspan="2" colspan="5">Keterangan</th>
                 </tr>
                 <tr><th>Masuk</th><th>Keluar</th></tr>
 
@@ -412,19 +412,24 @@
                     <td class="text-right" colspan="2">
                         @if($w->uraian != 'Di Reproses Ex WS.') {{ number_format($w->stok_akhir, 0, ',', '.') }} @endif
                     </td>
-                    <td class="text-center" colspan="5">{{ $w->keterangan }}</td> {{-- colspan dari 4 jadi 5 --}}
+                    <td class="text-center" colspan="5">{{ $w->keterangan }}</td>
                 </tr>
                 @endforeach
 
                 <tr>
-                    <td colspan="3" class="text-center">Jumlah 3.1 - 3.{{ count($dataWip) }}</td>
-                    <td class="text-right">{{ number_format(collect($dataWip)->sum('stok_awal'),0,',','.') }}</td>
-                    <td class="text-right">{{ number_format(collect($dataWip)->sum('masuk'),0,',','.') }}</td> 
-                    <td class="text-right">{{ number_format(collect($dataWip)->sum('keluar'),0,',','.') }}</td>
-                    <td class="text-right">{{ number_format(collect($dataWip)->sum('produksi_sir20'),0,',','.') }}</td>
-                    <td class="text-right">{{ number_format(collect($dataWip)->sum('rektif'),0,',','.') }}</td> 
-                    <td class="text-right" colspan="2">{{ number_format(collect($dataWip)->sum('stok_akhir'),0,',','.') }}</td>
-                    <td colspan="5"></td> {{-- colspan dari 4 jadi 5 --}}
+                    <td colspan="3" class="text-center fw-bold">Jumlah 3.1 - 3.{{ count($dataWip) }}</td>
+                    <td class="text-right fw-bold">{{ number_format(collect($dataWip)->sum('stok_awal'),0,',','.') }}</td>
+                    
+                    <td class="text-right"></td> 
+                    <td class="text-right"></td>
+                    <td class="text-right"></td>
+                    <td class="text-right"></td> 
+                    
+                    <td class="text-right fw-bold" colspan="2">{{ number_format(collect($dataWip)->sum('stok_akhir'),0,',','.') }}</td>
+                    
+                    <td class="text-right fw-bold" colspan="5">
+                        {{ number_format($grandTotalKeterangan, 0, ',', '.') }}
+                    </td>
                 </tr>
             </tbody>
 
@@ -432,6 +437,27 @@
 
             <tbody>
                 {{-- TABEL IV: GUDANG SIR --}}
+                {{-- 🔥 EKSTRAK KETERANGAN KONTRAK --}}
+                @php
+                    $keteranganKontrak = '';
+                    foreach($dataGudang as $g) {
+                        if(isset($g->keterangan) && $g->keterangan != '-') {
+                            $keteranganKontrak = $g->keterangan;
+                            break;
+                        }
+                    }
+                @endphp
+                
+                {{-- 🔥 TAMPILKAN BARIS KONTRAK DI ATAS PENGIRIMAN JIKA ADA --}}
+                @if($keteranganKontrak != '')
+                <tr>
+                    <td colspan="8" class="no-border"></td>
+                    <td colspan="7" class="text-center no-border" style="font-size: 8px; padding-bottom: 2px;">
+                        {{ $keteranganKontrak }}
+                    </td>
+                </tr>
+                @endif
+                
                 <tr>
                     <th rowspan="2">NO.</th>
                     <th rowspan="2" colspan="2">Stock Dalam Gudang SIR</th>

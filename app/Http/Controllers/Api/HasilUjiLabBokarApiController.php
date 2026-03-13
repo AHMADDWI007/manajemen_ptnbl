@@ -30,8 +30,8 @@ class HasilUjiLabBokarApiController extends Controller
             'suplier'   => 'required|string',
             'no_sampel' => 'required|string|unique:hasil_uji_lab_bokar,no_sampel',
             'k3'        => 'required|numeric',
-            'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'dirt'      => 'nullable|numeric', // 🔥 UBAH JADI NULLABLE
+            'ask'       => 'nullable|numeric', // 🔥 UBAH JADI NULLABLE
             'po'        => 'required|numeric',
             'pa'        => 'required|numeric',
             'pri'       => 'required|numeric',
@@ -57,8 +57,8 @@ class HasilUjiLabBokarApiController extends Controller
             'suplier'   => 'required|string',
             'no_sampel' => 'required|string|unique:hasil_uji_lab_bokar,no_sampel,' . $id . ',id_hasil_uji_lab_bokar',
             'k3'        => 'required|numeric',
-            'dirt'      => 'required|numeric',
-            'ask'       => 'required|numeric',
+            'dirt'      => 'nullable|numeric', // 🔥 UBAH JADI NULLABLE
+            'ask'       => 'nullable|numeric', // 🔥 UBAH JADI NULLABLE
             'po'        => 'required|numeric',
             'pa'        => 'required|numeric',
             'pri'       => 'required|numeric',

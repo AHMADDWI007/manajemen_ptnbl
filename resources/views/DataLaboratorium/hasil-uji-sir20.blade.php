@@ -103,10 +103,6 @@
                                         <th>Po</th>
                                         <th>Pa</th>
                                         <th>PRI</th>
-                                        <th>Dirt(%)</th>
-                                        <th>Ash(%)</th>
-                                        <th>VM(%)</th><th>Money</th><th>Nitrogen(%)</th>
-                                        {{-- 🔥 SEMBUNYIKAN HEADER AKSI JIKA ROLE USER --}}
                                         @if(auth()->user()->role != 'user')
                                         <th>Aksi</th>
                                         @endif
@@ -122,11 +118,6 @@
                                             <td>{{ $item->po }}</td>
                                             <td>{{ $item->pa }}</td>
                                             <td>{{ $item->pri }}</td>
-                                            <td>{{ $item->dirt }}</td> 
-                                            <td>{{ $item->ash }}</td>
-                                            <td>{{ $item->vm }}</td>
-                                            <td>{{ $item->money }}</td>
-                                            <td>{{ $item->nitrogen }}</td>
                                             {{-- 🔥 SEMBUNYIKAN KOLOM AKSI JIKA ROLE USER --}}
                                             @if(auth()->user()->role != 'user')
                                             <td>
@@ -228,42 +219,6 @@
                                     style="background-color: #e9ecef; border: 1px solid #ced4da;">
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Dirt (%)</label>
-                                <input type="number" name="dirt" class="form-control" step="0.001" placeholder="0.000">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Ash (%)</label>
-                                <input type="number" name="ash" class="form-control" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">VM (%)</label>
-                                <input type="number" name="vm" class="form-control" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Mooney</label>
-                                <input type="number" name="money" class="form-control" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Nitrogen (%)</label>
-                                <input type="number" name="nitrogen" class="form-control" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -346,45 +301,12 @@
                                     style="background-color: #e9ecef; border: 1px solid #ced4da;">
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Dirt (%)</label>
-                                <input type="number" name="dirt" id="editDirt" class="form-control" step="0.001">
-                            </div>
-                        </div>
                     </div>
 
                     {{-- Baris 5: Ash & VM --}}
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Ash (%)</label>
-                                <input type="number" name="ash" id="editAsh" class="form-control" step="0.01">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">VM (%)</label>
-                                <input type="number" name="vm" id="editVm" class="form-control" step="0.01">
-                            </div>
-                        </div>
-                    </div>
 
                     {{-- Baris 6: Mooney & Nitrogen --}}
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Mooney</label>
-                                <input type="number" name="money" id="editMoney" class="form-control" step="0.01">
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="form-group">
-                                <label class="font-weight-bold">Nitrogen (%)</label>
-                                <input type="number" name="nitrogen" id="editNitrogen" class="form-control" step="0.01">
-                            </div>
-                        </div>
-                    </div>
+                    
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -557,11 +479,6 @@ $(document).ready(function(){
             $('#editPo').val(data.po);
             $('#editPa').val(data.pa);
             $('#editPri').val(data.pri);
-            $('#editDirt').val(data.dirt);
-            $('#editAsh').val(data.ash);
-            $('#editVm').val(data.vm);
-            $('#editMoney').val(data.money);
-            $('#editNitrogen').val(data.nitrogen);
             $('#formEdit').attr('action', "{{ url('hasil-uji-sir20') }}/" + id);
             $('#modalEdit').modal('show');
         }).fail(function() { Swal.fire('Gagal', 'Tidak dapat memuat data edit.', 'error'); });

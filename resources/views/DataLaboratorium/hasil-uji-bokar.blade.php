@@ -96,8 +96,6 @@
                                         <th>Supplier</th>
                                         <th>No Sampel</th>
                                         <th>K3 (%)</th>
-                                        <th>Dirt (%)</th>
-                                        <th>Ash (%)</th>
                                         <th>Po</th>
                                         <th>Pa</th>
                                         <th>PRI</th>
@@ -115,8 +113,6 @@
                                             <td>{{ $item->suplier }}</td>
                                             <td>{{ $item->no_sampel }}</td>
                                             <td>{{ is_numeric($item->k3) ? (fmod($item->k3, 1) == 0 ? (int)$item->k3 : $item->k3) : '-' }}</td>
-                                            <td>{{ is_numeric($item->dirt) ? (fmod($item->dirt, 1) == 0 ? (int)$item->dirt : $item->dirt) : '-' }}</td>
-                                            <td>{{ is_numeric($item->ask) ? (fmod($item->ask, 1) == 0 ? (int)$item->ask : $item->ask) : '-' }}</td>
                                             <td>{{ is_numeric($item->po) ? (fmod($item->po, 1) == 0 ? (int)$item->po : $item->po) : '-' }}</td>
                                             <td>{{ is_numeric($item->pa) ? (fmod($item->pa, 1) == 0 ? (int)$item->pa : $item->pa) : '-' }}</td>
                                             <td>{{ is_numeric($item->pri) ? (fmod($item->pri, 1) == 0 ? (int)$item->pri : $item->pri) : '-' }}</td>
@@ -173,8 +169,6 @@
                     <div class="form-group"><label>Supplier</label><input type="text" name="suplier" class="form-control" required></div>
                     <div class="form-group"><label>No Sampel</label><input type="text" name="no_sampel" class="form-control" required></div>
                     <div class="form-group"><label>K3 (%)</label><input type="number" name="k3" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Dirt (%)</label><input type="number" name="dirt" class="form-control" step="0.01"></div>
-                    <div class="form-group"><label>Ash (%)</label><input type="number" name="ask" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Po</label><input type="number" name="po" class="form-control" step="0.01"></div>
                     <div class="form-group"><label>Pa</label><input type="number" name="pa" class="form-control" step="0.01"></div>
                     <div class="form-group">
@@ -440,8 +434,6 @@ $(document).ready(function() {
             $('#detailSupplier').text(data.suplier ?? '-');
             $('#detailNoSampel').text(data.no_sampel ?? '-');
             $('#detailK3').text(data.k3 ? ((Math.floor(data.k3) == data.k3 ? parseInt(data.k3) : data.k3) + ' %') : '-');
-            $('#detailDirt').text(data.dirt ? ((Math.floor(data.dirt) == data.dirt ? parseInt(data.dirt) : data.dirt) + ' %') : '-');
-            $('#detailAsk').text(data.ask ? ((Math.floor(data.ask) == data.ask ? parseInt(data.ask) : data.ask) + ' %') : '-');
             $('#detailPo').text(data.po ? (Math.floor(data.po) == data.po ? parseInt(data.po) : data.po) : '-');
             $('#detailPa').text(data.pa ? (Math.floor(data.pa) == data.pa ? parseInt(data.pa) : data.pa) : '-');
             $('#detailPri').text(data.pri ? (Math.floor(data.pri) == data.pri ? parseInt(data.pri) : data.pri) : '-');
@@ -459,8 +451,6 @@ $(document).ready(function() {
             $('#editSupplier').val(data.suplier);
             $('#editNoSampel').val(data.no_sampel);
             $('#editK3').val(data.k3);
-            $('#editDirt').val(data.dirt);
-            $('#editAsk').val(data.ask);
             $('#editPo').val(data.po);
             $('#editPa').val(data.pa);
             $('#editPri').val(data.pri);

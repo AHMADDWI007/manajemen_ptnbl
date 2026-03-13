@@ -178,6 +178,30 @@
                                     </div>
                                 </div>
                             </div>
+
+                            {{-- 🔥 CARD 3: PENGATURAN INFO PENTING DASHBOARD 🔥 --}}
+                            {{-- <div class="card card-outline card-warning shadow-sm mb-4">
+                                <div class="card-header">
+                                    <h3 class="card-title font-weight-bold">
+                                        <i class="fas fa-bullhorn mr-1 text-warning"></i> Info Penting Dashboard
+                                    </h3>
+                                    <div class="card-tools">
+                                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label for="info_penting_dashboard" class="font-weight-bold">Teks Pengumuman</label>
+                                        <textarea class="form-control" id="info_penting_dashboard" name="info_penting_dashboard" rows="3" placeholder="Contoh: Jadwal maintenance mesin Dryer akan dilakukan pada...">{!! old('info_penting_dashboard', $info_penting->nilai ?? 'Tidak ada informasi terbaru.') !!}</textarea>
+                                        <small class="form-text text-muted mt-2">
+                                            Teks ini akan muncul di kotak <b>"Info Penting"</b> pada halaman Dashboard semua pengguna.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div> --}}
+
                         </div>
                         
                         {{-- Kolom Kanan: Panel Informasi & Tombol --}}
@@ -201,6 +225,11 @@
                                     <p class="text-muted mt-1 mb-3">
                                         Pengaturan nama dan jabatan penandatangan akan otomatis mengubah seluruh hasil cetak laporan terbaru tanpa perlu menyentuh kode program.
                                     </p>
+
+                                    {{-- <strong><i class="fas fa-bullhorn mr-1 text-warning"></i> Info Dashboard</strong>
+                                    <p class="text-muted mt-1 mb-3">
+                                        Memungkinkan admin untuk memberikan pengumuman singkat secara real-time kepada semua pengguna yang masuk ke aplikasi.
+                                    </p> --}}
 
                                     <strong><i class="fas fa-shield-alt mr-1 text-secondary"></i> Keamanan</strong>
                                     <p class="text-muted mt-1">

@@ -57,11 +57,11 @@ class HasilUjiSir20ApiController extends Controller
             'po'            => 'required|numeric',
             'pa'            => 'required|numeric',
             'pri'           => 'required|numeric',
-            'dirt'          => 'required|numeric',
-            'ash'           => 'required|numeric',
-            'vm'            => 'required|numeric',
-            'money'         => 'required|numeric',
-            'nitrogen'      => 'required|numeric',
+            'dirt'          => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'ash'           => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'vm'            => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'money'         => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'nitrogen'      => 'nullable|numeric', // 🔥 Ubah jadi nullable
         ]);
 
         try {
@@ -86,11 +86,11 @@ class HasilUjiSir20ApiController extends Controller
             'po'            => 'required|numeric',
             'pa'            => 'required|numeric',
             'pri'           => 'required|numeric',
-            'dirt'          => 'required|numeric',
-            'ash'           => 'required|numeric',
-            'vm'            => 'required|numeric',
-            'money'         => 'required|numeric',
-            'nitrogen'      => 'required|numeric',
+            'dirt'          => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'ash'           => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'vm'            => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'money'         => 'nullable|numeric', // 🔥 Ubah jadi nullable
+            'nitrogen'      => 'nullable|numeric', // 🔥 Ubah jadi nullable
         ]);
         $data->update($validated);
         return response()->json(['success' => true, 'message' => 'Data Berhasil Diperbarui']);

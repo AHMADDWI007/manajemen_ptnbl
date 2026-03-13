@@ -110,6 +110,8 @@ class LaporanController extends Controller
         
         // Total III: WIP
         $totalWip = collect($dataWip)->sum('stok_akhir');
+        // 🔥 TAMBAHAN BARU UNTUK KETERANGAN WIP
+        $grandTotalKeterangan = $totalWip + $totalMaturasi;
         
         // Total IV: Gudang
         $totalGudang = collect($gudangMutu['gudang'])->sum('stok_akhir');
@@ -136,6 +138,9 @@ class LaporanController extends Controller
             'dataMutu'      => $gudangMutu['mutu'],
             'dataPenjualan' => $dataPenjualan,
             'total_1_sd_4'  => $total_1_sd_4, // 🔥 KIRIM KE BLADE
+            // 🔥 TAMBAHKAN DUA VARIABEL INI KE ARRAY RETURN
+            'stokAkhirMaturasi'    => $totalMaturasi, 
+            'grandTotalKeterangan' => $grandTotalKeterangan,
             'ttd_kiri_nama'     => $ttd->get('ttd_kiri_nama')->nilai ?? 'Sri Winarno',
             'ttd_kiri_jabatan'  => $ttd->get('ttd_kiri_jabatan')->nilai ?? 'Kadiv Pengolahan',
             'ttd_kanan_nama'    => $ttd->get('ttd_kanan_nama')->nilai ?? 'Sri Winarno',
@@ -491,17 +496,11 @@ class LaporanController extends Controller
         $lokasiList = Lokasi::all();
         $mutuList   = Mutu::all();
 
-        // 1. Ambil Pallet Aktif (Termasuk yang terjual setelah tanggal filter agar histori akurat)
+        // 1. Ambil Pallet Aktif (Belum terjual atau terjual SETELAH tanggal laporan)
         $activePallets = Pallet::where(function($q) use ($tglStr) {
                 $q->whereNull('tanggal_penjualan')
-                  ->orWhereDate('tanggal_penjualan', '>=', $tglStr);
+                  ->orWhereDate('tanggal_penjualan', '>', $tglStr); // PERBAIKAN: Ubah >= menjadi >
             })->get();
-
-        $soldPalletsToday = Pallet::whereDate('tanggal_penjualan', $tglStr)->get();
-        $soldPalletsSdKemarin = Pallet::whereBetween(DB::raw('DATE(tanggal_penjualan)'), [
-            $startOfMonth, 
-            $tanggal->copy()->subDay()->format('Y-m-d')
-        ])->get();
 
         // 2. SALDO AWAL (H-1)
         $subQueryKemarin = DB::table('lokasi_pallet')
@@ -541,7 +540,23 @@ class LaporanController extends Controller
             ->groupBy('lp.id_lokasi')
             ->pluck('total_berat', 'id_lokasi');
 
-        $dataGudang = []; // Diubah dari collect() jadi array biasa agar sesuai dengan LaporanHarianExport
+        // 🔥 PERBAIKAN PENTING: AMBIL TOTAL PENJUALAN LANGSUNG DARI TABEL PENJUALAN
+        // 🔥 PERBAIKAN PENTING: AMBIL TOTAL PENJUALAN DAN NOMOR KONTRAK
+        // Ambil Data Transaksi Hari Ini
+        $trxPenjualanHariIni = PenjualanSir20::whereDate('tanggal', $tglStr)->where('is_summary', 0)->get();
+        $totalPenjualanHariIni = $trxPenjualanHariIni->sum('hari_ini');
+        
+        // Ekstrak Nomor Kontrak unik dari transaksi hari ini untuk keterangan
+        $listKontrakHariIni = $trxPenjualanHariIni->pluck('no_kontrak')
+                                ->filter() // buang yang null/kosong
+                                ->unique() // pastikan tidak duplikat
+                                ->implode(', '); // gabungkan dengan koma
+
+        $totalPenjualanSdKemarin = PenjualanSir20::where('is_summary', 0)
+                                    ->whereBetween('tanggal', [$startOfMonth, $tanggal->copy()->subDay()->format('Y-m-d')])
+                                    ->sum('hari_ini');
+
+        $dataGudang = [];
         $lainnya_saldo_awal = 0;
         $lainnya_masuk = 0;
         $lainnya_sd_hi = 0;
@@ -564,27 +579,11 @@ class LaporanController extends Controller
                 }
             }
 
-            $keluar_kg = 0; 
-            foreach($soldPalletsToday as $sold) {
-                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
-                            ->whereDate('tanggal', '<=', $tglStr)
-                            ->orderBy('id_lokasi_pallet', 'desc')
-                            ->first();
-                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
-                    $keluar_kg += $sold->berat;
-                }
-            }
-
-            $pengiriman_sd_kemarin_kg = 0;
-            foreach($soldPalletsSdKemarin as $sold) {
-                $lastLoc = \App\Models\LokasiPallet::where('id_pallet', $sold->id_pallet)
-                            ->whereDate('tanggal', '<=', $tglStr)
-                            ->orderBy('id_lokasi_pallet', 'desc')
-                            ->first();
-                if ($lastLoc && $lastLoc->id_lokasi == $lokasi->id_lokasi) {
-                    $pengiriman_sd_kemarin_kg += $sold->berat;
-                }
-            }
+            // PENGIRIMAN: Hanya Di Gudang SIR yang punya pengiriman ke luar (Dijual)
+            $keluar_kg = ($lokasi->nama == 'Di Gudang SIR') ? $totalPenjualanHariIni : 0;
+            $pengiriman_sd_kemarin_kg = ($lokasi->nama == 'Di Gudang SIR') ? $totalPenjualanSdKemarin : 0;
+            // 🔥 TAMBAHAN: Simpan Keterangan Kontrak Jika Ada Pengiriman
+            $keterangan_gudang = ($lokasi->nama == 'Di Gudang SIR' && $keluar_kg > 0) ? "KONTRAK " . $listKontrakHariIni : '-';
 
             // RUMUS NET MATEMATIKA
             $net_masuk_kg = $saldo_akhir_kg - $saldo_awal_kg + $keluar_kg;
@@ -596,7 +595,6 @@ class LaporanController extends Controller
             $sd_hi_kg = $yg_lalu_kg + $masuk_kg;
 
             if (in_array($lokasi->id_lokasi, [1, 2])) {
-                // Di LaporanController, data gudang biasanya diekspektasikan sbg Object
                 $dataGudang[] = (object)[
                     'uraian'        => $lokasi->nama,
                     'stok_awal'     => $saldo_awal_kg,
@@ -604,7 +602,8 @@ class LaporanController extends Controller
                     'prod_sdhi'     => $sd_hi_kg,
                     'prod_bln_lalu' => $yg_lalu_kg,
                     'pengiriman'    => $keluar_kg,
-                    'stok_akhir'    => $saldo_akhir_kg
+                    'stok_akhir'    => $saldo_akhir_kg,
+                    'keterangan'    => $keterangan_gudang // 🔥 TAMBAHKAN INI
                 ];
             } else {
                 $lainnya_saldo_awal += $saldo_awal_kg;
@@ -650,33 +649,24 @@ class LaporanController extends Controller
     // =========================================================================
     // E. LOGIKA PENJUALAN (TABEL V) - 🔥 SINKRON DENGAN CONTROLLER PENJUALAN
     // =========================================================================
+    // =========================================================================
+    // E. LOGIKA PENJUALAN (TABEL V) - 🔥 SINKRON DENGAN CONTROLLER PENJUALAN
+    // =========================================================================
     private function getDataPenjualan($tanggal)
     {
         // 1. Inisialisasi Tanggal
         $selectedDate = $tanggal->copy()->startOfDay();
-
-        // 2. Ambil Data Snapshot (Hari Ini, Kemarin, Akhir Bulan Lalu)
-        // Kita butuh data historis ini untuk mengisi saldo awal jika hari ini belum ada transaksi
         
-        // Data Hari Ini
+        $startOfYear = $selectedDate->copy()->startOfYear(); // 1 Januari tahun berjalan
+        $startOfMonth = $selectedDate->copy()->startOfMonth(); // Tanggal 1 bulan berjalan
+
+        // 2. Ambil Keterangan Hari Ini (is_summary = 1 hanya untuk narik "keterangan")
         $dataDB = PenjualanSir20::whereDate('tanggal', $selectedDate)
             ->where('is_summary', 1)
             ->get()
             ->keyBy('uraian');
 
-        // Data Kemarin (Untuk menghitung 'Bulan Ini s/d Kemarin')
-        $dataKemarin = PenjualanSir20::whereDate('tanggal', $selectedDate->copy()->subDay())
-            ->where('is_summary', 1)
-            ->get()
-            ->keyBy('uraian');
-
-        // Data Akhir Bulan Lalu (Untuk menghitung 's/d Bulan Lalu')
-        $dataBulanLalu = PenjualanSir20::whereDate('tanggal', $selectedDate->copy()->subMonth()->endOfMonth())
-            ->where('is_summary', 1)
-            ->get()
-            ->keyBy('uraian');
-
-        // 3. Define Master Uraian (Agar baris tetap muncul walau data kosong)
+        // 3. Define Master Uraian
         $masterUraian = [
             '5.1' => 'SIR20 PTNBL', 
             '5.2' => 'SIR20 PTPN4'
@@ -685,33 +675,38 @@ class LaporanController extends Controller
         $tabelSummary = new Collection();
 
         foreach ($masterUraian as $no => $uraian) {
-            $itemToday     = $dataDB->get($uraian);
-            $itemKemarin   = $dataKemarin->get($uraian);
-            $itemBulanLalu = $dataBulanLalu->get($uraian);
+            $itemToday = $dataDB->get($uraian);
 
-            // A. Logika: s/d Bulan Lalu
-            // Jika hari ini ada record, ambil dari record tsb.
-            // Jika tidak, ambil dari Total s/d Hari Ini pada penutupan bulan lalu.
-            $sd_bln_lalu = $itemToday 
-                ? $itemToday->sd_bulan_lalu 
-                : ($itemBulanLalu->total_sd_hari_ini ?? 0);
-
-            // B. Logika: Bulan Ini s/d Kemarin
-            if ($selectedDate->day == 1) {
-                // Jika tanggal 1, pasti 0 karena bulan baru
-                $bln_ini_lalu = 0; 
+            // A. Logika: s/d Bulan Lalu 
+            // Jika Januari, otomatis 0. Jika bukan, sum dari 1 Januari s/d akhir bulan lalu.
+            if ($selectedDate->month == 1) {
+                $sd_bln_lalu = 0;
             } else {
-                // Jika hari lain, ambil dari record hari ini.
-                // Jika record hari ini belum ada, ambil (Bln Ini Lalu + Hari Ini) dari data Kemarin.
-                $bln_ini_lalu = $itemToday 
-                    ? $itemToday->bln_ini_lalu 
-                    : (($itemKemarin->bln_ini_lalu ?? 0) + ($itemKemarin->hari_ini ?? 0));
+                $sd_bln_lalu = PenjualanSir20::where('uraian', $uraian)
+                    ->where('is_summary', 0)
+                    ->whereBetween('tanggal', [
+                        $startOfYear->format('Y-m-d'), 
+                        $startOfMonth->copy()->subDay()->format('Y-m-d')
+                    ])
+                    ->sum('hari_ini');
             }
 
-            // C. Penjualan Hari Ini
-            $hari_ini = $itemToday ? $itemToday->hari_ini : 0;
+            // B. Logika: Bulan Ini Yg Lalu = SUM dari tgl 1 bulan ini sampai H-1
+            $bln_ini_lalu = PenjualanSir20::where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->whereBetween('tanggal', [
+                    $startOfMonth->format('Y-m-d'), 
+                    $selectedDate->copy()->subDay()->format('Y-m-d')
+                ])
+                ->sum('hari_ini');
 
-            // D. Hitung Total (Kalkulasi ulang untuk memastikan akurasi)
+            // C. Penjualan Hari Ini
+            $hari_ini = PenjualanSir20::where('uraian', $uraian)
+                ->where('is_summary', 0)
+                ->whereDate('tanggal', $selectedDate)
+                ->sum('hari_ini');
+
+            // D. Hitung Total
             $total_bln_ini     = $bln_ini_lalu + $hari_ini;
             $total_sd_hari_ini = $sd_bln_lalu + $total_bln_ini;
 

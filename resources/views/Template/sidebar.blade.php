@@ -200,6 +200,15 @@
                 </li>
                 @endif
 
+                 {{-- INFORMASI (Admin & Petugas) --}}
+                @if(in_array(auth()->user()->role, ['admin', 'user']))
+                <li class="nav-item">
+                    <a href="../manage_information.php" class="nav-link">
+                        <i class="nav-icon fas fa-info"></i> <p>Informasi</p>
+                    </a>
+                </li>
+                @endif
+
                 {{-- LOGOUT --}}
                 <li class="nav-item mt-4 mb-5">
                     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">

@@ -297,12 +297,19 @@
                                             <tr>
                                                 <td colspan="3" class="text-center">Total</td>
                                                 <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_awal'), 0, ',', '.') }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('masuk'), 0, ',', '.') }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('keluar'), 0, ',', '.') }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('produksi_sir20'), 0, ',', '.') }}</td>
-                                                <td class="text-center">{{ number_format(collect($dataWip)->sum('rektif'), 0, ',', '.') }}</td>
+                                                
+                                                {{-- 🔥 DIKOSONGKAN SESUAI INSTRUKSI --}}
+                                                <td class="text-center"></td>
+                                                <td class="text-center"></td>
+                                                <td class="text-center"></td>
+                                                <td class="text-center"></td>
+                                                
                                                 <td class="text-center">{{ number_format(collect($dataWip)->sum('stok_akhir'), 0, ',', '.') }}</td>
-                                                <td></td>
+                                                
+                                                {{-- 🔥 TAMPILKAN GRAND TOTAL KETERANGAN DI SINI (Rata Kanan) --}}
+                                                <td class="text-right font-weight-bold pr-3">
+                                                    {{ number_format($grandTotalKeterangan, 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                         </tfoot>
                                     </table>

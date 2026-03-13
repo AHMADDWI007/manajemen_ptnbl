@@ -34,6 +34,10 @@ class HasilUjiBokarController extends Controller
             'pri'       => 'nullable|numeric|min:0', 
         ]);
 
+        // 🔥 PERBAIKAN: Hardcode nilai 0 untuk dirt dan ask sebelum disimpan
+        $validated['dirt'] = 0;
+        $validated['ask']  = 0;
+
         HasilUjiLabBokar::create($validated);
 
         return redirect()->route('hasil-uji-bokar.index') 
@@ -92,6 +96,10 @@ class HasilUjiBokarController extends Controller
             'pa'        => 'nullable|numeric|min:0', 
             'pri'       => 'nullable|numeric|min:0', 
         ]);
+
+        // 🔥 PERBAIKAN: Hardcode nilai 0 untuk dirt dan ask sebelum di-update
+        $validated['dirt'] = 0;
+        $validated['ask']  = 0;
 
         // 3. Update
         $hasilUjiLabBokar->update($validated);
